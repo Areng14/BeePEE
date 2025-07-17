@@ -1,13 +1,13 @@
-const fs = require('fs')
-const vdf = require('vdf-parser')
-const path = require('path')
-const AdmZip = require('adm-zip')
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const fs = require("fs")
+const vdf = require("vdf-parser")
+const path = require("path")
+const AdmZip = require("adm-zip")
+const { app, BrowserWindow, dialog, ipcMain } = require("electron")
 const { addItem, removeAllItems, items } = require("./models/items")
 
 const loadPackage = (pathToPackage) => {
     //Extract package
-    const packageName = path.basename(pathToPackage, '.zip')
+    const packageName = path.basename(pathToPackage, ".zip")
     const packageDir = path.join(__dirname, "..", "packages", packageName) // Go up one level to root
     fs.mkdirSync(packageDir, { recursive: true })
 
@@ -16,7 +16,7 @@ const loadPackage = (pathToPackage) => {
 
     const infoPath = path.join(packageDir, "info.txt")
 
-    const rawInfo = fs.readFileSync(infoPath, 'utf-8')
+    const rawInfo = fs.readFileSync(infoPath, "utf-8")
     const parsedInfo = vdf.parse(rawInfo)
 
     //Items
@@ -24,24 +24,24 @@ const loadPackage = (pathToPackage) => {
     removeAllItems()
 
     //Add new ones
-    const rawitems = parsedInfo["Item"];
-    rawitems.forEach(element => {
-        addItem(packageDir, element);
-    });
-    console.log(items)
+    const rawitems = parsedInfo["Item"]
+    rawitems.forEach((element) => {
+        addItem(packageDir, element)
+    })
 }
 
 const loadPackagePopup = () => {
-    ipcMain.handle('dialog:loadPackage', async () => {
-    const result = await dialog.showOpenDialog({
-        properties: ['openFile']
-    });
+    ipcMain.handle("dialog:loadPackage", async () => {
+        const result = await dialog.showOpenDialog({
+            properties: ["openFile"],
+        })
 
-    if (result.canceled) return null;
-    
-    //Load the package
-    loadPackage(result.filePaths[0])
-    });
+        if (result.canceled) return null
+
+        //Load the package
+        loadPackage(result.filePaths[0])
+        return items
+    })
 }
 
 module.exports = { loadPackagePopup }

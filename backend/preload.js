@@ -1,5 +1,5 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require("electron")
 
-contextBridge.exposeInMainWorld('package', {
-    loadpackage: () => ipcRenderer.invoke('dialog:loadPackage')
-});
+contextBridge.exposeInMainWorld("package", {
+    loadpackage: () => ipcRenderer.invoke("dialog:loadPackage"),
+})
