@@ -1,28 +1,34 @@
-const fs = require('fs')
-const path = require('path')
-const vdf = require('vdf-parser')
+const fs = require("fs")
+const path = require("path")
+const vdf = require("vdf-parser")
+
+//TODO: Async
 
 var items = []
 
 class Item {
-    constructor({packagePath, itemJSON}) {
+    constructor({ packagePath, itemJSON }) {
         this.packagePath = packagePath
         this.id = itemJSON.ID
-        
+
         //get item folder from styles
         const styles = itemJSON.Version?.Styles || {}
         let folder = styles.BEE2_CLEAN || Object.values(styles)[0]
 
         //handle both string and object folder formats
-        if (typeof folder === 'object' && folder.folder) {
+        if (typeof folder === "object" && folder.folder) {
             folder = folder.folder
         }
 
         if (!folder) {
             throw new Error(`No item folder found for item ${this.id}`)
         }
-        
-        const fullItemPath = path.join(this.packagePath, "items", folder.toLowerCase())
+
+        const fullItemPath = path.join(
+            this.packagePath,
+            "items",
+            folder.toLowerCase(),
+        )
 
         //Paths
         this.paths = {
@@ -40,17 +46,19 @@ class Item {
             throw new Error("Missing editoritems.txt!")
         }
 
-        const rawEditoritems = fs.readFileSync(this.paths.editorItems, 'utf-8')
+        const rawEditoritems = fs.readFileSync(this.paths.editorItems, "utf-8")
         const parsedEditoritems = vdf.parse(rawEditoritems)
-        
+
         //handle both single SubType and array of SubTypes
         const editor = parsedEditoritems.Item.Editor
-        const subType = Array.isArray(editor.SubType) ? editor.SubType[0] : editor.SubType
-        
+        const subType = Array.isArray(editor.SubType)
+            ? editor.SubType[0]
+            : editor.SubType
+
         if (!subType?.Name) {
             throw new Error("Invalid editoritems - missing SubType Name")
         }
-        
+
         this.name = subType.Name
 
         //Get details
@@ -58,18 +66,23 @@ class Item {
             throw new Error("Missing properties.txt!")
         }
 
-        const rawProperties = fs.readFileSync(this.paths.properties, 'utf-8')
+        const rawProperties = fs.readFileSync(this.paths.properties, "utf-8")
         let parsedProperties
         let emptyKeyCounter = 0
-        const fixedVDF = rawProperties.replace(/""\s+"/g, () => `"desc_${emptyKeyCounter++}" "`)
+        const fixedVDF = rawProperties.replace(
+            /""\s+"/g,
+            () => `"desc_${emptyKeyCounter++}" "`,
+        )
         parsedProperties = vdf.parse(fixedVDF)
 
         this.details = parsedProperties["Properties"]
-        
+
         //Get icon
         //Since the icon is only half :( we need to merge with full path
         const iconPath = parsedProperties.Properties?.Icon?.["0"]
-        this.icon = iconPath ? path.join(packagePath, "resources/BEE2/items", iconPath) : null
+        this.icon = iconPath
+            ? path.join(packagePath, "resources/BEE2/items", iconPath)
+            : null
 
         this.itemFolder = folder.toLowerCase()
         this.fullItemPath = fullItemPath
@@ -77,9 +90,9 @@ class Item {
         console.log(`Added item: ${this.name} (id: ${this.id})`)
     }
 
-    getEditorItems(raw=false) {
+    getEditorItems(raw = false) {
         //Returns a JSON that is editoritems.
-        const rawEditoritems = fs.readFileSync(this.paths.editorItems, 'utf-8')
+        const rawEditoritems = fs.readFileSync(this.paths.editorItems, "utf-8")
         if (raw) {
             return rawEditoritems
         } else {
@@ -88,15 +101,26 @@ class Item {
     }
 
     saveEditorItems(editedVDF) {
-        fs.writeFileSync(this.paths.editorItems, vdf.stringify(editedVDF), 'utf8')
+        fs.writeFileSync(
+            this.paths.editorItems,
+            vdf.stringify(editedVDF),
+            "utf8",
+        )
     }
 
     saveProperties(propertiesVDF) {
-        fs.writeFileSync(this.paths.properties, vdf.stringify(propertiesVDF), 'utf8')
+        fs.writeFileSync(
+            this.paths.properties,
+            vdf.stringify(propertiesVDF),
+            "utf8",
+        )
     }
 
     exists() {
-        return fs.existsSync(this.paths.editorItems) && fs.existsSync(this.paths.properties)
+        return (
+            fs.existsSync(this.paths.editorItems) &&
+            fs.existsSync(this.paths.properties)
+        )
     }
 }
 
@@ -110,7 +134,7 @@ function getItemByName(name) {
         throw new Error("Name is empty!")
     }
 
-    return items.find(item => item.name === name)
+    return items.find((item) => item.name === name)
 }
 
 function getItemById(id) {
@@ -118,11 +142,13 @@ function getItemById(id) {
         throw new Error("ID is empty!")
     }
 
-    return items.find(item => item.id === id)
+    return items.find((item) => item.id === id)
 }
 
 function removeItem(identifier) {
-    const index = items.findIndex(item => item.name === identifier || item.id === identifier)
+    const index = items.findIndex(
+        (item) => item.name === identifier || item.id === identifier,
+    )
     if (index !== -1) {
         return items.splice(index, 1)[0]
     }
@@ -133,4 +159,12 @@ function removeAllItems() {
     items.length = 0
 }
 
-module.exports = { Item, addItem, getItemById, getItemByName, removeItem, removeAllItems, items }
+module.exports = {
+    Item,
+    addItem,
+    getItemById,
+    getItemByName,
+    removeItem,
+    removeAllItems,
+    items,
+}
