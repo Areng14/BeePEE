@@ -3,7 +3,7 @@ const vdf = require('vdf-parser')
 const path = require('path')
 const AdmZip = require('adm-zip')
 const { app, BrowserWindow, dialog, ipcMain } = require('electron');
-const { addItem } = require("./models/items")
+const { addItem, removeAllItems, items } = require("./models/items")
 
 const loadPackage = (pathToPackage) => {
     //Extract package
@@ -20,12 +20,15 @@ const loadPackage = (pathToPackage) => {
     const parsedInfo = vdf.parse(rawInfo)
 
     //Items
+    //Remove existing items
+    removeAllItems()
+
+    //Add new ones
     const rawitems = parsedInfo["Item"];
     rawitems.forEach(element => {
         addItem(packageDir, element);
     });
-    
-
+    console.log(items)
 }
 
 const loadPackagePopup = () => {
