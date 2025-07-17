@@ -22,14 +22,17 @@ class Item {
             throw new Error(`No item folder found for item ${this.id}`)
         }
         
-        this.itemFolder = folder.toLowerCase()
-        this.fullItemPath = path.join(this.packagePath, "items", this.itemFolder)
-        
+        const fullItemPath = path.join(this.packagePath, "items", folder.toLowerCase())
+
         //Paths
         this.paths = {
-            editorItems: path.join(this.fullItemPath, "editoritems.txt"),
-            properties: path.join(this.fullItemPath, "properties.txt"),
-            vbsp_config: path.join(this.fullItemPath, "vbsp_config.cfg")
+            editorItems: path.join(fullItemPath, "editoritems.txt"),
+            properties: path.join(fullItemPath, "properties.txt"),
+        }
+
+        //If there is vbsp add it
+        if (fs.existsSync(path.join(fullItemPath, "vbsp_config.cfg"))) {
+            this.paths.vbsp_config = path.join(fullItemPath, "vbsp_config.cfg")
         }
 
         //parse editoritems file
@@ -56,14 +59,21 @@ class Item {
         }
 
         const rawProperties = fs.readFileSync(this.paths.properties, 'utf-8')
-        const parsedProperties = vdf.parse(rawProperties)
+        let parsedProperties
+        let emptyKeyCounter = 0
+        const fixedVDF = rawProperties.replace(/""\s+"/g, () => `"desc_${emptyKeyCounter++}" "`)
+        parsedProperties = vdf.parse(fixedVDF)
 
-        this.details = parsedProperties
-
+        this.details = parsedProperties["Properties"]
+        
         //Get icon
         //Since the icon is only half :( we need to merge with full path
         const iconPath = parsedProperties.Properties?.Icon?.["0"]
         this.icon = iconPath ? path.join(packagePath, "resources/BEE2/items", iconPath) : null
+
+        this.itemFolder = folder.toLowerCase()
+        this.fullItemPath = fullItemPath
+
         console.log(`Added item: ${this.name} (id: ${this.id})`)
     }
 
@@ -82,7 +92,7 @@ class Item {
     }
 
     saveProperties(propertiesVDF) {
-    fs.writeFileSync(this.paths.properties, vdf.stringify(propertiesVDF), 'utf8')
+        fs.writeFileSync(this.paths.properties, vdf.stringify(propertiesVDF), 'utf8')
     }
 
     exists() {
@@ -123,4 +133,4 @@ function removeAllItems() {
     items.length = 0
 }
 
-module.exports = { Item, addItem, getItemById, getItemByName, removeItem, removeAllItems }
+module.exports = { Item, addItem, getItemById, getItemByName, removeItem, removeAllItems, items }
