@@ -13,7 +13,7 @@ class Item {
 
         //get item folder from styles
         const styles = itemJSON.Version?.Styles || {}
-        let folder = styles.BEE2_CLEAN || Object.values(styles)[0]
+        let folder = styles.BEE2_CLEAN || styles.ANY_STYLE || Object.values(styles)[0]
 
         //handle both string and object folder formats
         if (typeof folder === "object" && folder.folder) {
