@@ -1,16 +1,24 @@
 import "./App.css"
+import { useEffect, useState } from "react"
+import ItemIcon from "./components/ItemIcon"
 
 function App() {
-    const loadPackage = async () => {
-        if (window.package) {
-            const result = await window.package.loadpackage()
-            console.log(result)
-        }
-    }
+    const [items, setItems] = useState([])
+
+    useEffect(() => {
+        //wait for signle
+        window.package.onPackageLoaded((loadedItems) => {
+            setItems(loadedItems || [])
+        })
+    }, [])
 
     return (
         <>
-            <button onClick={loadPackage}>Load Package</button>
+            <div className="items-grid">
+                {items.map((item) => (
+                    <ItemIcon key={item.id} item={item} />
+                ))}
+            </div>
         </>
     )
 }
