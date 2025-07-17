@@ -1,6 +1,8 @@
-const { app, BrowserWindow } = require("electron")
+const { app, BrowserWindow, ipcMain } = require("electron")
 const path = require("path")
-const { loadPackagePopup } = require("./loadPackage.js")
+const { reg_loadPackagePopup } = require("./loadPackage.js")
+const { menu } = require("./menu.js")
+const fs = require("fs")
 
 const createWindow = () => {
     const win = new BrowserWindow({
@@ -12,7 +14,7 @@ const createWindow = () => {
         },
     })
 
-    win.setMenuBarVisibility(false)
+    win.setMenuBarVisibility(true)
 
     const isDev = !app.isPackaged
 
@@ -24,6 +26,25 @@ const createWindow = () => {
 }
 
 //register stuff
-loadPackagePopup()
+reg_loadPackagePopup()
+
+ipcMain.handle("api:loadImage", async (event, filePath) => {
+    try {
+        const imageBuffer = fs.readFileSync(filePath)
+        const base64 = imageBuffer.toString("base64")
+        const ext = path.extname(filePath).toLowerCase()
+
+        // Determine MIME type
+        let mimeType = "image/png"
+        if (ext === ".jpg" || ext === ".jpeg") mimeType = "image/jpeg"
+        if (ext === ".gif") mimeType = "image/gif"
+        if (ext === ".svg") mimeType = "image/svg+xml"
+
+        return `data:${mimeType};base64,${base64}`
+    } catch (error) {
+        console.error("Error loading image:", error)
+        return null
+    }
+})
 
 app.whenReady().then(createWindow)

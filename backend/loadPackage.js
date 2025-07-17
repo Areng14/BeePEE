@@ -2,7 +2,7 @@ const fs = require("fs")
 const vdf = require("vdf-parser")
 const path = require("path")
 const AdmZip = require("adm-zip")
-const { app, BrowserWindow, dialog, ipcMain } = require("electron")
+const { dialog, ipcMain } = require("electron")
 const { addItem, removeAllItems, items } = require("./models/items")
 
 const loadPackage = (pathToPackage) => {
@@ -28,9 +28,11 @@ const loadPackage = (pathToPackage) => {
     rawitems.forEach((element) => {
         addItem(packageDir, element)
     })
+
+    return items
 }
 
-const loadPackagePopup = () => {
+const reg_loadPackagePopup = () => {
     ipcMain.handle("dialog:loadPackage", async () => {
         const result = await dialog.showOpenDialog({
             properties: ["openFile"],
@@ -44,4 +46,4 @@ const loadPackagePopup = () => {
     })
 }
 
-module.exports = { loadPackagePopup }
+module.exports = { reg_loadPackagePopup, loadPackage }
