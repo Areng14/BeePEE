@@ -16,7 +16,7 @@ const template = [
                     if (result.canceled) return null
 
                     //Load the package
-                    const items = loadPackage(result.filePaths[0])
+                    const items = await loadPackage(result.filePaths[0])
 
                     BrowserWindow.getFocusedWindow().webContents.send(
                         "package:loaded",

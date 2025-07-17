@@ -1,11 +1,12 @@
 const fs = require("fs")
 const vdf = require("vdf-parser")
 const path = require("path")
-const AdmZip = require("adm-zip")
+const path7za = require('7zip-bin').path7za
+const { extractFull } = require('node-7z')
 const { dialog, ipcMain } = require("electron")
 const { addItem, removeAllItems, items } = require("./models/items")
 
-const loadPackage = (pathToPackage) => {
+const loadPackage = async (pathToPackage) => {
     let packageDir = null
 
     try {
@@ -14,8 +15,15 @@ const loadPackage = (pathToPackage) => {
         packageDir = path.join(__dirname, "..", "packages", packageName)
         fs.mkdirSync(packageDir, { recursive: true })
 
-        const zip = new AdmZip(pathToPackage)
-        zip.extractAllTo(packageDir)
+        const stream = extractFull(pathToPackage, packageDir, {
+            $bin: path7za,
+            recursive: true
+        })
+
+        await new Promise((resolve, reject) => {
+            stream.on('end', resolve)
+            stream.on('error', reject)
+        })
 
         const infoPath = path.join(packageDir, "info.txt")
 
@@ -81,7 +89,7 @@ const reg_loadPackagePopup = () => {
         if (result.canceled) return null
 
         //Load the package
-        loadPackage(result.filePaths[0])
+        await loadPackage(result.filePaths[0])
         return items
     })
 }
