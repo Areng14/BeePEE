@@ -44,9 +44,14 @@ const loadPackage = async (pathToPackage) => {
         removeAllItems()
 
         // Add new ones
-        const rawitems = parsedInfo["Item"]
-        if (!rawitems || !Array.isArray(rawitems)) {
+        let rawitems = parsedInfo["Item"]
+        if (!rawitems) {
             throw new Error("Invalid package format - no items found")
+        }
+
+        // Convert single item to array
+        if (!Array.isArray(rawitems)) {
+            rawitems = [rawitems]
         }
 
         rawitems.forEach((element) => {
