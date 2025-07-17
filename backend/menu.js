@@ -18,7 +18,10 @@ const template = [
                     //Load the package
                     const items = loadPackage(result.filePaths[0])
 
-                    BrowserWindow.getFocusedWindow().webContents.send("package:loaded", items)
+                    BrowserWindow.getFocusedWindow().webContents.send(
+                        "package:loaded",
+                        items,
+                    )
                 },
             },
         ],
