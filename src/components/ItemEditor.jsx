@@ -19,11 +19,43 @@ function ItemEditor() {
     const [item, setItem] = useState(null)
     const [tabValue, setTabValue] = useState(0)
     const [iconSrc, setIconSrc] = useState(null)
+    
+    // Form state for all tabs
+    const [formData, setFormData] = useState({
+        name: '',
+        author: '',
+        description: '',
+        // Add other fields as needed for other tabs
+    })
 
     useEffect(() => {
         const handleLoadItem = (event, loadedItem) => {
             setItem(loadedItem)
-            document.title = `Edit ${loadedItem.name}` // Use loadedItem.name instead of name
+            document.title = `Edit ${loadedItem.name}`
+            
+            // Initialize form data with loaded item
+            const desc = loadedItem.details?.Description
+            let description = ''
+            
+            if (desc && typeof desc === 'object') {
+                const descValues = Object.keys(desc)
+                    .filter(key => key.startsWith('desc_'))
+                    .sort()
+                    .map(key => desc[key])
+                    .filter(value => value && value.trim() !== '')
+                    .join('\n')
+                    .trim()
+                description = descValues
+            } else {
+                description = desc || ''
+            }
+            
+            setFormData({
+                name: loadedItem.name || '',
+                author: loadedItem.details?.Authors || '',
+                description: description,
+                // Add other fields here
+            })
 
             // Load the icon
             if (loadedItem.icon) {
@@ -39,9 +71,17 @@ function ItemEditor() {
         setTabValue(newValue)
     }
 
+    const updateFormData = (field, value) => {
+        setFormData(prev => ({
+            ...prev,
+            [field]: value
+        }))
+    }
+
     const handleSave = () => {
-        console.log("Save:", item)
+        console.log("Saving:", formData)
         // TODO: Send save data via IPC
+        // window.package?.saveItem?.(formData)
     }
 
     if (!item) return null
@@ -90,19 +130,39 @@ function ItemEditor() {
             {/* Tab Content */}
             <Box sx={{ flex: 1, p: 2, overflow: "auto" }}>
                 <Box sx={{ display: tabValue === 0 ? 'block' : 'none' }}>
-                    <BasicInfo item={item} />
+                    <BasicInfo 
+                        item={item} 
+                        formData={formData} 
+                        onUpdate={updateFormData} 
+                    />
                 </Box>
                 <Box sx={{ display: tabValue === 1 ? 'block' : 'none' }}>
-                    <Inputs item={item} />
+                    <Inputs 
+                        item={item} 
+                        formData={formData} 
+                        onUpdate={updateFormData} 
+                    />
                 </Box>
                 <Box sx={{ display: tabValue === 2 ? 'block' : 'none' }}>
-                    <Instances item={item} />
+                    <Instances 
+                        item={item} 
+                        formData={formData} 
+                        onUpdate={updateFormData} 
+                    />
                 </Box>
                 <Box sx={{ display: tabValue === 3 ? 'block' : 'none' }}>
-                    <Vbsp item={item} />
+                    <Vbsp 
+                        item={item} 
+                        formData={formData} 
+                        onUpdate={updateFormData} 
+                    />
                 </Box>
                 <Box sx={{ display: tabValue === 4 ? 'block' : 'none' }}>
-                    <Other item={item} />
+                    <Other 
+                        item={item} 
+                        formData={formData} 
+                        onUpdate={updateFormData} 
+                    />
                 </Box>
             </Box>
 
