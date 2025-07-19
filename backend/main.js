@@ -1,10 +1,12 @@
 const { app, BrowserWindow, ipcMain } = require("electron")
 const path = require("path")
-const { reg_loadPackagePopup } = require("./packageManager")
 const { createMainMenu } = require("./menu.js")
 const fs = require("fs")
+const { reg_events } = require("./events.js")
 
 const createWindow = () => {
+    const isDev = !app.isPackaged
+
     const win = new BrowserWindow({
         title: "BeePEE",
         width: 1024,
@@ -12,22 +14,20 @@ const createWindow = () => {
         webPreferences: {
             preload: path.join(__dirname, "preload.js"),
         },
+        devTools: isDev,
     })
 
     createMainMenu(win)
 
-    const isDev = !app.isPackaged
-
     if (isDev) {
         win.loadURL("http://localhost:5173")
-        win.webContents.openDevTools()
     } else {
         win.loadFile(path.join(__dirname, "../dist/index.html"))
     }
-}
 
-//register stuff
-reg_loadPackagePopup()
+    //register stuff
+    reg_events()
+}
 
 ipcMain.handle("api:loadImage", async (event, filePath) => {
     try {

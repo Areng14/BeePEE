@@ -1,13 +1,13 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import ItemBrowser from './components/ItemBrowser'
-import ItemEditor from './components/ItemEditor'
+import { BrowserRouter, Routes, Route } from "react-router-dom"
+import ItemBrowser from "./components/ItemBrowser"
+import ItemEditor from "./components/ItemEditor"
 
 function App() {
     return (
         <BrowserRouter>
             <Routes>
                 <Route path="/" element={<ItemBrowser />} />
-                <Route path="/edit/:itemId" element={<ItemEditor />} />
+                <Route path="/editor" element={<ItemEditor />} />
             </Routes>
         </BrowserRouter>
     )
