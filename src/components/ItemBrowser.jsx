@@ -39,8 +39,8 @@ function ItemBrowser() {
         return () => window.removeEventListener("resize", updateGridSize)
     }, [])
 
-    const handleEditItem = (itemId) => {
-        navigate(`/edit/${itemId}`)
+    const handleEditItem = (item) => {
+        window.package.openItemEditor(item)
     }
 
     const itemsInLastRow = items.length % gridSize.cols
@@ -55,8 +55,8 @@ function ItemBrowser() {
                 {items.map((item) => (
                     <Grid key={item.id} size="auto">
                         <ItemIcon
-                        item={item}
-                        onEdit={() => handleEditItem(item.id)}
+                            item={item}
+                            onEdit={() => handleEditItem(item)}
                         />
                     </Grid>
                 ))}

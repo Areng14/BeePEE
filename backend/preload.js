@@ -5,4 +5,8 @@ contextBridge.exposeInMainWorld("package", {
     loadFile: (path) => ipcRenderer.invoke("api:loadImage", path),
     onPackageLoaded: (callback) =>
         ipcRenderer.on("package:loaded", (event, items) => callback(items)),
+    openItemEditor: (item) => ipcRenderer.invoke("open-item-editor", item),
+    onItemLoaded: (callback) =>
+        ipcRenderer.on("load-item", (event, item) => callback(event, item)),
+    editorReady: () => ipcRenderer.send("editor-ready"),
 })

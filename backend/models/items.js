@@ -141,6 +141,19 @@ class Item {
             fs.existsSync(this.paths.properties)
         )
     }
+
+    toJSON() {
+        return {
+            id: this.id,
+            name: this.name,
+            details: this.details,
+            icon: this.icon,
+            paths: this.paths,
+            itemFolder: this.itemFolder,
+            fullItemPath: this.fullItemPath,
+            packagePath: this.packagePath,
+        }
+    }
 }
 
 module.exports = {
