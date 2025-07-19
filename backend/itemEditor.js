@@ -34,6 +34,8 @@ function createItemEditor(item, mainWindow) {
         window.loadFile(path.join(__dirname, "../dist/index.html"))
     }
 
+    window.setMenuBarVisibility(false)
+
     window.webContents.once("did-finish-load", () => {
         setTimeout(() => {
             window.webContents.send("load-item", item)
