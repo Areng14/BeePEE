@@ -15,8 +15,14 @@ class Item {
             styles.BEE2_CLEAN || styles.ANY_STYLE || Object.values(styles)[0]
 
         //handle both string and object folder formats
-        if (typeof folder === "object" && folder.folder) {
-            folder = folder.folder
+        if (typeof folder === "object") {
+            // Find any property that looks like "folder" (case insensitive)
+            const folderKey = Object.keys(folder).find(key => 
+                key.toLowerCase() === 'folder'
+            )
+            if (folderKey) {
+                folder = folder[folderKey]
+            }
         }
 
         if (!folder) {
