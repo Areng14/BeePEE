@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require("electron")
 const path = require("path")
-const { reg_loadPackagePopup } = require("./loadPackage.js")
-const { menu } = require("./menu.js")
+const { reg_loadPackagePopup } = require("./packageManager")
+const { createMainMenu } = require("./menu.js")
 const fs = require("fs")
 
 const createWindow = () => {
@@ -14,7 +14,7 @@ const createWindow = () => {
         },
     })
 
-    win.setMenuBarVisibility(true)
+    createMainMenu(win)
 
     const isDev = !app.isPackaged
 
