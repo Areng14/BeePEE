@@ -366,11 +366,11 @@ describe("Item", () => {
             expect(editorItems).toHaveProperty("Item")
         })
 
-        test('should return raw editor items when requested', () => {
+        test("should return raw editor items when requested", () => {
             vdf.parse.mockClear()
-            
+
             const rawEditorItems = item.getEditorItems(true)
-            
+
             expect(rawEditorItems).toBe(mockEditorItemsVDF)
             expect(vdf.parse).not.toHaveBeenCalled()
         })

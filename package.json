@@ -12,8 +12,12 @@
         "test": "jest"
     },
     "jest": {
-        "setupFilesAfterEnv": ["<rootDir>/backend/__tests__/jest.setup.js"],
-        "testMatch": ["<rootDir>/backend/**/*.test.js"],
+        "setupFilesAfterEnv": [
+            "<rootDir>/backend/__tests__/jest.setup.js"
+        ],
+        "testMatch": [
+            "<rootDir>/backend/**/*.test.js"
+        ],
         "testEnvironment": "node"
     },
     "dependencies": {

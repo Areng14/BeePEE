@@ -83,6 +83,20 @@ class Item {
             ? path.join(packagePath, "resources/BEE2/items", iconPath)
             : null
 
+        if (!this.icon) {
+            //Icon isnt defined in properties, get it from editoritems
+            const rawIconPath = subType.Palette?.Image
+            if (rawIconPath) {
+                // Remove "palette/" prefix and build full path
+                const cleanIconPath = rawIconPath.split("/").slice(1).join("/")
+                this.icon = path.join(
+                    packagePath,
+                    "resources/BEE2/items",
+                    cleanIconPath,
+                )
+            }
+        }
+
         this.itemFolder = folder.toLowerCase()
         this.fullItemPath = fullItemPath
 
