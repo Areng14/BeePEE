@@ -123,6 +123,7 @@ class Package {
 
     addItem(packagePath, itemJSON) {
         //Adds a item to the itemsArray
+        //NOTE: YOU NEED TO MAKE THE FOLDER STRUCUTRE + EDITORITEMS BEFORE CALLING THIS
         return this.items.push(new Item({ packagePath, itemJSON }))
     }
 
