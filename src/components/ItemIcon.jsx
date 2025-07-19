@@ -33,12 +33,12 @@ function ItemIcon({ item }) {
                 },
                 "&:hover": {
                     "& img": {
-                        filter: "brightness(0.3)" // Darken the image
+                        filter: "brightness(0.3)", // Darken the image
                     },
                     "& .edit-icon": {
-                        opacity: 1
-                    }
-                }
+                        opacity: 1,
+                    },
+                },
             }}>
             <img
                 src={imageSrc || "placeholder.png"}
@@ -47,10 +47,10 @@ function ItemIcon({ item }) {
                     width: "100%",
                     height: "100%",
                     objectFit: "cover",
-                    transition: "filter 0.2s ease"
+                    transition: "filter 0.2s ease",
                 }}
             />
-            
+
             {/* Edit icon overlay */}
             <Box
                 className="edit-icon"
@@ -61,9 +61,8 @@ function ItemIcon({ item }) {
                     transform: "translate(-50%, -50%)",
                     opacity: 0,
                     transition: "opacity 0.2s ease",
-                    pointerEvents: "none"
-                }}
-            >
+                    pointerEvents: "none",
+                }}>
                 <Edit sx={{ color: "white", fontSize: 32 }} />
             </Box>
         </Button>

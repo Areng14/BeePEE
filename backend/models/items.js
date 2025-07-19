@@ -4,8 +4,6 @@ const vdf = require("vdf-parser")
 
 //TODO: Async
 
-var items = []
-
 class Item {
     constructor({ packagePath, itemJSON }) {
         this.packagePath = packagePath
@@ -13,7 +11,8 @@ class Item {
 
         //get item folder from styles
         const styles = itemJSON.Version?.Styles || {}
-        let folder = styles.BEE2_CLEAN || styles.ANY_STYLE || Object.values(styles)[0]
+        let folder =
+            styles.BEE2_CLEAN || styles.ANY_STYLE || Object.values(styles)[0]
 
         //handle both string and object folder formats
         if (typeof folder === "object" && folder.folder) {
@@ -124,47 +123,6 @@ class Item {
     }
 }
 
-function addItem(packagePath, itemJSON) {
-    //Adds a item to the itemsArray
-    items.push(new Item({ packagePath, itemJSON }))
-}
-
-function getItemByName(name) {
-    if (!name) {
-        throw new Error("Name is empty!")
-    }
-
-    return items.find((item) => item.name === name)
-}
-
-function getItemById(id) {
-    if (!id) {
-        throw new Error("ID is empty!")
-    }
-
-    return items.find((item) => item.id === id)
-}
-
-function removeItem(identifier) {
-    const index = items.findIndex(
-        (item) => item.name === identifier || item.id === identifier,
-    )
-    if (index !== -1) {
-        return items.splice(index, 1)[0]
-    }
-    return null
-}
-
-function removeAllItems() {
-    items.length = 0
-}
-
 module.exports = {
     Item,
-    addItem,
-    getItemById,
-    getItemByName,
-    removeItem,
-    removeAllItems,
-    items,
 }

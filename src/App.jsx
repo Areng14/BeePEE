@@ -67,9 +67,9 @@ function App() {
                                     height: 96,
                                     border: "1px dashed #444",
                                     borderRadius: 1,
-                                    boxSizing: 'border-box',
-                                    overflow: 'hidden',
-                                    cursor: 'default'
+                                    boxSizing: "border-box",
+                                    overflow: "hidden",
+                                    cursor: "default",
                                 }}
                             />
                         </Grid>
