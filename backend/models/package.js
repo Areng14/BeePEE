@@ -26,9 +26,16 @@ class Package {
 
     async getStats() {
         //Check if the package is there if not then well it aint loaded
+        stats = {
+            "Items" : 0,
+            "Signages" : 0,
+            "Music" : 0,
+            "Style" : 0,
+            //Thats the plan for now...
+        }
     }
 
-    async loadItems() {
+    async loadInfo() {
         try {
             // Extract package
             fs.mkdirSync(this.packageDir, { recursive: true })
