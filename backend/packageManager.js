@@ -4,7 +4,7 @@ const { Package } = require("./models/package") // import your new class
 var packages = []
 
 const unloadPackage = async (packageName, remove = false) => {
-    const index = packages.findIndex(pkg => pkg.name === packageName)
+    const index = packages.findIndex((pkg) => pkg.name === packageName)
     if (index !== -1) {
         if (remove) {
             // maybe delete the extracted files too
@@ -37,9 +37,9 @@ const reg_loadPackagePopup = () => {
     })
 }
 
-module.exports = { 
-    reg_loadPackagePopup, 
-    loadPackage, 
+module.exports = {
+    reg_loadPackagePopup,
+    loadPackage,
     unloadPackage,
-    packages
+    packages,
 }

@@ -11,7 +11,13 @@ class Package {
         this.path = packagePath
         this.name = path.parse(this.path).name
         const packageName = path.parse(this.path).name
-        this.packageDir = path.join(__dirname, "..", "..", "packages", packageName)
+        this.packageDir = path.join(
+            __dirname,
+            "..",
+            "..",
+            "packages",
+            packageName,
+        )
     }
 
     static async create(packagePath) {
@@ -20,8 +26,8 @@ class Package {
         return pkg
     }
 
-    isLoaded() { 
-        return fs.existsSync(this.packageDir) 
+    isLoaded() {
+        return fs.existsSync(this.packageDir)
     }
 
     async getStats() {

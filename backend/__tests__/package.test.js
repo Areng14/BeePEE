@@ -51,7 +51,9 @@ describe("Package", () => {
 
             expect(pkg.path).toBe(mockPackagePath)
             expect(pkg.name).toBe("test-package")
-            expect(pkg.packageDir).toContain(path.join("packages", "test-package"))
+            expect(pkg.packageDir).toContain(
+                path.join("packages", "test-package"),
+            )
         })
 
         test("should handle package names with special characters", () => {
