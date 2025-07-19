@@ -36,3 +36,10 @@ const reg_loadPackagePopup = () => {
         return pkg.items // return the package's items
     })
 }
+
+module.exports = { 
+    reg_loadPackagePopup, 
+    loadPackage, 
+    unloadPackage,
+    packages
+}
