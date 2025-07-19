@@ -1,32 +1,32 @@
-import { Stack, TextField, Box, Typography, IconButton } from '@mui/material'
-import { Visibility, Edit } from '@mui/icons-material'
-import ReactMarkdown from 'react-markdown'
-import { useEffect, useState } from 'react'
+import { Stack, TextField, Box, Typography, IconButton } from "@mui/material"
+import { Visibility, Edit } from "@mui/icons-material"
+import ReactMarkdown from "react-markdown"
+import { useEffect, useState } from "react"
 
 function BasicInfo({ item }) {
-    const [name, setName] = useState('')
-    const [author, setAuthor] = useState('')
-    const [description, setDescription] = useState('')
+    const [name, setName] = useState("")
+    const [author, setAuthor] = useState("")
+    const [description, setDescription] = useState("")
     const [isPreview, setIsPreview] = useState(false)
 
     useEffect(() => {
         if (item) {
-            setName(item.name || '')
-            setAuthor(item.details?.Authors || '')
-            
+            setName(item.name || "")
+            setAuthor(item.details?.Authors || "")
+
             // Handle description object properly
             const desc = item.details?.Description
-            if (desc && typeof desc === 'object') {
+            if (desc && typeof desc === "object") {
                 const descValues = Object.keys(desc)
-                    .filter(key => key.startsWith('desc_'))
+                    .filter((key) => key.startsWith("desc_"))
                     .sort()
-                    .map(key => desc[key])
-                    .filter(value => value && value.trim() !== '')
-                    .join('\n')
+                    .map((key) => desc[key])
+                    .filter((value) => value && value.trim() !== "")
+                    .join("\n")
                     .trim()
                 setDescription(descValues)
             } else {
-                setDescription(desc || '')
+                setDescription(desc || "")
             }
         }
     }, [item])
@@ -34,22 +34,27 @@ function BasicInfo({ item }) {
     // Process markdown to handle single line breaks properly
     const processMarkdown = (text) => {
         return text
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line !== '') // Remove empty lines first
-            .join('  \n') // Add two spaces + newline for proper markdown line breaks
+            .split("\n")
+            .map((line) => line.trim())
+            .filter((line) => line !== "") // Remove empty lines first
+            .join("  \n") // Add two spaces + newline for proper markdown line breaks
     }
 
     const markdownComponents = {
         // Custom paragraph renderer to handle spacing better
         p: ({ children }) => (
-            <Typography component="p" variant="body1" sx={{ mb: 1, '&:last-child': { mb: 0 } }}>
+            <Typography
+                component="p"
+                variant="body1"
+                sx={{ mb: 1, "&:last-child": { mb: 0 } }}>
                 {children}
             </Typography>
         ),
         // Better list styling
         ul: ({ children }) => (
-            <Box component="ul" sx={{ pl: 2, mb: 1, '&:last-child': { mb: 0 } }}>
+            <Box
+                component="ul"
+                sx={{ pl: 2, mb: 1, "&:last-child": { mb: 0 } }}>
                 {children}
             </Box>
         ),
@@ -59,14 +64,14 @@ function BasicInfo({ item }) {
             </Typography>
         ),
         strong: ({ children }) => (
-            <Box component="span" sx={{ fontWeight: 'bold' }}>
+            <Box component="span" sx={{ fontWeight: "bold" }}>
                 {children}
             </Box>
-        )
+        ),
     }
 
     return (
-        <Stack spacing={2} sx={{ height: '100%' }}>
+        <Stack spacing={2} sx={{ height: "100%" }}>
             <TextField
                 label="Name"
                 value={name}
@@ -74,7 +79,7 @@ function BasicInfo({ item }) {
                 fullWidth
                 variant="outlined"
             />
-            
+
             <TextField
                 label="Author"
                 value={author}
@@ -84,36 +89,40 @@ function BasicInfo({ item }) {
             />
 
             {/* Description with preview toggle */}
-            <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+            <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        mb: 1,
+                    }}>
                     <Typography variant="body2" color="text.secondary">
                         Description
                     </Typography>
-                    <IconButton 
-                        size="small" 
+                    <IconButton
+                        size="small"
                         onClick={() => setIsPreview(!isPreview)}
-                        sx={{ ml: 'auto' }}
-                        title={isPreview ? 'Edit' : 'Preview'}
-                    >
+                        sx={{ ml: "auto" }}
+                        title={isPreview ? "Edit" : "Preview"}>
                         {isPreview ? <Edit /> : <Visibility />}
                     </IconButton>
                 </Box>
-                
+
                 {isPreview ? (
-                    <Box sx={{ 
-                        flex: 1, 
-                        border: '1px solid #ccc', 
-                        borderRadius: 1, 
-                        p: 2, 
-                        backgroundColor: 'background.paper',
-                        color: 'text.primary',
-                        overflow: 'auto',
-                        '& > *:first-of-type': { mt: 0 },
-                        '& > *:last-child': { mb: 0 }
-                    }}>
-                        <ReactMarkdown 
-                            components={markdownComponents}
-                        >
+                    <Box
+                        sx={{
+                            flex: 1,
+                            border: "1px solid #ccc",
+                            borderRadius: 1,
+                            p: 2,
+                            backgroundColor: "background.paper",
+                            color: "text.primary",
+                            overflow: "auto",
+                            "& > *:first-of-type": { mt: 0 },
+                            "& > *:last-child": { mb: 0 },
+                        }}>
+                        <ReactMarkdown components={markdownComponents}>
                             {processMarkdown(description)}
                         </ReactMarkdown>
                     </Box>
@@ -124,12 +133,12 @@ function BasicInfo({ item }) {
                         fullWidth
                         multiline
                         placeholder="Enter description... Use markdown formatting like **bold** and __underline__"
-                        sx={{ 
+                        sx={{
                             flex: 1,
-                            '& .MuiInputBase-root': {
-                                height: '100%',
-                                alignItems: 'flex-start'
-                            }
+                            "& .MuiInputBase-root": {
+                                height: "100%",
+                                alignItems: "flex-start",
+                            },
                         }}
                     />
                 )}
