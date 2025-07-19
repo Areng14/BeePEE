@@ -2,6 +2,9 @@ const fs = require("fs")
 const path = require("path")
 const vdf = require("vdf-parser")
 const { Item } = require("./items")
+const path7za = require('7zip-bin').path7za
+const { extractFull } = require('node-7z')
+const { dialog } = require('electron')
 
 class Package {
     constructor(packagePath) {
@@ -73,9 +76,6 @@ class Package {
                         itemJSON: element,
                     }),
             )
-
-            //Set current package
-            currentPackage = this.name
 
             return this.items
         } catch (error) {
