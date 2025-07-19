@@ -1,18 +1,27 @@
 const { dialog, ipcMain } = require("electron")
-const { removeAllItems, items } = require("./models/items")
+const { Package } = require("./models/package") // import your new class
 
-var currentPackage
+var packages = []
 
-const unloadPackage = async (remove = false) => {
-    //Unload it
-    removeAllItems()
-
-    //If remove is true we also unload it from packages
-
+const unloadPackage = async (packageName, remove = false) => {
+    const index = packages.findIndex(pkg => pkg.name === packageName)
+    if (index !== -1) {
+        if (remove) {
+            // maybe delete the extracted files too
+        }
+        return packages.splice(index, 1)[0]
+    }
 }
 
 const loadPackage = async (pathToPackage) => {
-    
+    try {
+        const pkg = await Package.create(pathToPackage)
+        packages.push(pkg)
+        return pkg
+    } catch (error) {
+        console.error("Failed to load package:", error)
+        throw error
+    }
 }
 
 const reg_loadPackagePopup = () => {
@@ -23,10 +32,7 @@ const reg_loadPackagePopup = () => {
 
         if (result.canceled) return null
 
-        //Load the package
-        await loadPackage(result.filePaths[0])
-        return items
+        const pkg = await loadPackage(result.filePaths[0])
+        return pkg.items // return the package's items
     })
 }
-
-module.exports = { reg_loadPackagePopup, loadPackage }
