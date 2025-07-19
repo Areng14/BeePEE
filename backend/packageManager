@@ -1,10 +1,5 @@
-const fs = require("fs")
-const vdf = require("vdf-parser")
-const path = require("path")
-const path7za = require('7zip-bin').path7za
-const { extractFull } = require('node-7z')
 const { dialog, ipcMain } = require("electron")
-const { addItem, removeAllItems, items } = require("./models/items")
+const { removeAllItems, items } = require("./models/items")
 
 var currentPackage
 
