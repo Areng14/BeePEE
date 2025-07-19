@@ -17,9 +17,9 @@ function createMainMenu(mainWindow) {
                         if (result.canceled) return null
 
                         //Load the package
-                        const items = await loadPackage(result.filePaths[0])
+                        const package = await loadPackage(result.filePaths[0])
 
-                        mainWindow.webContents.send("package:loaded", items)
+                        mainWindow.webContents.send("package:loaded", package.items)
                     },
                 },
             ],

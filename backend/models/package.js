@@ -16,7 +16,7 @@ class Package {
 
     static async create(packagePath) {
         const pkg = new Package(packagePath)
-        await pkg.loadItems()
+        await pkg.loadInfo()
         return pkg
     }
 
@@ -150,3 +150,5 @@ class Package {
         this.items.length = 0
     }
 }
+
+module.exports = { Package }
