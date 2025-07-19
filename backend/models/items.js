@@ -17,8 +17,8 @@ class Item {
         //handle both string and object folder formats
         if (typeof folder === "object") {
             // Find any property that looks like "folder" (case insensitive)
-            const folderKey = Object.keys(folder).find(key => 
-                key.toLowerCase() === 'folder'
+            const folderKey = Object.keys(folder).find(
+                (key) => key.toLowerCase() === "folder",
             )
             if (folderKey) {
                 folder = folder[folderKey]
