@@ -11,6 +11,11 @@
         "lint": "eslint . --fix",
         "test": "jest"
     },
+    "jest": {
+        "setupFilesAfterEnv": ["<rootDir>/backend/__tests__/jest.setup.js"],
+        "testMatch": ["<rootDir>/backend/**/*.test.js"],
+        "testEnvironment": "node"
+    },
     "dependencies": {
         "@emotion/react": "^11.14.0",
         "@emotion/styled": "^11.14.1",
