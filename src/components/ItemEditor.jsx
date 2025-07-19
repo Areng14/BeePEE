@@ -86,14 +86,24 @@ function ItemEditor() {
                 <Tab icon={<Code />} />
                 <Tab icon={<Construction />} />
             </Tabs>
-
+            
             {/* Tab Content */}
             <Box sx={{ flex: 1, p: 2, overflow: "auto" }}>
-                {tabValue === 0 && <BasicInfo item={item} />}
-                {tabValue === 1 && <Inputs item={item} />}
-                {tabValue === 2 && <Instances item={item} />}
-                {tabValue === 3 && <Vbsp item={item} />}
-                {tabValue === 4 && <Other item={item} />}
+                <Box sx={{ display: tabValue === 0 ? 'block' : 'none' }}>
+                    <BasicInfo item={item} />
+                </Box>
+                <Box sx={{ display: tabValue === 1 ? 'block' : 'none' }}>
+                    <Inputs item={item} />
+                </Box>
+                <Box sx={{ display: tabValue === 2 ? 'block' : 'none' }}>
+                    <Instances item={item} />
+                </Box>
+                <Box sx={{ display: tabValue === 3 ? 'block' : 'none' }}>
+                    <Vbsp item={item} />
+                </Box>
+                <Box sx={{ display: tabValue === 4 ? 'block' : 'none' }}>
+                    <Other item={item} />
+                </Box>
             </Box>
 
             {/* Save/Close Buttons */}
