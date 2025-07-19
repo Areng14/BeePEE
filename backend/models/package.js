@@ -2,9 +2,9 @@ const fs = require("fs")
 const path = require("path")
 const vdf = require("vdf-parser")
 const { Item } = require("./items")
-const path7za = require('7zip-bin').path7za
-const { extractFull } = require('node-7z')
-const { dialog } = require('electron')
+const path7za = require("7zip-bin").path7za
+const { extractFull } = require("node-7z")
+const { dialog } = require("electron")
 
 class Package {
     constructor(packagePath) {
@@ -20,17 +20,17 @@ class Package {
         return pkg
     }
 
-    isLoaded = () => {
-        fs.existsSync(this.packageDir)
+    isLoaded() { 
+        return fs.existsSync(this.packageDir) 
     }
 
     async getStats() {
         //Check if the package is there if not then well it aint loaded
         stats = {
-            "Items" : 0,
-            "Signages" : 0,
-            "Music" : 0,
-            "Style" : 0,
+            Items: 0,
+            Signages: 0,
+            Music: 0,
+            Style: 0,
             //Thats the plan for now...
         }
     }
@@ -111,7 +111,7 @@ class Package {
 
             this.items = []
 
-            return false
+            throw error
         }
     }
 

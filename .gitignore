@@ -25,3 +25,4 @@ dist-ssr
 
 # BEEPEE stuff
 packages
+backend/__tests__/package

@@ -19,7 +19,10 @@ function createMainMenu(mainWindow) {
                         //Load the package
                         const package = await loadPackage(result.filePaths[0])
 
-                        mainWindow.webContents.send("package:loaded", package.items)
+                        mainWindow.webContents.send(
+                            "package:loaded",
+                            package.items,
+                        )
                     },
                 },
             ],
