@@ -1,25 +1,19 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState } from "react"
+import { Box, Tabs, Tab, Button, Stack } from "@mui/material"
 import {
-    Box,
-    Tabs,
-    Tab,
-    Button,
-    Stack
-} from '@mui/material'
-import { 
-    Info, 
-    Input, 
+    Info,
+    Input,
     ViewInAr,
     Code,
-    Save, 
-    Close, 
-    Construction
-} from '@mui/icons-material'
-import BasicInfo from './items/BasicInfo'
-import Inputs from './items/Inputs'
-import Instances from './items/Instances'
-import Vbsp from './items/Vbsp'
-import Other from './items/Other'
+    Save,
+    Close,
+    Construction,
+} from "@mui/icons-material"
+import BasicInfo from "./items/BasicInfo"
+import Inputs from "./items/Inputs"
+import Instances from "./items/Instances"
+import Vbsp from "./items/Vbsp"
+import Other from "./items/Other"
 
 function ItemEditor() {
     const [item, setItem] = useState(null)
@@ -30,7 +24,7 @@ function ItemEditor() {
         const handleLoadItem = (event, loadedItem) => {
             setItem(loadedItem)
             document.title = `Edit ${loadedItem.name}` // Use loadedItem.name instead of name
-            
+
             // Load the icon
             if (loadedItem.icon) {
                 window.package.loadFile(loadedItem.icon).then(setIconSrc)
@@ -46,45 +40,46 @@ function ItemEditor() {
     }
 
     const handleSave = () => {
-        console.log('Save:', item)
+        console.log("Save:", item)
         // TODO: Send save data via IPC
     }
 
     if (!item) return null
 
     return (
-        <Box sx={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <Box sx={{ height: "100vh", display: "flex", flexDirection: "column" }}>
             {/* Icon Banner */}
-            <Box sx={{
-                height: 120,
-                background: 'linear-gradient(135deg, #669bea 0%, #4b55a2 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-            }}>
+            <Box
+                sx={{
+                    height: 120,
+                    background:
+                        "linear-gradient(135deg, #d2b019ff 0%, #b8951a 100%)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                }}>
                 <img
-                    src={iconSrc || 'placeholder.png'}
+                    src={iconSrc || "placeholder.png"}
                     alt={item.name}
                     style={{
                         width: 64,
                         height: 64,
-                        border: '2px solid white',
-                        borderRadius: 4
+                        border: "2px solid white",
+                        borderRadius: 4,
                     }}
                 />
             </Box>
 
             {/* Tabs */}
-            <Tabs 
-                value={tabValue} 
+            <Tabs
+                value={tabValue}
                 onChange={handleTabChange}
                 variant="fullWidth"
-                sx={{ 
-                    borderBottom: 1, 
-                    borderColor: 'divider',
-                    minHeight: 48
-                }}
-            >
+                sx={{
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    minHeight: 48,
+                }}>
                 <Tab icon={<Info />} />
                 <Tab icon={<Input />} />
                 <Tab icon={<ViewInAr />} />
@@ -93,41 +88,29 @@ function ItemEditor() {
             </Tabs>
 
             {/* Tab Content */}
-            <Box sx={{ flex: 1, p: 2, overflow: 'auto' }}>
-                {tabValue === 0 && (
-                    <BasicInfo item={item} />
-                )}
-                {tabValue === 1 && (
-                    <Inputs item={item} />
-                )}
-                {tabValue === 2 && (
-                    <Instances item={item} />
-                )}
-                {tabValue === 3 && (
-                    <Vbsp item={item} />
-                )}
-                {tabValue === 4 && (
-                    <Other item={item} />
-                )}
+            <Box sx={{ flex: 1, p: 2, overflow: "auto" }}>
+                {tabValue === 0 && <BasicInfo item={item} />}
+                {tabValue === 1 && <Inputs item={item} />}
+                {tabValue === 2 && <Instances item={item} />}
+                {tabValue === 3 && <Vbsp item={item} />}
+                {tabValue === 4 && <Other item={item} />}
             </Box>
 
             {/* Save/Close Buttons */}
-            <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
+            <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
                 <Stack direction="row" spacing={1}>
                     <Button
                         variant="contained"
                         startIcon={<Save />}
                         onClick={handleSave}
-                        fullWidth
-                    >
+                        fullWidth>
                         Save
                     </Button>
                     <Button
                         variant="outlined"
                         startIcon={<Close />}
                         onClick={() => window.close?.()}
-                        fullWidth
-                    >
+                        fullWidth>
                         Close
                     </Button>
                 </Stack>
