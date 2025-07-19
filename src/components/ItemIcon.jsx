@@ -2,7 +2,7 @@ import { Button, Box } from "@mui/material"
 import { Edit } from "@mui/icons-material"
 import { useState, useEffect } from "react"
 
-function ItemIcon({ item }) {
+function ItemIcon({ item, onEdit }) {
     const [imageSrc, setImageSrc] = useState(null)
 
     useEffect(() => {
@@ -14,6 +14,7 @@ function ItemIcon({ item }) {
     return (
         <Button
             className="item-icon"
+            onClick={onEdit}
             sx={{
                 width: 96,
                 height: 96,
@@ -33,7 +34,7 @@ function ItemIcon({ item }) {
                 },
                 "&:hover": {
                     "& img": {
-                        filter: "brightness(0.3)", // Darken the image
+                        filter: "brightness(0.3)",
                     },
                     "& .edit-icon": {
                         opacity: 1,
@@ -51,7 +52,6 @@ function ItemIcon({ item }) {
                 }}
             />
 
-            {/* Edit icon overlay */}
             <Box
                 className="edit-icon"
                 sx={{
