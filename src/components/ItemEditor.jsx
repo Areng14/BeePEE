@@ -12,27 +12,24 @@ import {
     ViewInAr,
     Code,
     Save, 
-    Close 
+    Close, 
+    Construction
 } from '@mui/icons-material'
 import BasicInfo from './items/BasicInfo'
 import Inputs from './items/Inputs'
 import Instances from './items/Instances'
 import Vbsp from './items/Vbsp'
+import Other from './items/Other'
 
 function ItemEditor() {
     const [item, setItem] = useState(null)
     const [tabValue, setTabValue] = useState(0)
-    const [name, setName] = useState('')
-    const [author, setAuthor] = useState('')
-    const [description, setDescription] = useState('')
     const [iconSrc, setIconSrc] = useState(null)
 
     useEffect(() => {
         const handleLoadItem = (event, loadedItem) => {
             setItem(loadedItem)
-            setName(loadedItem.name || '')
-            setAuthor(loadedItem.details?.Authors || '')
-            setDescription(loadedItem.details?.Description || '')
+            document.title = `Edit ${loadedItem.name}` // Use loadedItem.name instead of name
             
             // Load the icon
             if (loadedItem.icon) {
@@ -44,18 +41,12 @@ function ItemEditor() {
         window.package?.editorReady?.()
     }, [])
 
-    useEffect(() => {
-        if (item) {
-            document.title = `Edit ${name}`
-        }
-    }, [name, item])
-
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue)
     }
 
     const handleSave = () => {
-        console.log('Save:', { name, author })
+        console.log('Save:', item)
         // TODO: Send save data via IPC
     }
 
@@ -97,20 +88,14 @@ function ItemEditor() {
                 <Tab icon={<Info />} />
                 <Tab icon={<Input />} />
                 <Tab icon={<ViewInAr />} />
-                <Tab icon={<Code />} />  {/* Add this */}
+                <Tab icon={<Code />} />
+                <Tab icon={<Construction />} />
             </Tabs>
 
             {/* Tab Content */}
             <Box sx={{ flex: 1, p: 2, overflow: 'auto' }}>
                 {tabValue === 0 && (
-                    <BasicInfo 
-                        name={name} 
-                        setName={setName} 
-                        author={author} 
-                        setAuthor={setAuthor}
-                        description={description}
-                        setDescription={setDescription} 
-                    />
+                    <BasicInfo item={item} />
                 )}
                 {tabValue === 1 && (
                     <Inputs item={item} />
@@ -120,6 +105,9 @@ function ItemEditor() {
                 )}
                 {tabValue === 3 && (
                     <Vbsp item={item} />
+                )}
+                {tabValue === 4 && (
+                    <Other item={item} />
                 )}
             </Box>
 

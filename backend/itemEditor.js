@@ -11,8 +11,8 @@ function createItemEditor(item, mainWindow) {
     const isDev = !require("electron").app.isPackaged
 
     const window = new BrowserWindow({
-        width: 384,
-        height: 512,
+        width: 512,
+        height: 832,
         parent: mainWindow,
         webPreferences: {
             nodeIntegration: false,

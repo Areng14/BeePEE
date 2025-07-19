@@ -9,6 +9,9 @@ export const theme = createTheme({
             default: '#1d1e1f',
             paper: '#1d1e1f',
         },
+        text: {
+            primary: '#c3c7c9ff'
+        }
     },
     components: {
         MuiTextField: {
@@ -40,6 +43,16 @@ export const theme = createTheme({
             styleOverrides: {
                 root: {
                     textTransform: 'none',
+                },
+            },
+        },
+        MuiTypography: {
+            styleOverrides: {
+                root: {
+                    '& strong': {
+                        color: '#c3c7c9ff',
+                        fontWeight: 'bold',
+                    },
                 },
             },
         },
