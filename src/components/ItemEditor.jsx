@@ -24,6 +24,7 @@ function ItemEditor() {
     const [tabValue, setTabValue] = useState(0)
     const [name, setName] = useState('')
     const [author, setAuthor] = useState('')
+    const [description, setDescription] = useState('')
     const [iconSrc, setIconSrc] = useState(null)
 
     useEffect(() => {
@@ -31,6 +32,7 @@ function ItemEditor() {
             setItem(loadedItem)
             setName(loadedItem.name || '')
             setAuthor(loadedItem.details?.Authors || '')
+            setDescription(loadedItem.details?.Description || '')
             
             // Load the icon
             if (loadedItem.icon) {
@@ -41,6 +43,12 @@ function ItemEditor() {
         window.package?.onItemLoaded?.(handleLoadItem)
         window.package?.editorReady?.()
     }, [])
+
+    useEffect(() => {
+        if (item) {
+            document.title = `Edit ${name}`
+        }
+    }, [name, item])
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue)
@@ -99,7 +107,9 @@ function ItemEditor() {
                         name={name} 
                         setName={setName} 
                         author={author} 
-                        setAuthor={setAuthor} 
+                        setAuthor={setAuthor}
+                        description={description}
+                        setDescription={setDescription} 
                     />
                 )}
                 {tabValue === 1 && (
