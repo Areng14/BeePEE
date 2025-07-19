@@ -1,5 +1,5 @@
 const { reg_loadPackagePopup } = require("./packageManager")
-const { createItemEditor } = require("./itemEditor")
+const { createItemEditor } = require("./items/itemEditor")
 const { ipcMain } = require("electron")
 
 function reg_events(win) {
