@@ -1,8 +1,5 @@
 const fs = require("fs")
 const path = require("path")
-const vdf = require("vdf-parser")
-
-//TODO: Async
 
 class Item {
     constructor({ packagePath, itemJSON }) {
@@ -35,24 +32,25 @@ class Item {
             folder.toLowerCase(),
         )
 
-        //Paths
+        //Paths (now using .json instead of .txt)
         this.paths = {
-            editorItems: path.join(fullItemPath, "editoritems.txt"),
-            properties: path.join(fullItemPath, "properties.txt"),
+            editorItems: path.join(fullItemPath, "editoritems.json"),
+            properties: path.join(fullItemPath, "properties.json"),
         }
 
-        //If there is vbsp add it
+        //If there is vbsp add it (keeping .cfg as it's not VDF)
         if (fs.existsSync(path.join(fullItemPath, "vbsp_config.cfg"))) {
             this.paths.vbsp_config = path.join(fullItemPath, "vbsp_config.cfg")
         }
 
         //parse editoritems file
         if (!fs.existsSync(this.paths.editorItems)) {
-            throw new Error("Missing editoritems.txt!")
+            throw new Error("Missing editoritems.json!")
         }
 
-        const rawEditoritems = fs.readFileSync(this.paths.editorItems, "utf-8")
-        const parsedEditoritems = vdf.parse(rawEditoritems)
+        const parsedEditoritems = JSON.parse(
+            fs.readFileSync(this.paths.editorItems, "utf-8")
+        )
 
         //handle both single SubType and array of SubTypes
         const editor = parsedEditoritems.Item.Editor
@@ -68,17 +66,12 @@ class Item {
 
         //Get details
         if (!fs.existsSync(this.paths.properties)) {
-            throw new Error("Missing properties.txt!")
+            throw new Error("Missing properties.json!")
         }
 
-        const rawProperties = fs.readFileSync(this.paths.properties, "utf-8")
-        let parsedProperties
-        let emptyKeyCounter = 0
-        const fixedVDF = rawProperties.replace(
-            /""\s+"/g,
-            () => `"desc_${emptyKeyCounter++}" "`,
+        const parsedProperties = JSON.parse(
+            fs.readFileSync(this.paths.properties, "utf-8")
         )
-        parsedProperties = vdf.parse(fixedVDF)
 
         this.details = parsedProperties["Properties"]
 
@@ -115,22 +108,22 @@ class Item {
         if (raw) {
             return rawEditoritems
         } else {
-            return vdf.parse(rawEditoritems)
+            return JSON.parse(rawEditoritems)
         }
     }
 
-    saveEditorItems(editedVDF) {
+    saveEditorItems(editedJSON) {
         fs.writeFileSync(
             this.paths.editorItems,
-            vdf.stringify(editedVDF),
+            JSON.stringify(editedJSON, null, 4),
             "utf8",
         )
     }
 
-    saveProperties(propertiesVDF) {
+    saveProperties(propertiesJSON) {
         fs.writeFileSync(
             this.paths.properties,
-            vdf.stringify(propertiesVDF),
+            JSON.stringify(propertiesJSON, null, 4),
             "utf8",
         )
     }

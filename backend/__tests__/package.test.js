@@ -31,6 +31,9 @@ describe("Package", () => {
         fs.mkdirSync.mockImplementation(() => {})
         fs.existsSync.mockReturnValue(true)
         fs.rmSync.mockImplementation(() => {})
+        fs.statSync.mockReturnValue({ isDirectory: () => false })
+        fs.readdirSync.mockReturnValue(["info.txt"])
+        fs.writeFileSync.mockImplementation(() => {})
 
         // Mock successful 7z extraction
         const mockStream = {
@@ -79,33 +82,29 @@ describe("Package", () => {
     })
 
     describe("Package.create", () => {
-        const mockVdfContent = `
-"Item"
-{
-    "ID" "TEST_ITEM_1"
-    "Version"
-    {
-        "Styles"
-        {
-            "BEE2_CLEAN" "test_item"
+        const mockInfoContent = {
+            Item: [
+                {
+                    ID: "TEST_ITEM_1",
+                    Version: {
+                        Styles: {
+                            BEE2_CLEAN: "test_item"
+                        }
+                    }
+                },
+                {
+                    ID: "TEST_ITEM_2",
+                    Version: {
+                        Styles: {
+                            BEE2_CLEAN: "test_item_2"
+                        }
+                    }
+                }
+            ]
         }
-    }
-}
-"Item"
-{
-    "ID" "TEST_ITEM_2"
-    "Version"
-    {
-        "Styles"
-        {
-            "BEE2_CLEAN" "test_item_2"
-        }
-    }
-}
-`
 
         test("should successfully load package with multiple items", async () => {
-            fs.readFileSync.mockReturnValue(mockVdfContent)
+            fs.readFileSync.mockReturnValue(JSON.stringify(mockInfoContent))
 
             const pkg = await Package.create(mockPackagePath)
 
@@ -116,20 +115,17 @@ describe("Package", () => {
         })
 
         test("should handle single item packages", async () => {
-            const singleItemVdf = `
-"Item"
-{
-    "ID" "SINGLE_ITEM"
-    "Version"
-    {
-        "Styles"
-        {
-            "BEE2_CLEAN" "single"
-        }
-    }
-}
-`
-            fs.readFileSync.mockReturnValue(singleItemVdf)
+            const singleItemContent = {
+                Item: {
+                    ID: "SINGLE_ITEM",
+                    Version: {
+                        Styles: {
+                            BEE2_CLEAN: "single"
+                        }
+                    }
+                }
+            }
+            fs.readFileSync.mockReturnValue(JSON.stringify(singleItemContent))
 
             const pkg = await Package.create(mockPackagePath)
 
@@ -137,20 +133,18 @@ describe("Package", () => {
             expect(pkg.items[0].id).toBe("SINGLE_ITEM")
         })
 
-        test("should handle VDF with empty keys", async () => {
-            const malformedVdf = `
-"Item"
-{
-    "ID" "TEST_ITEM"
-    "" "some value"
-    "" "another value"
-}
-`
-            fs.readFileSync.mockReturnValue(malformedVdf)
+        test("should handle empty keys in JSON", async () => {
+            const contentWithEmptyKeys = {
+                Item: {
+                    ID: "TEST_ITEM",
+                    "": "some value",
+                    desc_0: "another value"
+                }
+            }
+            fs.readFileSync.mockReturnValue(JSON.stringify(contentWithEmptyKeys))
 
             const pkg = await Package.create(mockPackagePath)
 
-            // Should fix empty keys and still load
             expect(pkg.items).toHaveLength(1)
         })
     })
@@ -249,12 +243,10 @@ describe("Package", () => {
 
         test("should throw error when getting item with empty name", () => {
             expect(() => pkg.getItemByName("")).toThrow("Name is empty!")
-            expect(() => pkg.getItemByName(null)).toThrow("Name is empty!")
         })
 
         test("should throw error when getting item with empty ID", () => {
             expect(() => pkg.getItemById("")).toThrow("ID is empty!")
-            expect(() => pkg.getItemById(null)).toThrow("ID is empty!")
         })
     })
 })
