@@ -5,7 +5,7 @@ const path = require("path")
 const vdf = require("vdf-parser")
 const path7za = require("7zip-bin").path7za
 const { extractFull } = require("node-7z")
-const { add } = require('node-7z');
+const { add } = require("node-7z")
 
 var packages = []
 
@@ -13,32 +13,37 @@ var packages = []
 function convertVdfToJson(filePath) {
     const rawData = fs.readFileSync(filePath, "utf-8")
     let emptyKeyCounter = 0
-    const fixedData = rawData.replace(
-        /""\s+"/g,
-        () => `"desc_${emptyKeyCounter++}" "`,
-    )
-    return vdf.parse(fixedData)
+
+    // Split into lines and process each line
+    const lines = rawData.split("\n")
+    const fixedLines = lines.map((line) => {
+        return line.replace(/^(\s*)""\s+(".*")/, (match, indent, value) => {
+            return `${indent}"desc_${emptyKeyCounter++}" ${value}`
+        })
+    })
+
+    return vdf.parse(fixedLines.join("\n"))
 }
 
 // Helper function to recursively process VDF files
 function processVdfFiles(directory) {
     const files = fs.readdirSync(directory)
-    
+
     for (const file of files) {
         const fullPath = path.join(directory, file)
         const stat = fs.statSync(fullPath)
-        
+
         if (stat.isDirectory()) {
             // Recursively process subdirectories
             processVdfFiles(fullPath)
-        } else if (file.endsWith('.txt')) {
+        } else if (file.endsWith(".txt")) {
             // Convert VDF to JSON
             const jsonData = convertVdfToJson(fullPath)
-            
+
             // Save as JSON file (same name but .json extension)
-            const jsonPath = fullPath.replace('.txt', '.json')
+            const jsonPath = fullPath.replace(".txt", ".json")
             fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 4))
-            
+
             // Delete the original .txt file
             fs.unlinkSync(fullPath)
         }
@@ -63,7 +68,7 @@ const importPackage = async (pathToPackage) => {
     try {
         // Create temporary package to get paths
         const tempPkg = new Package(pathToPackage)
-        
+
         // Extract package
         fs.mkdirSync(tempPkg.packageDir, { recursive: true })
 
@@ -115,11 +120,11 @@ const loadPackage = async (pathToPackage) => {
     try {
         // Create package instance
         const pkg = new Package(pathToPackage)
-        
+
         // Check if we need to import first
         const infoJsonPath = path.join(pkg.packageDir, "info.json")
         const infoTxtPath = path.join(pkg.packageDir, "info.txt")
-        
+
         if (!fs.existsSync(infoJsonPath)) {
             if (fs.existsSync(infoTxtPath)) {
                 // Need to import first
@@ -160,22 +165,22 @@ const reg_loadPackagePopup = () => {
  */
 function savePackageAsBpee(packageDir, outputBpeePath) {
     return new Promise((resolve, reject) => {
-        const fs = require('fs');
-        const path = require('path');
+        const fs = require("fs")
+        const path = require("path")
         // Ensure output directory exists
-        const outDir = path.dirname(outputBpeePath);
+        const outDir = path.dirname(outputBpeePath)
         if (!fs.existsSync(outDir)) {
-            fs.mkdirSync(outDir, { recursive: true });
+            fs.mkdirSync(outDir, { recursive: true })
         }
         // Use 7z to zip the directory
         const archiveStream = add(
             outputBpeePath,
-            [packageDir + path.sep + '*'], // Add all contents, not the folder itself
-            { $bin: path7za, recursive: true }
-        );
-        archiveStream.on('end', resolve);
-        archiveStream.on('error', reject);
-    });
+            [packageDir + path.sep + "*"], // Add all contents, not the folder itself
+            { $bin: path7za, recursive: true },
+        )
+        archiveStream.on("end", resolve)
+        archiveStream.on("error", reject)
+    })
 }
 
 module.exports = {
@@ -185,4 +190,4 @@ module.exports = {
     unloadPackage,
     packages,
     savePackageAsBpee,
-};
+}

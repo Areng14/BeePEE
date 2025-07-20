@@ -36,7 +36,7 @@ describe("Item", () => {
         Properties: {
             Description: "Test description",
             Icon: {
-                "0": "test_icon.png",
+                0: "test_icon.png",
             },
         },
     }

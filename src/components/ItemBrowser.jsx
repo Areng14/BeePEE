@@ -24,10 +24,10 @@ function ItemBrowser() {
 
         // Handle item updates
         window.package.onItemUpdated((event, updatedItem) => {
-            setItems(currentItems => 
-                currentItems.map(item => 
-                    item.id === updatedItem.id ? updatedItem : item
-                )
+            setItems((currentItems) =>
+                currentItems.map((item) =>
+                    item.id === updatedItem.id ? updatedItem : item,
+                ),
             )
         })
     }, [])

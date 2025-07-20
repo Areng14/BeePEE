@@ -22,12 +22,12 @@ function ItemEditor() {
     const [iconSrc, setIconSrc] = useState(null)
     const [saveError, setSaveError] = useState(null)
     const [showSaveSuccess, setShowSaveSuccess] = useState(false)
-    
+
     // Form state for all tabs
     const [formData, setFormData] = useState({
-        name: '',
-        author: '',
-        description: '',
+        name: "",
+        author: "",
+        description: "",
         // Add other fields as needed for other tabs
     })
 
@@ -35,27 +35,27 @@ function ItemEditor() {
         const handleLoadItem = (event, loadedItem) => {
             setItem(loadedItem)
             document.title = `Edit ${loadedItem.name}`
-            
+
             // Initialize form data with loaded item
             const desc = loadedItem.details?.Description
-            let description = ''
-            
-            if (desc && typeof desc === 'object') {
+            let description = ""
+
+            if (desc && typeof desc === "object") {
                 const descValues = Object.keys(desc)
-                    .filter(key => key.startsWith('desc_'))
+                    .filter((key) => key.startsWith("desc_"))
                     .sort()
-                    .map(key => desc[key])
-                    .filter(value => value && value.trim() !== '')
-                    .join('\n')
+                    .map((key) => desc[key])
+                    .filter((value) => value && value.trim() !== "")
+                    .join("\n")
                     .trim()
                 description = descValues
             } else {
-                description = desc || ''
+                description = desc || ""
             }
-            
+
             setFormData({
-                name: loadedItem.name || '',
-                author: loadedItem.details?.Authors || '',
+                name: loadedItem.name || "",
+                author: loadedItem.details?.Authors || "",
                 description: description,
                 // Add other fields here
             })
@@ -69,27 +69,27 @@ function ItemEditor() {
         const handleItemUpdate = (event, updatedItem) => {
             setItem(updatedItem)
             document.title = `Edit ${updatedItem.name}`
-            
+
             // Update form data with new values
             const desc = updatedItem.details?.Description
-            let description = ''
-            
-            if (desc && typeof desc === 'object') {
+            let description = ""
+
+            if (desc && typeof desc === "object") {
                 const descValues = Object.keys(desc)
-                    .filter(key => key.startsWith('desc_'))
+                    .filter((key) => key.startsWith("desc_"))
                     .sort()
-                    .map(key => desc[key])
-                    .filter(value => value && value.trim() !== '')
-                    .join('\n')
+                    .map((key) => desc[key])
+                    .filter((value) => value && value.trim() !== "")
+                    .join("\n")
                     .trim()
                 description = descValues
             } else {
-                description = desc || ''
+                description = desc || ""
             }
-            
+
             setFormData({
-                name: updatedItem.name || '',
-                author: updatedItem.details?.Authors || '',
+                name: updatedItem.name || "",
+                author: updatedItem.details?.Authors || "",
                 description: description,
                 // Add other fields here
             })
@@ -111,9 +111,9 @@ function ItemEditor() {
     }
 
     const updateFormData = (field, value) => {
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
-            [field]: value
+            [field]: value,
         }))
     }
 
@@ -132,14 +132,14 @@ function ItemEditor() {
                 details: {
                     ...item.details,
                     Authors: formData.author,
-                    Description: formData.description
+                    Description: formData.description,
                 },
                 // Add other fields from formData as needed
             }
-            
+
             // Send save data via IPC
             const result = await window.package?.saveItem?.(saveData)
-            
+
             if (result?.success) {
                 // Show checkmark icon temporarily
                 setShowSaveSuccess(true)
@@ -202,42 +202,42 @@ function ItemEditor() {
                 <Tab icon={<Code />} />
                 <Tab icon={<Construction />} />
             </Tabs>
-            
+
             {/* Tab Content */}
             <Box sx={{ flex: 1, p: 2, overflow: "auto" }}>
-                <Box sx={{ display: tabValue === 0 ? 'block' : 'none' }}>
-                    <BasicInfo 
-                        item={item} 
-                        formData={formData} 
-                        onUpdate={updateFormData} 
+                <Box sx={{ display: tabValue === 0 ? "block" : "none" }}>
+                    <BasicInfo
+                        item={item}
+                        formData={formData}
+                        onUpdate={updateFormData}
                     />
                 </Box>
-                <Box sx={{ display: tabValue === 1 ? 'block' : 'none' }}>
-                    <Inputs 
-                        item={item} 
-                        formData={formData} 
-                        onUpdate={updateFormData} 
+                <Box sx={{ display: tabValue === 1 ? "block" : "none" }}>
+                    <Inputs
+                        item={item}
+                        formData={formData}
+                        onUpdate={updateFormData}
                     />
                 </Box>
-                <Box sx={{ display: tabValue === 2 ? 'block' : 'none' }}>
-                    <Instances 
-                        item={item} 
-                        formData={formData} 
-                        onUpdate={updateFormData} 
+                <Box sx={{ display: tabValue === 2 ? "block" : "none" }}>
+                    <Instances
+                        item={item}
+                        formData={formData}
+                        onUpdate={updateFormData}
                     />
                 </Box>
-                <Box sx={{ display: tabValue === 3 ? 'block' : 'none' }}>
-                    <Vbsp 
-                        item={item} 
-                        formData={formData} 
-                        onUpdate={updateFormData} 
+                <Box sx={{ display: tabValue === 3 ? "block" : "none" }}>
+                    <Vbsp
+                        item={item}
+                        formData={formData}
+                        onUpdate={updateFormData}
                     />
                 </Box>
-                <Box sx={{ display: tabValue === 4 ? 'block' : 'none' }}>
-                    <Other 
-                        item={item} 
-                        formData={formData} 
-                        onUpdate={updateFormData} 
+                <Box sx={{ display: tabValue === 4 ? "block" : "none" }}>
+                    <Other
+                        item={item}
+                        formData={formData}
+                        onUpdate={updateFormData}
                     />
                 </Box>
             </Box>
@@ -265,12 +265,17 @@ function ItemEditor() {
 
             {/* Error Alert */}
             {saveError && (
-                <Box sx={{ position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)' }}>
-                    <Alert 
+                <Box
+                    sx={{
+                        position: "fixed",
+                        bottom: 16,
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                    }}>
+                    <Alert
                         severity="error"
                         onClose={handleCloseError}
-                        variant="filled"
-                    >
+                        variant="filled">
                         {saveError}
                     </Alert>
                 </Box>
