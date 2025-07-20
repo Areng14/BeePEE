@@ -186,9 +186,6 @@ function reg_events(mainWindow) {
                 throw new Error("Item not found")
             }
 
-            // Convert all instances to VMF
-            Instance.convertAllToVmf(packagePath, item.instances)
-
             // Build absolute path to instance file
             const instancePath = Instance.getCleanPath(packagePath, instanceName)
             if (!fs.existsSync(instancePath)) {
@@ -201,37 +198,10 @@ function reg_events(mainWindow) {
                 stdio: 'ignore'
             })
             
-            // Handle Hammer process exit
-            hammer.on('exit', () => {
-                // Convert back to JSON and cleanup
-                Instance.convertAllToJson(packagePath, item.instances)
-                // Save the editoritems file to update instance names
-                const editoritems = item.getEditorItems()
-                item.saveEditorItems(editoritems)
-            })
-
-            // Handle if the app closes while Hammer is open
-            mainWindow.on('close', () => {
-                if (!hammer.killed) {
-                    hammer.kill()
-                }
-                // Convert back to JSON and cleanup
-                Instance.convertAllToJson(packagePath, item.instances)
-                const editoritems = item.getEditorItems()
-                item.saveEditorItems(editoritems)
-            })
-
             hammer.unref()
 
             return { success: true, editorType: hammerStatus.type }
         } catch (error) {
-            // If anything fails, try to convert back to JSON
-            try {
-                Instance.convertAllToJson(packagePath, item.instances)
-            } catch (cleanupError) {
-                console.error("Failed to cleanup VMFs:", cleanupError)
-            }
-
             const errorMessage = `Could not open instance in Hammer: ${error.message}`
             dialog.showErrorBox(
                 "Failed to Launch Hammer",

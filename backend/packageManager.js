@@ -36,19 +36,31 @@ function processVdfFiles(directory) {
         if (stat.isDirectory()) {
             // Recursively process subdirectories
             processVdfFiles(fullPath)
-        } else if (file.endsWith(".txt") || file.endsWith(".vmf")) {
-            // Convert VDF/VMF to JSON
+        } else if (file.endsWith(".txt")) {
+            // Convert VDF to JSON
             const jsonData = convertVdfToJson(fullPath)
 
             // Save as JSON file (same name but .json extension)
-            const jsonPath = fullPath.replace(/\.(txt|vmf)$/i, ".json")
+            const jsonPath = fullPath.replace(/\.txt$/i, ".json")
             fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 4))
 
-            // Delete the original .txt or .vmf file
+            // Delete the original .txt file
             fs.unlinkSync(fullPath)
         } else if (file.endsWith(".vmx")) {
             // Delete .vmx files (not needed)
             fs.unlinkSync(fullPath)
+        } else if (file === "editoritems.json") {
+            // Ensure instance paths in editoritems.json use .vmf extension
+            const jsonData = JSON.parse(fs.readFileSync(fullPath, "utf-8"))
+            if (jsonData.Item?.Exporting?.Instances) {
+                for (const instance of Object.values(jsonData.Item.Exporting.Instances)) {
+                    if (instance.Name) {
+                        // Ensure instance paths use .vmf extension
+                        instance.Name = instance.Name.replace(/\.json$/i, '.vmf')
+                    }
+                }
+                fs.writeFileSync(fullPath, JSON.stringify(jsonData, null, 4))
+            }
         }
     }
 }
