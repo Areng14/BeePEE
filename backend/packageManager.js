@@ -143,16 +143,22 @@ const loadPackage = async (pathToPackage) => {
             // Create package instance
             const pkg = new Package(pathToPackage)
 
+            // Create package directory if it doesn't exist
+            if (!fs.existsSync(pkg.packageDir)) {
+                fs.mkdirSync(pkg.packageDir, { recursive: true })
+            }
+
             // Check if we need to import first
             const infoJsonPath = path.join(pkg.packageDir, "info.json")
             const infoTxtPath = path.join(pkg.packageDir, "info.txt")
 
             if (!fs.existsSync(infoJsonPath)) {
-                if (fs.existsSync(infoTxtPath)) {
-                    // Need to import first
+                // If neither info file exists, we need to import
+                if (!fs.existsSync(infoTxtPath)) {
                     await importPackage(pathToPackage)
                 } else {
-                    throw new Error("Package not found or not imported")
+                    // Only info.txt exists, convert it
+                    await importPackage(pathToPackage)
                 }
             }
 
