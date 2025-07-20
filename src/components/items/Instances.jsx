@@ -19,6 +19,7 @@ import AddIcon from '@mui/icons-material/Add'
 import CodeIcon from '@mui/icons-material/Code'
 import SubjectIcon from '@mui/icons-material/Subject'
 import { useState } from 'react'
+import ViewInAr from '@mui/icons-material/ViewInAr'
 
 function Instances({ item }) {
     const [addDialogOpen, setAddDialogOpen] = useState(false)
@@ -88,10 +89,10 @@ function Instances({ item }) {
                 <Stack spacing={2}>
                     {instances.map((instance) => {
                         const isVBSP = instance.source === 'vbsp'
-                        const instanceNumber = instance.Name.match(/(\d+)\.vmf$/)?.[1] || '?'
+                        const instanceNumber = instance?.Name?.match?.(/(\d+)\.vmf$/)?.[1] || '?'
 
                         return (
-                            <Paper key={instance.Name} variant="outlined" sx={{ p: 2 }}>
+                            <Paper key={instance.Name || 'unknown'} variant="outlined" sx={{ p: 2 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                     <Typography variant="subtitle1" sx={{ mr: 1, minWidth: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
                                         <Tooltip title={isVBSP ? "VBSP Instance" : "Editor Instance"}>
@@ -112,7 +113,7 @@ function Instances({ item }) {
                                             textAlign: 'left'  // Keep text aligned normally
                                         }}
                                     >
-                                        {instance.Name}
+                                        {instance.Name || '(unnamed instance)'}
                                     </Typography>
                                     <IconButton
                                         size="small"
@@ -147,9 +148,29 @@ function Instances({ item }) {
                     })}
                 </Stack>
             ) : (
-                <Typography variant="body2" color="text.secondary">
-                    No instances found for this item.
-                </Typography>
+                <Box sx={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    gap: 2,
+                    p: 4,
+                    textAlign: 'center'
+                }}>
+                    <ViewInAr sx={{ fontSize: 48, color: 'text.secondary', opacity: 0.5 }} />
+                    <Typography variant="h6" color="text.secondary">
+                        No Instances Yet
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Add your first instance to this item using the button above
+                    </Typography>
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => setAddDialogOpen(true)}
+                    >
+                        Add First Instance
+                    </Button>
+                </Box>
             )}
 
             {/* Add Instance Dialog */}
