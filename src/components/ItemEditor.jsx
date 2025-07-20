@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Box, Tabs, Tab, Button, Stack, Alert } from "@mui/material"
+import { Box, Tabs, Tab, Button, Stack, Alert, Tooltip } from "@mui/material"
 import {
     Info,
     Input,
@@ -196,11 +196,21 @@ function ItemEditor() {
                     borderColor: "divider",
                     minHeight: 48,
                 }}>
-                <Tab icon={<Info />} />
-                <Tab icon={<Input />} />
-                <Tab icon={<ViewInAr />} />
-                <Tab icon={<Code />} />
-                <Tab icon={<Construction />} />
+                <Tooltip title="Basic Info - Edit name, author, description">
+                    <Tab icon={<Info />} />
+                </Tooltip>
+                <Tooltip title="Inputs - Configure item inputs and outputs">
+                    <Tab icon={<Input />} />
+                </Tooltip>
+                <Tooltip title="Instances - Manage item's VMF instances">
+                    <Tab icon={<ViewInAr />} />
+                </Tooltip>
+                <Tooltip title="VBSP - Configure instance swapping and conditions">
+                    <Tab icon={<Code />} />
+                </Tooltip>
+                <Tooltip title="Other - Additional item settings">
+                    <Tab icon={<Construction />} />
+                </Tooltip>
             </Tabs>
 
             {/* Tab Content */}
@@ -245,41 +255,38 @@ function ItemEditor() {
             {/* Save/Close Buttons */}
             <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
                 <Stack direction="row" spacing={1}>
-                    <Button
-                        variant="contained"
-                        startIcon={showSaveSuccess ? <CheckCircle /> : <Save />}
-                        onClick={handleSave}
-                        color={showSaveSuccess ? "success" : "primary"}
-                        fullWidth>
-                        {showSaveSuccess ? "Saved!" : "Save"}
-                    </Button>
-                    <Button
-                        variant="outlined"
-                        startIcon={<Close />}
-                        onClick={() => window.close?.()}
-                        fullWidth>
-                        Close
-                    </Button>
+                    <Tooltip title="Save changes to this item">
+                        <Button
+                            variant="contained"
+                            startIcon={showSaveSuccess ? <CheckCircle /> : <Save />}
+                            onClick={handleSave}
+                            color={showSaveSuccess ? "success" : "primary"}
+                            sx={{ flex: 1 }}
+                        >
+                            Save
+                        </Button>
+                    </Tooltip>
+                    <Tooltip title="Close editor without saving">
+                        <Button
+                            variant="outlined"
+                            startIcon={<Close />}
+                            onClick={() => window.close()}
+                            sx={{ flex: 1 }}
+                        >
+                            Close
+                        </Button>
+                    </Tooltip>
                 </Stack>
-            </Box>
-
-            {/* Error Alert */}
-            {saveError && (
-                <Box
-                    sx={{
-                        position: "fixed",
-                        bottom: 16,
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                    }}>
+                {saveError && (
                     <Alert
                         severity="error"
                         onClose={handleCloseError}
-                        variant="filled">
+                        sx={{ mt: 2 }}
+                    >
                         {saveError}
                     </Alert>
-                </Box>
-            )}
+                )}
+            </Box>
         </Box>
     )
 }
