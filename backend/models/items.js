@@ -1,5 +1,6 @@
 const fs = require("fs")
 const path = require("path")
+const { Instance } = require("../items/Instance")
 
 class Item {
     constructor({ packagePath, itemJSON }) {
@@ -99,6 +100,10 @@ class Item {
         this.itemFolder = folder.toLowerCase()
         this.fullItemPath = fullItemPath
 
+        // Store instance data from editoritems instead of loading files
+        this.instances = parsedEditoritems.Item?.Exporting?.Instances || {}
+        this._loadedInstances = new Map() // Cache for loaded Instance objects
+
         console.log(`Added item: ${this.name} (id: ${this.id})`)
     }
 
@@ -128,6 +133,41 @@ class Item {
         )
     }
 
+    getInstance(index = "0") {
+        // Return cached instance if already loaded
+        if (this._loadedInstances.has(index)) {
+            return this._loadedInstances.get(index)
+        }
+
+        // Check if instance exists in editoritems
+        const instanceData = this.instances[index]
+        if (!instanceData) {
+            return null
+        }
+
+        // Build full path to instance file
+        const instancePath = path.join(
+            this.packagePath,
+            "resources",
+            instanceData.Name
+        )
+
+        // Check if file actually exists
+        if (!fs.existsSync(instancePath)) {
+            return null
+        }
+
+        // Create and cache the instance
+        const instance = new Instance({ path: instancePath })
+        this._loadedInstances.set(index, instance)
+        
+        return instance
+    }
+
+    getAvailableInstances() {
+        return Object.keys(this.instances)
+    }
+
     exists() {
         return (
             fs.existsSync(this.paths.editorItems) &&
@@ -145,6 +185,7 @@ class Item {
             itemFolder: this.itemFolder,
             fullItemPath: this.fullItemPath,
             packagePath: this.packagePath,
+            instances: this.instances,
         }
     }
 }

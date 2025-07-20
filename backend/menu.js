@@ -13,6 +13,14 @@ const fs = require("fs")
 let lastSavedBpeePath = null
 let currentPackageDir = null // This should be set when a package is loaded/imported
 
+// Helper to get the current package name for saving
+function getCurrentPackageName() {
+    if (currentPackageDir) {
+        return path.basename(currentPackageDir)
+    }
+    return 'package'
+}
+
 function createMainMenu(mainWindow) {
     const isDev = !require("electron").app.isPackaged
 
@@ -98,7 +106,7 @@ function createMainMenu(mainWindow) {
                                 const { canceled, filePath } =
                                     await dialog.showSaveDialog(mainWindow, {
                                         title: "Save Package As",
-                                        defaultPath: "package.bpee",
+                                        defaultPath: getCurrentPackageName() + ".bpee",
                                         filters: [
                                             {
                                                 name: "BeePEE Package",
@@ -132,7 +140,7 @@ function createMainMenu(mainWindow) {
                             const { canceled, filePath } =
                                 await dialog.showSaveDialog(mainWindow, {
                                     title: "Save Package As",
-                                    defaultPath: "package.bpee",
+                                    defaultPath: getCurrentPackageName() + ".bpee",
                                     filters: [
                                         {
                                             name: "BeePEE Package",
