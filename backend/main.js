@@ -26,7 +26,7 @@ const createWindow = () => {
     }
 
     //register stuff
-    reg_events()
+    reg_events(win)
 }
 
 ipcMain.handle("api:loadImage", async (event, filePath) => {

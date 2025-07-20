@@ -12,7 +12,7 @@ function ItemBrowser() {
     useEffect(() => {
         console.log("Component mounted, setting up package listener")
 
-        // Wait for signal
+        // Handle initial package load
         window.package.onPackageLoaded((loadedItems) => {
             console.log("Package loaded callback fired")
             console.log("loadedItems:", loadedItems)
@@ -20,6 +20,15 @@ function ItemBrowser() {
 
             setItems(loadedItems || [])
             console.log("setItems called")
+        })
+
+        // Handle item updates
+        window.package.onItemUpdated((event, updatedItem) => {
+            setItems(currentItems => 
+                currentItems.map(item => 
+                    item.id === updatedItem.id ? updatedItem : item
+                )
+            )
         })
     }, [])
 

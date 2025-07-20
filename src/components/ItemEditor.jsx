@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Box, Tabs, Tab, Button, Stack } from "@mui/material"
+import { Box, Tabs, Tab, Button, Stack, Alert } from "@mui/material"
 import {
     Info,
     Input,
@@ -8,6 +8,7 @@ import {
     Save,
     Close,
     Construction,
+    CheckCircle,
 } from "@mui/icons-material"
 import BasicInfo from "./items/BasicInfo"
 import Inputs from "./items/Inputs"
@@ -19,6 +20,8 @@ function ItemEditor() {
     const [item, setItem] = useState(null)
     const [tabValue, setTabValue] = useState(0)
     const [iconSrc, setIconSrc] = useState(null)
+    const [saveError, setSaveError] = useState(null)
+    const [showSaveSuccess, setShowSaveSuccess] = useState(false)
     
     // Form state for all tabs
     const [formData, setFormData] = useState({
@@ -63,8 +66,44 @@ function ItemEditor() {
             }
         }
 
+        const handleItemUpdate = (event, updatedItem) => {
+            setItem(updatedItem)
+            document.title = `Edit ${updatedItem.name}`
+            
+            // Update form data with new values
+            const desc = updatedItem.details?.Description
+            let description = ''
+            
+            if (desc && typeof desc === 'object') {
+                const descValues = Object.keys(desc)
+                    .filter(key => key.startsWith('desc_'))
+                    .sort()
+                    .map(key => desc[key])
+                    .filter(value => value && value.trim() !== '')
+                    .join('\n')
+                    .trim()
+                description = descValues
+            } else {
+                description = desc || ''
+            }
+            
+            setFormData({
+                name: updatedItem.name || '',
+                author: updatedItem.details?.Authors || '',
+                description: description,
+                // Add other fields here
+            })
+        }
+
         window.package?.onItemLoaded?.(handleLoadItem)
+        window.package?.onItemUpdated?.(handleItemUpdate)
         window.package?.editorReady?.()
+
+        // Cleanup
+        return () => {
+            window.package?.onItemLoaded?.(null)
+            window.package?.onItemUpdated?.(null)
+        }
     }, [])
 
     const handleTabChange = (event, newValue) => {
@@ -78,10 +117,45 @@ function ItemEditor() {
         }))
     }
 
-    const handleSave = () => {
-        console.log("Saving:", formData)
-        // TODO: Send save data via IPC
-        // window.package?.saveItem?.(formData)
+    const handleSave = async () => {
+        try {
+            // Validate required fields
+            if (!formData.name?.trim()) {
+                throw new Error("Item name cannot be empty")
+            }
+
+            // Prepare the save data
+            const saveData = {
+                id: item.id,
+                name: formData.name,
+                fullItemPath: item.fullItemPath,
+                details: {
+                    ...item.details,
+                    Authors: formData.author,
+                    Description: formData.description
+                },
+                // Add other fields from formData as needed
+            }
+            
+            // Send save data via IPC
+            const result = await window.package?.saveItem?.(saveData)
+            
+            if (result?.success) {
+                // Show checkmark icon temporarily
+                setShowSaveSuccess(true)
+                setSaveError(null)
+                setTimeout(() => setShowSaveSuccess(false), 2000)
+            } else {
+                throw new Error("Failed to save item")
+            }
+        } catch (error) {
+            console.error("Failed to save:", error)
+            setSaveError(error.message)
+        }
+    }
+
+    const handleCloseError = () => {
+        setSaveError(null)
     }
 
     if (!item) return null
@@ -171,10 +245,11 @@ function ItemEditor() {
                 <Stack direction="row" spacing={1}>
                     <Button
                         variant="contained"
-                        startIcon={<Save />}
+                        startIcon={showSaveSuccess ? <CheckCircle /> : <Save />}
                         onClick={handleSave}
+                        color={showSaveSuccess ? "success" : "primary"}
                         fullWidth>
-                        Save
+                        {showSaveSuccess ? "Saved!" : "Save"}
                     </Button>
                     <Button
                         variant="outlined"
@@ -185,6 +260,19 @@ function ItemEditor() {
                     </Button>
                 </Stack>
             </Box>
+
+            {/* Error Alert */}
+            {saveError && (
+                <Box sx={{ position: 'fixed', bottom: 16, left: '50%', transform: 'translateX(-50%)' }}>
+                    <Alert 
+                        severity="error"
+                        onClose={handleCloseError}
+                        variant="filled"
+                    >
+                        {saveError}
+                    </Alert>
+                </Box>
+            )}
         </Box>
     )
 }

@@ -9,4 +9,7 @@ contextBridge.exposeInMainWorld("package", {
     onItemLoaded: (callback) =>
         ipcRenderer.on("load-item", (event, item) => callback(event, item)),
     editorReady: () => ipcRenderer.send("editor-ready"),
+    saveItem: (itemData) => ipcRenderer.invoke("save-item", itemData),
+    onItemUpdated: (callback) =>
+        ipcRenderer.on("item-updated", (event, item) => callback(event, item)),
 })
