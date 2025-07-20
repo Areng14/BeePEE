@@ -183,6 +183,21 @@ function savePackageAsBpee(packageDir, outputBpeePath) {
     })
 }
 
+/**
+ * Clears all contents of the packages directory at the project root.
+ * @returns {Promise<void>} Resolves when done, rejects on error.
+ */
+async function clearPackagesDirectory() {
+    const packagesDir = path.resolve(__dirname, '../packages')
+    if (fs.existsSync(packagesDir)) {
+        const entries = fs.readdirSync(packagesDir)
+        for (const entry of entries) {
+            const entryPath = path.join(packagesDir, entry)
+            fs.rmSync(entryPath, { recursive: true, force: true })
+        }
+    }
+}
+
 module.exports = {
     reg_loadPackagePopup,
     loadPackage,
@@ -190,4 +205,5 @@ module.exports = {
     unloadPackage,
     packages,
     savePackageAsBpee,
+    clearPackagesDirectory, // Export the new function
 }
