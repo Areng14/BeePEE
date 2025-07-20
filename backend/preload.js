@@ -12,4 +12,7 @@ contextBridge.exposeInMainWorld("package", {
     saveItem: (itemData) => ipcRenderer.invoke("save-item", itemData),
     onItemUpdated: (callback) =>
         ipcRenderer.on("item-updated", (event, item) => callback(event, item)),
+    editInstance: (instancePath) => ipcRenderer.invoke("edit-instance", instancePath),
+    addInstance: (itemId, instanceName) => ipcRenderer.invoke("add-instance", { itemId, instanceName }),
+    removeInstance: (itemId, instanceIndex) => ipcRenderer.invoke("remove-instance", { itemId, instanceIndex }),
 })
