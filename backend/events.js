@@ -187,7 +187,14 @@ function reg_events(mainWindow) {
             }
 
             // Build absolute path to instance file
-            const instancePath = Instance.getCleanPath(packagePath, instanceName)
+            const instancePath = path.normalize(Instance.getCleanPath(packagePath, instanceName))
+            
+            // Verify the path is within the package resources directory
+            const resourcesDir = path.normalize(path.join(packagePath, "resources"))
+            if (!instancePath.startsWith(resourcesDir)) {
+                throw new Error(`Invalid instance path: ${instancePath} (must be within package resources directory)`)
+            }
+
             if (!fs.existsSync(instancePath)) {
                 throw new Error(`Instance file not found: ${instancePath}`)
             }
