@@ -24,15 +24,22 @@ class Instance {
      * @returns {string} Full path to the instance file with BEE2 prefix removed
      */
     static getCleanPath(packagePath, instanceName) {
-        // Handle both forward and back slashes, remove BEE2 from anywhere in the instances path
-        // First normalize all slashes to the OS-specific separator
+        // First normalize the instance name to use OS-specific path separators
         const normalizedName = instanceName.replace(/[/\\]/g, path.sep)
-        // Then clean up the path structure
-        const cleanInstanceName = normalizedName.replace(
-            new RegExp(`^(?:instances${path.sep})?(?:BEE2${path.sep})?(.*)$`),
-            `instances${path.sep}$1`
-        )
-        return path.join(packagePath, "resources", cleanInstanceName)
+        
+        // Remove any BEE2 prefix and ensure proper instances prefix
+        const cleanInstanceName = normalizedName
+            .split(path.sep)
+            .filter(part => part !== "BEE2")
+            .join(path.sep)
+
+        // Ensure the path starts with "instances"
+        const finalPath = cleanInstanceName.startsWith("instances" + path.sep) 
+            ? cleanInstanceName 
+            : path.join("instances", cleanInstanceName)
+
+        // Join with the package resources directory
+        return path.normalize(path.join(packagePath, "resources", finalPath))
     }
 
     // Placeholder: In the future, this would parse the VMF and return all entities

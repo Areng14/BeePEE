@@ -115,12 +115,14 @@ function Instances({ item }) {
                                     >
                                         {instance.Name || '(unnamed instance)'}
                                     </Typography>
-                                    <IconButton
-                                        size="small"
-                                        onClick={() => handleEditInstance(item.packagePath, instance.Name)}
-                                    >
-                                        <EditIcon fontSize="small" />
-                                    </IconButton>
+                                    <Tooltip title="Open and edit instance in Hammer">
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => handleEditInstance(item.packagePath, instance.Name)}
+                                        >
+                                            <EditIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
                                     <Tooltip title={isVBSP ? "VBSP instances cannot be deleted - To remove them, remove them in the VBSP tab." : "Delete instance"}>
                                         <span>
                                             <IconButton
