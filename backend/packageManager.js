@@ -36,15 +36,18 @@ function processVdfFiles(directory) {
         if (stat.isDirectory()) {
             // Recursively process subdirectories
             processVdfFiles(fullPath)
-        } else if (file.endsWith(".txt")) {
-            // Convert VDF to JSON
+        } else if (file.endsWith(".txt") || file.endsWith(".vmf")) {
+            // Convert VDF/VMF to JSON
             const jsonData = convertVdfToJson(fullPath)
 
             // Save as JSON file (same name but .json extension)
-            const jsonPath = fullPath.replace(".txt", ".json")
+            const jsonPath = fullPath.replace(/\.(txt|vmf)$/i, ".json")
             fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 4))
 
-            // Delete the original .txt file
+            // Delete the original .txt or .vmf file
+            fs.unlinkSync(fullPath)
+        } else if (file.endsWith(".vmx")) {
+            // Delete .vmx files (not needed)
             fs.unlinkSync(fullPath)
         }
     }
