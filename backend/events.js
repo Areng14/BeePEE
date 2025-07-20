@@ -1,4 +1,4 @@
-const { reg_loadPackagePopup } = require("./packageManager")
+const { reg_loadPackagePopup, packages } = require("./packageManager")
 const { createItemEditor } = require("./items/itemEditor")
 const { ipcMain, dialog, BrowserWindow } = require("electron")
 const fs = require("fs")
@@ -6,6 +6,10 @@ const path = require("path")
 const { saveItem } = require("./saveItem") // Import the new saveItem function
 const { Item } = require("./models/items") // Import the Item class
 const { savePackageAsBpee } = require("./packageManager")
+const { findPortal2Resources, getHammerPath, getHammerAvailability } = require("./data")
+const { spawn } = require("child_process")
+const { Instance } = require("./items/Instance")
+const { getCleanInstancePath } = require("./utils/instancePaths")
 
 // Track last saved .bpee path in memory (could be improved with persistent storage)
 let lastSavedBpeePath = null
@@ -76,6 +80,11 @@ async function handleItemSave(item, event, mainWindow) {
 }
 
 function reg_events(mainWindow) {
+    // Initialize Portal 2 resources at startup
+    findPortal2Resources().catch(error => {
+        console.error("Failed to find Portal 2 resources:", error)
+    })
+
     // Register package loading
     reg_loadPackagePopup()
 
@@ -120,6 +129,115 @@ function reg_events(mainWindow) {
             event.sender.send("package-saved", { path: filePath })
         } catch (err) {
             dialog.showErrorBox("Save As Failed", err.message)
+        }
+    })
+
+    // Add instance
+    ipcMain.handle("add-instance", async (event, { itemId, instanceName }) => {
+        try {
+            // Find the item in any loaded package
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) {
+                throw new Error("Item not found")
+            }
+
+            const newIndex = item.addInstance(instanceName)
+            return { success: true, index: newIndex }
+        } catch (error) {
+            dialog.showErrorBox(
+                "Failed to Add Instance",
+                `Could not add instance: ${error.message}`
+            )
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Remove instance
+    ipcMain.handle("remove-instance", async (event, { itemId, instanceIndex }) => {
+        try {
+            // Find the item in any loaded package
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) {
+                throw new Error("Item not found")
+            }
+
+            item.removeInstance(instanceIndex)
+            return { success: true }
+        } catch (error) {
+            dialog.showErrorBox(
+                "Failed to Remove Instance",
+                `Could not remove instance: ${error.message}`
+            )
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Register instance editing in Hammer
+    ipcMain.handle("edit-instance", async (event, { packagePath, instanceName, itemId }) => {
+        try {
+            const hammerStatus = getHammerAvailability()
+            if (!hammerStatus.available) {
+                throw new Error("Neither Hammer++ nor Hammer was found in Portal 2's bin directory")
+            }
+
+            // Find the item to get all its instances
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) {
+                throw new Error("Item not found")
+            }
+
+            // Convert all instances to VMF
+            Instance.convertAllToVmf(packagePath, item.instances)
+
+            // Build absolute path to instance file
+            const instancePath = Instance.getCleanPath(packagePath, instanceName)
+            if (!fs.existsSync(instancePath)) {
+                throw new Error(`Instance file not found: ${instancePath}`)
+            }
+
+            // Launch Hammer with the instance file
+            const hammer = spawn(getHammerPath(), [instancePath], {
+                detached: true,
+                stdio: 'ignore'
+            })
+            
+            // Handle Hammer process exit
+            hammer.on('exit', () => {
+                // Convert back to JSON and cleanup
+                Instance.convertAllToJson(packagePath, item.instances)
+                // Save the editoritems file to update instance names
+                const editoritems = item.getEditorItems()
+                item.saveEditorItems(editoritems)
+            })
+
+            // Handle if the app closes while Hammer is open
+            mainWindow.on('close', () => {
+                if (!hammer.killed) {
+                    hammer.kill()
+                }
+                // Convert back to JSON and cleanup
+                Instance.convertAllToJson(packagePath, item.instances)
+                const editoritems = item.getEditorItems()
+                item.saveEditorItems(editoritems)
+            })
+
+            hammer.unref()
+
+            return { success: true, editorType: hammerStatus.type }
+        } catch (error) {
+            // If anything fails, try to convert back to JSON
+            try {
+                Instance.convertAllToJson(packagePath, item.instances)
+            } catch (cleanupError) {
+                console.error("Failed to cleanup VMFs:", cleanupError)
+            }
+
+            const errorMessage = `Could not open instance in Hammer: ${error.message}`
+            dialog.showErrorBox(
+                "Failed to Launch Hammer",
+                errorMessage
+            )
+            return { success: false, error: errorMessage }
         }
     })
 }

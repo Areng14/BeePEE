@@ -31,7 +31,8 @@
         "react-dom": "^19.1.0",
         "react-markdown": "^10.1.0",
         "react-router-dom": "^7.7.0",
-        "vdf-parser": "^1.2.1"
+        "vdf-parser": "^1.2.1",
+        "winreg": "^1.2.5"
     },
     "devDependencies": {
         "@eslint/js": "^9.30.1",

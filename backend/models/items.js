@@ -145,12 +145,8 @@ class Item {
             return null
         }
 
-        // Build full path to instance file
-        const instancePath = path.join(
-            this.packagePath,
-            "resources",
-            instanceData.Name
-        )
+        // Build full path to instance file using Instance class
+        const instancePath = Instance.getCleanPath(this.packagePath, instanceData.Name)
 
         // Check if file actually exists
         if (!fs.existsSync(instancePath)) {
@@ -166,6 +162,58 @@ class Item {
 
     getAvailableInstances() {
         return Object.keys(this.instances)
+    }
+
+    addInstance(instanceName) {
+        // Find the next available index
+        const keys = Object.keys(this.instances)
+        const nextIndex = keys.length > 0 ? 
+            Math.max(...keys.map(k => parseInt(k))) + 1 : 
+            0
+        
+        // Add the new instance
+        this.instances[nextIndex.toString()] = {
+            Name: instanceName
+        }
+
+        // Update editoritems file
+        const editoritems = this.getEditorItems()
+        if (!editoritems.Item.Exporting) {
+            editoritems.Item.Exporting = {}
+        }
+        if (!editoritems.Item.Exporting.Instances) {
+            editoritems.Item.Exporting.Instances = {}
+        }
+        editoritems.Item.Exporting.Instances[nextIndex.toString()] = {
+            Name: instanceName
+        }
+        this.saveEditorItems(editoritems)
+
+        return nextIndex.toString()
+    }
+
+    removeInstance(index) {
+        if (!this.instances[index]) {
+            throw new Error(`Instance ${index} not found`)
+        }
+
+        // Remove from memory
+        delete this.instances[index]
+        this._loadedInstances.delete(index)
+
+        // Update editoritems file
+        const editoritems = this.getEditorItems()
+        if (editoritems.Item.Exporting?.Instances) {
+            delete editoritems.Item.Exporting.Instances[index]
+            // If no instances left, clean up the structure
+            if (Object.keys(editoritems.Item.Exporting.Instances).length === 0) {
+                delete editoritems.Item.Exporting.Instances
+                if (Object.keys(editoritems.Item.Exporting).length === 0) {
+                    delete editoritems.Item.Exporting
+                }
+            }
+            this.saveEditorItems(editoritems)
+        }
     }
 
     exists() {

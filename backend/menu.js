@@ -49,6 +49,12 @@ function createMainMenu(mainWindow) {
                         })
                         if (result.canceled) return null
                         try {
+                            // Ensure packages directory exists
+                            const packagesDir = path.join(__dirname, "..", "packages")
+                            if (!fs.existsSync(packagesDir)) {
+                                fs.mkdirSync(packagesDir, { recursive: true })
+                            }
+
                             const pkg = await loadPackage(result.filePaths[0])
                             currentPackageDir = pkg.packageDir
                             mainWindow.webContents.send(

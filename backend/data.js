@@ -2,7 +2,6 @@ const fs = require("fs")
 const path = require("path")
 const WinReg = require("winreg")
 const vdf = require("vdf-parser")
-const fgdParser = require("fgdparser") // npm i fgdparser
 
 async function findPortal2Dir(log = console) {
     // 1. Find main Steam path from registry
@@ -75,33 +74,85 @@ function parseFGD(fgdPath, log = console) {
     }
 
     try {
-        log.log("Parsing FGD file:", fgdPath)
+        log.log("Parsing FGD file with regex:", fgdPath)
         const fgdContent = fs.readFileSync(fgdPath, 'utf-8')
-        const parsed = fgdParser.parse(fgdContent)
-        
         const entities = {}
         
-        // Extract inputs/outputs for each entity
-        for (const entity of parsed.entities) {
-            entities[entity.name] = {
-                type: entity.type,
-                description: entity.description,
-                inputs: (entity.inputs || []).map(i => i.name),
-                outputs: (entity.outputs || []).map(o => o.name),
-                inputDetails: entity.inputs || [],
-                outputDetails: entity.outputs || []
+        // Split into entity blocks - look for @PointClass, @SolidClass, @BaseClass
+        const entityBlocks = fgdContent.split(/@(?:PointClass|SolidClass|BaseClass)/)
+        
+        for (const block of entityBlocks) {
+            if (!block.trim()) continue
+            
+            // Extract entity name (after = sign)
+            const nameMatch = block.match(/=\s*(\w+)/)
+            if (!nameMatch) continue
+            
+            const entityName = nameMatch[1]
+            const inputs = []
+            const outputs = []
+            
+            // Extract inputs: input InputName(type) : "description"
+            const inputMatches = [...block.matchAll(/input\s+(\w+)\s*\([^)]*\)\s*:\s*"([^"]*)"/g)]
+            for (const match of inputMatches) {
+                inputs.push(match[1])
+            }
+            
+            // Extract outputs: output OutputName(type) : "description"  
+            const outputMatches = [...block.matchAll(/output\s+(\w+)\s*\([^)]*\)\s*:\s*"([^"]*)"/g)]
+            for (const match of outputMatches) {
+                outputs.push(match[1])
+            }
+            
+            // Only add entities that have inputs or outputs
+            if (inputs.length > 0 || outputs.length > 0) {
+                entities[entityName] = {
+                    inputs,
+                    outputs
+                }
             }
         }
         
-        log.log(`Parsed ${Object.keys(entities).length} entities from FGD`)
+        // Add universal Source engine inputs/outputs to all entities
+        const universalInputs = ['FireUser1', 'FireUser2', 'FireUser3', 'FireUser4']
+        const universalOutputs = ['OnUser1', 'OnUser2', 'OnUser3', 'OnUser4']
+        
+        for (const entityName in entities) {
+            const entity = entities[entityName]
+            
+            // Add universal inputs if they don't already exist
+            for (const input of universalInputs) {
+                if (!entity.inputs.includes(input)) {
+                    entity.inputs.push(input)
+                }
+            }
+            
+            // Add universal outputs if they don't already exist  
+            for (const output of universalOutputs) {
+                if (!entity.outputs.includes(output)) {
+                    entity.outputs.push(output)
+                }
+            }
+        }
+        
+        log.log(`Found ${Object.keys(entities).length} entities with inputs/outputs`)
+        
         return entities
+        
     } catch (e) {
-        log.error("Error parsing FGD:", e)
+        log.error("FGD regex parsing failed:", e.message)
         return null
     }
 }
 
+let cachedResources = null
+
 async function findPortal2Resources(log = console) {
+    // Return cached resources if already found
+    if (cachedResources) {
+        return cachedResources
+    }
+
     const p2dir = await findPortal2Dir(log)
     if (!p2dir) return null
 
@@ -112,7 +163,8 @@ async function findPortal2Resources(log = console) {
         maps: null,
         scripts: null,
         bin: null,
-        entities: null // FGD parsed data
+        entities: null,
+        hammer: null,
     }
 
     // Check for gameinfo.txt
@@ -140,9 +192,40 @@ async function findPortal2Resources(log = console) {
     const binPath = path.join(p2dir, "bin")
     if (fs.existsSync(binPath)) {
         paths.bin = binPath
+        // Check for hammer++ first, then regular hammer
+        const hammerPlusPlusPath = path.join(binPath, "hammerplusplus.exe")
+        const hammerPath = path.join(binPath, "hammer.exe")
+        
+        if (fs.existsSync(hammerPlusPlusPath)) {
+            paths.hammerPlusPlus = hammerPlusPlusPath
+            paths.hammer = hammerPlusPlusPath // Default to Hammer++ if available
+        } else if (fs.existsSync(hammerPath)) {
+            paths.hammer = hammerPath
+        }
     }
 
+    // Cache the results
+    cachedResources = paths
     return paths
 }
 
-module.exports = { findPortal2Dir, findPortal2Resources, parseFGD }
+// Simple getter for hammer path
+function getHammerPath() {
+    return cachedResources?.hammer || null
+}
+
+// Add a function to check if any Hammer is available
+function getHammerAvailability() {
+    if (!cachedResources) return { available: false, type: null }
+    if (cachedResources.hammerPlusPlus) return { available: true, type: 'Hammer++' }
+    if (cachedResources.hammer) return { available: true, type: 'Hammer' }
+    return { available: false, type: null }
+}
+
+module.exports = {
+    findPortal2Dir,
+    findPortal2Resources,
+    parseFGD,
+    getHammerPath,
+    getHammerAvailability,
+}
