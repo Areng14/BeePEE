@@ -5,6 +5,7 @@ const path = require("path")
 const vdf = require("vdf-parser")
 const path7za = require("7zip-bin").path7za
 const { extractFull } = require("node-7z")
+const { add } = require('node-7z');
 
 var packages = []
 
@@ -151,10 +152,37 @@ const reg_loadPackagePopup = () => {
     })
 }
 
+/**
+ * Zips a package directory into a .bpee file using 7zip.
+ * @param {string} packageDir - The directory to zip.
+ * @param {string} outputBpeePath - The output .bpee file path.
+ * @returns {Promise<void>} Resolves when done, rejects on error.
+ */
+function savePackageAsBpee(packageDir, outputBpeePath) {
+    return new Promise((resolve, reject) => {
+        const fs = require('fs');
+        const path = require('path');
+        // Ensure output directory exists
+        const outDir = path.dirname(outputBpeePath);
+        if (!fs.existsSync(outDir)) {
+            fs.mkdirSync(outDir, { recursive: true });
+        }
+        // Use 7z to zip the directory
+        const archiveStream = add(
+            outputBpeePath,
+            [packageDir + path.sep + '*'], // Add all contents, not the folder itself
+            { $bin: path7za, recursive: true }
+        );
+        archiveStream.on('end', resolve);
+        archiveStream.on('error', reject);
+    });
+}
+
 module.exports = {
     reg_loadPackagePopup,
     loadPackage,
     importPackage,
     unloadPackage,
     packages,
-}
+    savePackageAsBpee,
+};

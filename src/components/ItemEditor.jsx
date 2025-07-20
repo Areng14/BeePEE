@@ -160,6 +160,8 @@ function ItemEditor() {
 
     if (!item) return null
 
+    console.log(item)
+
     return (
         <Box sx={{ height: "100vh", display: "flex", flexDirection: "column" }}>
             {/* Icon Banner */}
