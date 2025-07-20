@@ -22,6 +22,11 @@ function ItemBrowser() {
             console.log("setItems called")
         })
 
+        // Handle package close
+        window.package.onPackageClosed(() => {
+            setItems([])
+        })
+
         // Handle item updates
         window.package.onItemUpdated((event, updatedItem) => {
             setItems((currentItems) =>

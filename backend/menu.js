@@ -3,7 +3,8 @@ const {
     loadPackage,
     importPackage,
     savePackageAsBpee,
-    clearPackagesDirectory, // Import the new function
+    clearPackagesDirectory,
+    closePackage,
 } = require("./packageManager")
 const { dialog, BrowserWindow } = require("electron")
 const path = require("path")
@@ -35,7 +36,7 @@ function createMainMenu(mainWindow) {
                     click: () => {},
                 },
                 {
-                    label: "Open Package...",
+                    label: "Load Package...",
                     accelerator: "Ctrl+O",
                     click: async () => {
                         const result = await dialog.showOpenDialog(mainWindow, {
@@ -95,6 +96,24 @@ function createMainMenu(mainWindow) {
                             dialog.showErrorBox(
                                 "Import Failed",
                                 `Failed to import package: ${error.message}`,
+                            )
+                        }
+                    },
+                },
+                { type: "separator" },
+                {
+                    label: "Close Package",
+                    accelerator: "Ctrl+W",
+                    click: async () => {
+                        try {
+                            await closePackage()
+                            currentPackageDir = null
+                            lastSavedBpeePath = null
+                            mainWindow.webContents.send("package:closed")
+                        } catch (error) {
+                            dialog.showErrorBox(
+                                "Close Failed",
+                                `Failed to close package: ${error.message}`
                             )
                         }
                     },
@@ -168,30 +187,6 @@ function createMainMenu(mainWindow) {
                 },
                 { type: "separator" },
                 {
-                    label: "Clear Packages Directory",
-                    click: async () => {
-                        const { response } = await dialog.showMessageBox(mainWindow, {
-                            type: "warning",
-                            buttons: ["Cancel", "Clear"],
-                            defaultId: 0,
-                            cancelId: 0,
-                            title: "Clear Packages Directory",
-                            message: "Are you sure you want to clear all contents of the packages directory? This cannot be undone.",
-                        })
-                        if (response === 1) { // User chose 'Clear'
-                            try {
-                                await clearPackagesDirectory()
-                                dialog.showMessageBox(mainWindow, {
-                                    message: "Packages directory cleared.",
-                                    type: "info",
-                                })
-                            } catch (err) {
-                                dialog.showErrorBox("Clear Failed", err.message)
-                            }
-                        }
-                    },
-                },
-                {
                     label: process.platform === "darwin" ? "Quit" : "Exit",
                     accelerator:
                         process.platform === "darwin" ? "Cmd+Q" : "Alt+F4",
@@ -224,6 +219,38 @@ function createMainMenu(mainWindow) {
                         const focusedWindow = BrowserWindow.getFocusedWindow()
                         if (focusedWindow) {
                             focusedWindow.webContents.toggleDevTools()
+                        }
+                    },
+                },
+                { type: "separator" },
+                {
+                    label: "Clear Packages Directory",
+                    click: async () => {
+                        const { response } = await dialog.showMessageBox(mainWindow, {
+                            type: "warning",
+                            buttons: ["Cancel", "Clear"],
+                            defaultId: 0,
+                            cancelId: 0,
+                            title: "Clear Packages Directory",
+                            message: "Are you sure you want to clear all contents of the packages directory? This cannot be undone.",
+                        })
+                        if (response === 1) { // User chose 'Clear'
+                            try {
+                                // Close any open packages first
+                                await closePackage()
+                                currentPackageDir = null
+                                lastSavedBpeePath = null
+                                mainWindow.webContents.send("package:closed")
+                                
+                                // Then clear the directory
+                                await clearPackagesDirectory()
+                                dialog.showMessageBox(mainWindow, {
+                                    message: "Packages directory cleared.",
+                                    type: "info",
+                                })
+                            } catch (err) {
+                                dialog.showErrorBox("Clear Failed", err.message)
+                            }
                         }
                     },
                 },
