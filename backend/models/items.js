@@ -100,9 +100,43 @@ class Item {
         this.itemFolder = folder.toLowerCase()
         this.fullItemPath = fullItemPath
 
-        // Store instance data from editoritems instead of loading files
-        this.instances = parsedEditoritems.Item?.Exporting?.Instances || {}
+        // Initialize instances from editoritems
+        this.instances = {}
         this._loadedInstances = new Map() // Cache for loaded Instance objects
+
+        // Add editor instances
+        const editorInstances = parsedEditoritems.Item?.Exporting?.Instances || {}
+        Object.entries(editorInstances).forEach(([key, instance]) => {
+            this.instances[key] = {
+                Name: instance.Name,
+                source: 'editor'
+            }
+        })
+
+        // Add VBSP instances if they exist
+        if (this.paths.vbsp_config && fs.existsSync(this.paths.vbsp_config)) {
+            try {
+                const vbspContent = fs.readFileSync(this.paths.vbsp_config, 'utf-8')
+                const matches = [...vbspContent.matchAll(/"Changeinstance"\s+"([^"]+)"/g)]
+                
+                // Start index after the last editor instance
+                let nextIndex = Object.keys(this.instances).length
+                
+                for (const match of matches) {
+                    const instancePath = match[1]
+                    // Only add if not already present
+                    if (!Object.values(this.instances).some(inst => inst.Name === instancePath)) {
+                        this.instances[nextIndex.toString()] = {
+                            Name: instancePath,
+                            source: 'vbsp'
+                        }
+                        nextIndex++
+                    }
+                }
+            } catch (error) {
+                console.error(`Failed to parse VBSP config for ${this.name}:`, error.message)
+            }
+        }
 
         console.log(`Added item: ${this.name} (id: ${this.id})`)
     }
@@ -139,7 +173,7 @@ class Item {
             return this._loadedInstances.get(index)
         }
 
-        // Check if instance exists in editoritems
+        // Check if instance exists
         const instanceData = this.instances[index]
         if (!instanceData) {
             return null
@@ -173,7 +207,8 @@ class Item {
         
         // Add the new instance
         this.instances[nextIndex.toString()] = {
-            Name: instanceName
+            Name: instanceName,
+            source: 'editor'
         }
 
         // Update editoritems file
@@ -193,8 +228,14 @@ class Item {
     }
 
     removeInstance(index) {
-        if (!this.instances[index]) {
+        const instance = this.instances[index]
+        if (!instance) {
             throw new Error(`Instance ${index} not found`)
+        }
+
+        // Only allow removing editor instances
+        if (instance.source === 'vbsp') {
+            throw new Error('Cannot remove VBSP instances')
         }
 
         // Remove from memory
@@ -233,7 +274,7 @@ class Item {
             itemFolder: this.itemFolder,
             fullItemPath: this.fullItemPath,
             packagePath: this.packagePath,
-            instances: this.instances,
+            instances: this.instances
         }
     }
 }
