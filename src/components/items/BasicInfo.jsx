@@ -107,7 +107,7 @@ function BasicInfo({ item, formData, onUpdate }) {
                         }
                         fullWidth
                         multiline
-                        placeholder="Enter description... Use markdown formatting like **bold** and __underline__"
+                        placeholder="Enter description...   Markdown formatting is supported"
                         sx={{
                             flex: 1,
                             "& .MuiInputBase-root": {

@@ -80,29 +80,29 @@ const unloadPackage = async (packageName, remove = false) => {
     }
 }
 
+const extractPackage = async (pathToPackage, packageDir) => {
+    console.log("Extracting package...")
+    const stream = extractFull(pathToPackage, packageDir, {
+        $bin: path7za,
+        recursive: true,
+    })
+
+    await new Promise((resolve, reject) => {
+        stream.on("end", resolve)
+        stream.on("error", reject)
+    })
+    console.log("Extraction complete")
+}
+
 const importPackage = async (pathToPackage) => {
     return timeOperation("Import package", async () => {
+        let tempPkg = null
         try {
-            // Create temporary package to get paths
-            const tempPkg = new Package(pathToPackage)
+            tempPkg = new Package(pathToPackage)
 
             // Extract package
             fs.mkdirSync(tempPkg.packageDir, { recursive: true })
-
-            const stream = extractFull(pathToPackage, tempPkg.packageDir, {
-                $bin: path7za,
-                recursive: true,
-            })
-
-            await new Promise((resolve, reject) => {
-                stream.on("end", resolve)
-                stream.on("error", reject)
-            })
-
-            const infoPath = path.join(tempPkg.packageDir, "info.txt")
-            if (!fs.existsSync(infoPath)) {
-                throw new Error("Package missing info.txt file")
-            }
+            await extractPackage(pathToPackage, tempPkg.packageDir)
 
             // Process all VDF files recursively
             await timeOperation("Process VDF files", () => {
@@ -143,24 +143,14 @@ const loadPackage = async (pathToPackage) => {
             // Create package instance
             const pkg = new Package(pathToPackage)
 
-            // Create package directory if it doesn't exist
-            if (!fs.existsSync(pkg.packageDir)) {
-                fs.mkdirSync(pkg.packageDir, { recursive: true })
+            // Check if the package file exists
+            if (!fs.existsSync(pathToPackage)) {
+                throw new Error(`Package file ${pathToPackage} does not exist`)
             }
 
-            // Check if we need to import first
-            const infoJsonPath = path.join(pkg.packageDir, "info.json")
-            const infoTxtPath = path.join(pkg.packageDir, "info.txt")
-
-            if (!fs.existsSync(infoJsonPath)) {
-                // If neither info file exists, we need to import
-                if (!fs.existsSync(infoTxtPath)) {
-                    await importPackage(pathToPackage)
-                } else {
-                    // Only info.txt exists, convert it
-                    await importPackage(pathToPackage)
-                }
-            }
+            // Always extract fresh
+            fs.mkdirSync(pkg.packageDir, { recursive: true })
+            await extractPackage(pathToPackage, pkg.packageDir)
 
             // Now load the package
             await pkg.load()
@@ -227,6 +217,12 @@ async function clearPackagesDirectory() {
     }
 }
 
+const closePackage = async () => {
+    // Remove all packages from memory
+    packages.length = 0
+    return true
+}
+
 module.exports = {
     reg_loadPackagePopup,
     loadPackage,
@@ -234,5 +230,6 @@ module.exports = {
     unloadPackage,
     packages,
     savePackageAsBpee,
-    clearPackagesDirectory, // Export the new function
+    clearPackagesDirectory,
+    closePackage, // Export the new function
 }
