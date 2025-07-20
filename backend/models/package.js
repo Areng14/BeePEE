@@ -1,10 +1,6 @@
 const fs = require("fs")
 const path = require("path")
-const vdf = require("vdf-parser")
 const { Item } = require("./items")
-const path7za = require("7zip-bin").path7za
-const { extractFull } = require("node-7z")
-const { dialog } = require("electron")
 
 class Package {
     constructor(packagePath) {
@@ -18,57 +14,22 @@ class Package {
             "packages",
             packageName,
         )
-    }
-
-    static async create(packagePath) {
-        const pkg = new Package(packagePath)
-        await pkg.loadInfo()
-        return pkg
+        this.items = []
     }
 
     isLoaded() {
         return fs.existsSync(this.packageDir)
     }
 
-    async getStats() {
-        //Check if the package is there if not then well it aint loaded
-        stats = {
-            Items: 0,
-            Signages: 0,
-            Music: 0,
-            Style: 0,
-            //Thats the plan for now...
-        }
-    }
-
-    async loadInfo() {
+    async load() {
         try {
-            // Extract package
-            fs.mkdirSync(this.packageDir, { recursive: true })
-
-            const stream = extractFull(this.path, this.packageDir, {
-                $bin: path7za,
-                recursive: true,
-            })
-
-            await new Promise((resolve, reject) => {
-                stream.on("end", resolve)
-                stream.on("error", reject)
-            })
-
-            const infoPath = path.join(this.packageDir, "info.txt")
-
+            const infoPath = path.join(this.packageDir, "info.json")
             if (!fs.existsSync(infoPath)) {
-                throw new Error("Package missing info.txt file")
+                throw new Error("Package not imported - missing info.json")
             }
 
-            const rawInfo = fs.readFileSync(infoPath, "utf-8")
-            let emptyKeyCounter = 0
-            const fixedInfo = rawInfo.replace(
-                /""\s+"/g,
-                () => `"desc_${emptyKeyCounter++}" "`,
-            )
-            const parsedInfo = vdf.parse(fixedInfo)
+            // Read and parse info.json
+            const parsedInfo = JSON.parse(fs.readFileSync(infoPath, "utf-8"))
 
             // Items
             let rawitems = parsedInfo["Item"]
@@ -93,30 +54,7 @@ class Package {
             return this.items
         } catch (error) {
             console.error("Failed to load package:", error.message)
-
-            // Cleanup on failure
-            if (this.packageDir && fs.existsSync(this.packageDir)) {
-                try {
-                    fs.rmSync(this.packageDir, { recursive: true, force: true })
-                    console.log("Cleaned up failed package directory")
-                } catch (cleanupError) {
-                    console.error(
-                        "Failed to cleanup package directory:",
-                        cleanupError.message,
-                    )
-                }
-            }
-
-            // Reset items state
             this.items = []
-
-            dialog.showErrorBox(
-                "Package Load Failed",
-                `Failed to load package ${path.parse(this.path).name}: ${error.message}`,
-            )
-
-            this.items = []
-
             throw error
         }
     }

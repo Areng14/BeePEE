@@ -1,469 +1,224 @@
 const fs = require("fs")
 const path = require("path")
-const vdf = require("vdf-parser")
 const { Item } = require("../models/items")
 
-// Mock dependencies
 jest.mock("fs")
-jest.mock("vdf-parser")
 
 describe("Item", () => {
-    const mockPackagePath = "/test/packages/test-package"
+    beforeEach(() => {
+        jest.clearAllMocks()
+    })
+
+    const mockPackagePath = "/test/package"
     const mockItemJSON = {
-        ID: "TEST_ITEM_001",
+        ID: "TEST_ITEM",
         Version: {
             Styles: {
-                BEE2_CLEAN: "test_button",
+                BEE2_CLEAN: "test_folder",
             },
         },
     }
 
-    const mockEditorItemsVDF = `
-"Item"
-{
-    "ItemClass" "ItemButtonFloor"
-    "Type" "TEST_ITEM_001"
-    "Editor"
-    {
-        "SubType"
-        {
-            "Name" "Test Button"
-            "Model" { "ModelName" "buttonweight.3ds" }
-            "Palette"
-            {
-                "Tooltip" "TEST BUTTON"
-                "Image" "palette/beepkg/test_button.png"
-                "Position" "4 2 0"
-            }
-        }
-        "MovementHandle" "HANDLE_4_DIRECTIONS"
+    const mockEditorItemsJSON = {
+        Item: {
+            Editor: {
+                SubType: {
+                    Name: "Test Item",
+                    Palette: {
+                        Image: "palette/test.png",
+                    },
+                },
+            },
+        },
     }
-}
-`
 
-    const mockPropertiesVDF = `
-"Properties"
-{
-    "Authors" "Test Author"
-    "Description" "A test button item"
-    "Icon"
-    {
-        "0" "beepkg/test_button.png"
+    const mockPropertiesJSON = {
+        Properties: {
+            Description: "Test description",
+            Icon: {
+                "0": "test_icon.png",
+            },
+        },
     }
-}
-`
 
+    // Mock file system
     beforeEach(() => {
-        jest.clearAllMocks()
+        fs.existsSync.mockImplementation((filePath) => {
+            if (filePath.includes("editoritems.json")) {
+                return true
+            }
+            if (filePath.includes("properties.json")) {
+                return true
+            }
+            return false
+        })
 
-        // Default mocks
-        fs.existsSync.mockReturnValue(true)
         fs.readFileSync.mockImplementation((filePath) => {
-            if (filePath.includes("editoritems.txt")) {
-                return mockEditorItemsVDF
+            if (filePath.includes("editoritems.json")) {
+                return JSON.stringify(mockEditorItemsJSON)
             }
-            if (filePath.includes("properties.txt")) {
-                return mockPropertiesVDF
+            if (filePath.includes("properties.json")) {
+                return JSON.stringify(mockPropertiesJSON)
             }
-            return ""
-        })
-
-        vdf.parse.mockImplementation((content) => {
-            if (content.includes("ItemClass")) {
-                return {
-                    Item: {
-                        Editor: {
-                            SubType: {
-                                Name: "Test Button",
-                            },
-                        },
-                    },
-                }
-            }
-            if (content.includes("Authors")) {
-                return {
-                    Properties: {
-                        Authors: "Test Author",
-                        Description: "A test button item",
-                        Icon: {
-                            0: "beepkg/test_button.png",
-                        },
-                    },
-                }
-            }
-            return {}
+            throw new Error(`Unexpected file read: ${filePath}`)
         })
     })
 
-    describe("constructor", () => {
-        test("should create item with basic properties", () => {
-            const item = new Item({
-                packagePath: mockPackagePath,
-                itemJSON: mockItemJSON,
-            })
-
-            expect(item.packagePath).toBe(mockPackagePath)
-            expect(item.id).toBe("TEST_ITEM_001")
-            expect(item.name).toBe("Test Button")
-            expect(item.itemFolder).toBe("test_button")
+    test("should create item with valid data", () => {
+        const item = new Item({
+            packagePath: mockPackagePath,
+            itemJSON: mockItemJSON,
         })
 
-        test("should handle different style folder formats", () => {
-            const itemWithObjectFolder = {
-                ID: "TEST_ITEM_002",
-                Version: {
-                    Styles: {
-                        BEE2_CLEAN: {
-                            folder: "custom_folder",
-                        },
-                    },
-                },
-            }
-
-            const item = new Item({
-                packagePath: mockPackagePath,
-                itemJSON: itemWithObjectFolder,
-            })
-
-            expect(item.itemFolder).toBe("custom_folder")
-        })
-
-        test("should handle missing BEE2_CLEAN style", () => {
-            const itemWithOtherStyle = {
-                ID: "TEST_ITEM_003",
-                Version: {
-                    Styles: {
-                        CUSTOM_STYLE: "custom_item",
-                    },
-                },
-            }
-
-            const item = new Item({
-                packagePath: mockPackagePath,
-                itemJSON: itemWithOtherStyle,
-            })
-
-            expect(item.itemFolder).toBe("custom_item")
-        })
-
-        test("should set correct file paths", () => {
-            const item = new Item({
-                packagePath: mockPackagePath,
-                itemJSON: mockItemJSON,
-            })
-
-            expect(item.paths.editorItems).toBe(
-                path.join(
-                    mockPackagePath,
-                    "items",
-                    "test_button",
-                    "editoritems.txt",
-                ),
-            )
-            expect(item.paths.properties).toBe(
-                path.join(
-                    mockPackagePath,
-                    "items",
-                    "test_button",
-                    "properties.txt",
-                ),
-            )
-        })
-
-        test("should set vbsp_config path when file exists", () => {
-            fs.existsSync.mockImplementation((filePath) => {
-                return (
-                    filePath.includes("vbsp_config.cfg") ||
-                    !filePath.includes("missing")
-                )
-            })
-
-            const item = new Item({
-                packagePath: mockPackagePath,
-                itemJSON: mockItemJSON,
-            })
-
-            expect(item.paths.vbsp_config).toBeDefined()
-            expect(item.paths.vbsp_config).toContain("vbsp_config.cfg")
-        })
-
-        test("should not set vbsp_config path when file missing", () => {
-            fs.existsSync.mockImplementation((filePath) => {
-                return !filePath.includes("vbsp_config.cfg")
-            })
-
-            const item = new Item({
-                packagePath: mockPackagePath,
-                itemJSON: mockItemJSON,
-            })
-
-            expect(item.paths.vbsp_config).toBeUndefined()
-        })
-
-        test("should handle array of SubTypes", () => {
-            vdf.parse.mockReturnValue({
-                Item: {
-                    Editor: {
-                        SubType: [
-                            { Name: "First SubType" },
-                            { Name: "Second SubType" },
-                        ],
-                    },
-                },
-            })
-
-            const item = new Item({
-                packagePath: mockPackagePath,
-                itemJSON: mockItemJSON,
-            })
-
-            expect(item.name).toBe("First SubType")
-        })
-
-        test("should set icon path correctly", () => {
-            const item = new Item({
-                packagePath: mockPackagePath,
-                itemJSON: mockItemJSON,
-            })
-
-            expect(item.icon).toBe(
-                path.join(
-                    mockPackagePath,
-                    "resources/BEE2/items",
-                    "beepkg/test_button.png",
-                ),
-            )
-        })
-
-        test("should handle missing icon", () => {
-            vdf.parse.mockImplementation((content) => {
-                if (content.includes("Authors")) {
-                    return {
-                        Properties: {
-                            Authors: "Test Author",
-                            Description: "A test button item",
-                        },
-                    }
-                }
-                return {
-                    Item: {
-                        Editor: {
-                            SubType: { Name: "Test Button" },
-                        },
-                    },
-                }
-            })
-
-            const item = new Item({
-                packagePath: mockPackagePath,
-                itemJSON: mockItemJSON,
-            })
-
-            expect(item.icon).toBeNull()
-        })
+        expect(item.id).toBe("TEST_ITEM")
+        expect(item.name).toBe("Test Item")
+        expect(item.paths.editorItems).toContain("editoritems.json")
+        expect(item.paths.properties).toContain("properties.json")
+        expect(item.details).toEqual(mockPropertiesJSON.Properties)
     })
 
-    describe("error handling", () => {
-        test("should throw error when no item folder found", () => {
-            const invalidItemJSON = {
-                ID: "INVALID_ITEM",
-                Version: {},
-            }
-
-            expect(() => {
-                new Item({
-                    packagePath: mockPackagePath,
-                    itemJSON: invalidItemJSON,
-                })
-            }).toThrow("No item folder found for item INVALID_ITEM")
-        })
-
-        test("should throw error when editoritems.txt missing", () => {
-            fs.existsSync.mockImplementation((filePath) => {
-                return !filePath.includes("editoritems.txt")
-            })
-
-            expect(() => {
-                new Item({
-                    packagePath: mockPackagePath,
-                    itemJSON: mockItemJSON,
-                })
-            }).toThrow("Missing editoritems.txt!")
-        })
-
-        test("should throw error when properties.txt missing", () => {
-            fs.existsSync.mockImplementation((filePath) => {
-                return !filePath.includes("properties.txt")
-            })
-
-            expect(() => {
-                new Item({
-                    packagePath: mockPackagePath,
-                    itemJSON: mockItemJSON,
-                })
-            }).toThrow("Missing properties.txt!")
-        })
-
-        test("should throw error when SubType Name missing", () => {
-            vdf.parse.mockReturnValue({
-                Item: {
-                    Editor: {
-                        SubType: {},
+    test("should handle folder in object format", () => {
+        const itemJSON = {
+            ID: "TEST_ITEM",
+            Version: {
+                Styles: {
+                    BEE2_CLEAN: {
+                        folder: "test_folder",
                     },
                 },
-            })
+            },
+        }
 
-            expect(() => {
-                new Item({
-                    packagePath: mockPackagePath,
-                    itemJSON: mockItemJSON,
-                })
-            }).toThrow("Invalid editoritems - missing SubType Name")
+        const item = new Item({
+            packagePath: mockPackagePath,
+            itemJSON,
         })
 
-        test("should handle malformed properties.txt with empty keys", () => {
-            const malformedProperties = `
-"Properties"
-{
-    "Authors" "Test Author"
-    "" "empty key value"
-    "" "another empty key"
-    "Description" "Test description"
-}
-`
+        expect(item.itemFolder).toBe("test_folder")
+    })
 
-            fs.readFileSync.mockImplementation((filePath) => {
-                if (filePath.includes("properties.txt")) {
-                    return malformedProperties
-                }
-                return mockEditorItemsVDF
+    test("should throw error when no folder found", () => {
+        const itemJSON = {
+            ID: "TEST_ITEM",
+            Version: {
+                Styles: {},
+            },
+        }
+
+        expect(() => {
+            new Item({
+                packagePath: mockPackagePath,
+                itemJSON,
             })
+        }).toThrow("No item folder found for item TEST_ITEM")
+    })
 
-            // Should fix empty keys and parse successfully
-            const item = new Item({
+    test("should throw error when editoritems.json missing", () => {
+        fs.existsSync.mockImplementation((filePath) => {
+            return !filePath.includes("editoritems.json")
+        })
+
+        expect(() => {
+            new Item({
                 packagePath: mockPackagePath,
                 itemJSON: mockItemJSON,
             })
-
-            expect(item.details.Authors).toBe("Test Author")
-        })
+        }).toThrow("Missing editoritems.json!")
     })
 
-    describe("file operations", () => {
-        let item
+    test("should throw error when properties.json missing", () => {
+        fs.existsSync.mockImplementation((filePath) => {
+            return !filePath.includes("properties.json")
+        })
 
-        beforeEach(() => {
-            item = new Item({
+        expect(() => {
+            new Item({
                 packagePath: mockPackagePath,
                 itemJSON: mockItemJSON,
             })
-        })
-
-        test("should return parsed editor items", () => {
-            const editorItems = item.getEditorItems()
-
-            expect(vdf.parse).toHaveBeenCalledWith(mockEditorItemsVDF)
-            expect(editorItems).toHaveProperty("Item")
-        })
-
-        test("should return raw editor items when requested", () => {
-            vdf.parse.mockClear()
-
-            const rawEditorItems = item.getEditorItems(true)
-
-            expect(rawEditorItems).toBe(mockEditorItemsVDF)
-            expect(vdf.parse).not.toHaveBeenCalled()
-        })
-
-        test("should save editor items", () => {
-            const mockVDF = { Item: { test: "data" } }
-            vdf.stringify = jest.fn().mockReturnValue("stringified vdf")
-            fs.writeFileSync = jest.fn()
-
-            item.saveEditorItems(mockVDF)
-
-            expect(vdf.stringify).toHaveBeenCalledWith(mockVDF)
-            expect(fs.writeFileSync).toHaveBeenCalledWith(
-                item.paths.editorItems,
-                "stringified vdf",
-                "utf8",
-            )
-        })
-
-        test("should save properties", () => {
-            const mockPropertiesVDF = { Properties: { test: "data" } }
-            vdf.stringify = jest.fn().mockReturnValue("stringified properties")
-            fs.writeFileSync = jest.fn()
-
-            item.saveProperties(mockPropertiesVDF)
-
-            expect(vdf.stringify).toHaveBeenCalledWith(mockPropertiesVDF)
-            expect(fs.writeFileSync).toHaveBeenCalledWith(
-                item.paths.properties,
-                "stringified properties",
-                "utf8",
-            )
-        })
-
-        test("should check if item exists", () => {
-            fs.existsSync.mockReturnValue(true)
-
-            expect(item.exists()).toBe(true)
-        })
-
-        test("should return false when item files missing", () => {
-            fs.existsSync.mockReturnValue(false)
-
-            expect(item.exists()).toBe(false)
-        })
+        }).toThrow("Missing properties.json!")
     })
 
-    describe("edge cases", () => {
-        test("should handle item with no Version section", () => {
-            const noVersionItem = {
-                ID: "NO_VERSION_ITEM",
-            }
-
-            expect(() => {
-                new Item({
-                    packagePath: mockPackagePath,
-                    itemJSON: noVersionItem,
-                })
-            }).toThrow("No item folder found")
+    test("should get raw editor items", () => {
+        const item = new Item({
+            packagePath: mockPackagePath,
+            itemJSON: mockItemJSON,
         })
 
-        test("should handle item with empty Styles section", () => {
-            const emptyStylesItem = {
-                ID: "EMPTY_STYLES_ITEM",
-                Version: {
-                    Styles: {},
-                },
-            }
+        const rawEditorItems = item.getEditorItems(true)
+        expect(rawEditorItems).toBe(JSON.stringify(mockEditorItemsJSON))
+    })
 
-            expect(() => {
-                new Item({
-                    packagePath: mockPackagePath,
-                    itemJSON: emptyStylesItem,
-                })
-            }).toThrow("No item folder found")
+    test("should get parsed editor items", () => {
+        const item = new Item({
+            packagePath: mockPackagePath,
+            itemJSON: mockItemJSON,
         })
 
-        test("should convert folder name to lowercase", () => {
-            const upperCaseFolder = {
-                ID: "UPPER_CASE_ITEM",
-                Version: {
-                    Styles: {
-                        BEE2_CLEAN: "UPPER_CASE_FOLDER",
-                    },
-                },
-            }
+        const parsedEditorItems = item.getEditorItems()
+        expect(parsedEditorItems).toEqual(mockEditorItemsJSON)
+    })
 
-            const item = new Item({
-                packagePath: mockPackagePath,
-                itemJSON: upperCaseFolder,
-            })
+    test("should save editor items", () => {
+        const item = new Item({
+            packagePath: mockPackagePath,
+            itemJSON: mockItemJSON,
+        })
 
-            expect(item.itemFolder).toBe("upper_case_folder")
+        const mockJSON = { Item: { test: "data" } }
+        item.saveEditorItems(mockJSON)
+
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+            expect.stringContaining("editoritems.json"),
+            JSON.stringify(mockJSON, null, 4),
+            "utf8",
+        )
+    })
+
+    test("should save properties", () => {
+        const item = new Item({
+            packagePath: mockPackagePath,
+            itemJSON: mockItemJSON,
+        })
+
+        const mockPropertiesJSON = { Properties: { test: "data" } }
+        item.saveProperties(mockPropertiesJSON)
+
+        expect(fs.writeFileSync).toHaveBeenCalledWith(
+            expect.stringContaining("properties.json"),
+            JSON.stringify(mockPropertiesJSON, null, 4),
+            "utf8",
+        )
+    })
+
+    test("should check if item exists", () => {
+        const item = new Item({
+            packagePath: mockPackagePath,
+            itemJSON: mockItemJSON,
+        })
+
+        expect(item.exists()).toBe(true)
+
+        fs.existsSync.mockReturnValue(false)
+        expect(item.exists()).toBe(false)
+    })
+
+    test("should serialize to JSON", () => {
+        const item = new Item({
+            packagePath: mockPackagePath,
+            itemJSON: mockItemJSON,
+        })
+
+        const json = item.toJSON()
+        expect(json).toEqual({
+            id: item.id,
+            name: item.name,
+            details: item.details,
+            icon: item.icon,
+            paths: item.paths,
+            itemFolder: item.itemFolder,
+            fullItemPath: item.fullItemPath,
+            packagePath: item.packagePath,
         })
     })
 })

@@ -1,5 +1,5 @@
 const { Menu } = require("electron")
-const { loadPackage } = require("./packageManager")
+const { loadPackage, importPackage } = require("./packageManager")
 const { dialog, BrowserWindow } = require("electron")
 
 function createMainMenu(mainWindow) {
@@ -14,17 +14,55 @@ function createMainMenu(mainWindow) {
                     click: async () => {
                         const result = await dialog.showOpenDialog(mainWindow, {
                             properties: ["openFile"],
+                            filters: [
+                                { name: "BEE Package", extensions: ["bee_pack", "zip"] }
+                            ]
                         })
 
                         if (result.canceled) return null
 
-                        //Load the package
-                        const package = await loadPackage(result.filePaths[0])
+                        try {
+                            // First import (convert VDF to JSON)
+                            await importPackage(result.filePaths[0])
+                            // Then load the converted package
+                            const package = await loadPackage(result.filePaths[0])
+                            mainWindow.webContents.send(
+                                "package:loaded",
+                                package.items,
+                            )
+                        } catch (error) {
+                            dialog.showErrorBox(
+                                "Import Failed",
+                                `Failed to import package: ${error.message}`
+                            )
+                        }
+                    },
+                },
+                {
+                    label: "Load Package",
+                    click: async () => {
+                        const result = await dialog.showOpenDialog(mainWindow, {
+                            properties: ["openFile"],
+                            filters: [
+                                { name: "BEE Package", extensions: ["bpee"] }
+                            ]
+                        })
 
-                        mainWindow.webContents.send(
-                            "package:loaded",
-                            package.items,
-                        )
+                        if (result.canceled) return null
+
+                        try {
+                            // Just load (assumes already imported/converted to JSON)
+                            const package = await loadPackage(result.filePaths[0])
+                            mainWindow.webContents.send(
+                                "package:loaded",
+                                package.items,
+                            )
+                        } catch (error) {
+                            dialog.showErrorBox(
+                                "Load Failed",
+                                `Failed to load package: ${error.message}`
+                            )
+                        }
                     },
                 },
             ],
