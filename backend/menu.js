@@ -3,6 +3,7 @@ const {
     loadPackage,
     importPackage,
     savePackageAsBpee,
+    clearPackagesDirectory, // Import the new function
 } = require("./packageManager")
 const { dialog, BrowserWindow } = require("electron")
 const path = require("path")
@@ -152,6 +153,30 @@ function createMainMenu(mainWindow) {
                     },
                 },
                 { type: "separator" },
+                {
+                    label: "Clear Packages Directory",
+                    click: async () => {
+                        const { response } = await dialog.showMessageBox(mainWindow, {
+                            type: "warning",
+                            buttons: ["Cancel", "Clear"],
+                            defaultId: 0,
+                            cancelId: 0,
+                            title: "Clear Packages Directory",
+                            message: "Are you sure you want to clear all contents of the packages directory? This cannot be undone.",
+                        })
+                        if (response === 1) { // User chose 'Clear'
+                            try {
+                                await clearPackagesDirectory()
+                                dialog.showMessageBox(mainWindow, {
+                                    message: "Packages directory cleared.",
+                                    type: "info",
+                                })
+                            } catch (err) {
+                                dialog.showErrorBox("Clear Failed", err.message)
+                            }
+                        }
+                    },
+                },
                 {
                     label: process.platform === "darwin" ? "Quit" : "Exit",
                     accelerator:
