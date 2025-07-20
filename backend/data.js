@@ -2,6 +2,7 @@ const fs = require("fs")
 const path = require("path")
 const WinReg = require("winreg")
 const vdf = require("vdf-parser")
+const fgdParser = require("fgdparser") // npm i fgdparser
 
 async function findPortal2Dir(log = console) {
     // 1. Find main Steam path from registry
@@ -67,6 +68,39 @@ async function findPortal2Dir(log = console) {
     return null
 }
 
+function parseFGD(fgdPath, log = console) {
+    if (!fs.existsSync(fgdPath)) {
+        log.error("FGD file not found:", fgdPath)
+        return null
+    }
+
+    try {
+        log.log("Parsing FGD file:", fgdPath)
+        const fgdContent = fs.readFileSync(fgdPath, 'utf-8')
+        const parsed = fgdParser.parse(fgdContent)
+        
+        const entities = {}
+        
+        // Extract inputs/outputs for each entity
+        for (const entity of parsed.entities) {
+            entities[entity.name] = {
+                type: entity.type,
+                description: entity.description,
+                inputs: (entity.inputs || []).map(i => i.name),
+                outputs: (entity.outputs || []).map(o => o.name),
+                inputDetails: entity.inputs || [],
+                outputDetails: entity.outputs || []
+            }
+        }
+        
+        log.log(`Parsed ${Object.keys(entities).length} entities from FGD`)
+        return entities
+    } catch (e) {
+        log.error("Error parsing FGD:", e)
+        return null
+    }
+}
+
 async function findPortal2Resources(log = console) {
     const p2dir = await findPortal2Dir(log)
     if (!p2dir) return null
@@ -78,6 +112,7 @@ async function findPortal2Resources(log = console) {
         maps: null,
         scripts: null,
         bin: null,
+        entities: null // FGD parsed data
     }
 
     // Check for gameinfo.txt
@@ -86,10 +121,11 @@ async function findPortal2Resources(log = console) {
         paths.gameinfo = gameinfoPath
     }
 
-    // Check for FGD file
+    // Check for FGD file and parse it
     const fgdPath = path.join(p2dir, "bin", "portal2.fgd")
     if (fs.existsSync(fgdPath)) {
         paths.fgd = fgdPath
+        paths.entities = parseFGD(fgdPath, log)
     }
 
     // Maps, scripts, bin
@@ -109,7 +145,4 @@ async function findPortal2Resources(log = console) {
     return paths
 }
 
-const resources = await findPortal2Resources()
-console.log(resources)
-
-module.exports = { findPortal2Dir, findPortal2Resources }
+module.exports = { findPortal2Dir, findPortal2Resources, parseFGD }
