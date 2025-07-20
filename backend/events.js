@@ -3,6 +3,31 @@ const { createItemEditor } = require("./items/itemEditor")
 const { ipcMain, dialog, BrowserWindow } = require("electron")
 const fs = require("fs")
 const path = require("path")
+const { saveItem } = require("./saveItem") // Import the new saveItem function
+const { Item } = require("./models/items") // Import the Item class
+const { savePackageAsBpee } = require("./packageManager");
+
+// Track last saved .bpee path in memory (could be improved with persistent storage)
+let lastSavedBpeePath = null;
+let currentPackageDir = null; // This should be set when a package is loaded
+
+// Helper to load original itemJSON from info.json
+function loadOriginalItemJSON(packagePath, itemId) {
+    // Try to find info.json in the packagePath or its parent
+    let infoPath = fs.existsSync(path.join(packagePath, "info.json"))
+        ? path.join(packagePath, "info.json")
+        : path.join(path.dirname(packagePath), "info.json");
+    if (!fs.existsSync(infoPath)) {
+        throw new Error(`info.json not found for package: ${packagePath}`);
+    }
+    const parsedInfo = JSON.parse(fs.readFileSync(infoPath, "utf-8"));
+    let rawitems = parsedInfo["Item"];
+    if (!rawitems) throw new Error("Invalid package format - no items found");
+    if (!Array.isArray(rawitems)) rawitems = [rawitems];
+    const found = rawitems.find((el) => el.ID === itemId);
+    if (!found) throw new Error(`Item with ID ${itemId} not found in info.json`);
+    return found;
+}
 
 async function handleItemSave(item, event, mainWindow) {
     try {
@@ -14,68 +39,21 @@ async function handleItemSave(item, event, mainWindow) {
             throw new Error("Item name cannot be empty")
         }
 
-        // Get the item's editor items and properties files
-        const editorItemsPath = path.join(item.fullItemPath, "editoritems.json")
-        const propertiesPath = path.join(item.fullItemPath, "properties.json")
+        // Use the new saveItem function to handle file operations
+        const { editorItems, properties } = await saveItem(item)
 
-        // Check if files exist
-        if (!fs.existsSync(editorItemsPath)) {
-            throw new Error(`Editor items file not found: ${editorItemsPath}`)
-        }
-        if (!fs.existsSync(propertiesPath)) {
-            throw new Error(`Properties file not found: ${propertiesPath}`)
-        }
-
-        // Read current files
-        let editorItems, properties
+        // Reconstruct the item from disk to ensure all fields are up to date
+        const packagePath = item.packagePath || path.dirname(path.dirname(item.fullItemPath));
+        let itemJSON;
         try {
-            editorItems = JSON.parse(fs.readFileSync(editorItemsPath, "utf-8"))
-        } catch (error) {
-            throw new Error(`Failed to read editor items: ${error.message}`)
+            itemJSON = loadOriginalItemJSON(packagePath, item.id);
+        } catch (e) {
+            // fallback to minimal itemJSON if info.json is missing or item not found
+            const itemFolder = item.itemFolder || path.basename(item.fullItemPath);
+            itemJSON = { ID: item.id, Version: { Styles: { BEE2_CLEAN: itemFolder } } };
         }
-
-        try {
-            properties = JSON.parse(fs.readFileSync(propertiesPath, "utf-8"))
-        } catch (error) {
-            throw new Error(`Failed to read properties: ${error.message}`)
-        }
-
-        // Validate file structure
-        if (!editorItems?.Item?.Editor?.SubType) {
-            throw new Error("Invalid editor items format")
-        }
-        if (!properties?.Properties) {
-            throw new Error("Invalid properties format")
-        }
-
-        // Update editor items
-        if (Array.isArray(editorItems.Item.Editor.SubType)) {
-            editorItems.Item.Editor.SubType[0].Name = item.name
-        } else {
-            editorItems.Item.Editor.SubType.Name = item.name
-        }
-
-        // Update properties
-        properties.Properties = {
-            ...properties.Properties,
-            ...item.details
-        }
-
-        // Save the files
-        try {
-            fs.writeFileSync(editorItemsPath, JSON.stringify(editorItems, null, 4))
-            fs.writeFileSync(propertiesPath, JSON.stringify(properties, null, 4))
-        } catch (error) {
-            throw new Error(`Failed to write files: ${error.message}`)
-        }
-
-        // Create updated item data
-        const updatedItem = {
-            ...item,
-            name: item.name,
-            details: properties.Properties,
-            editorItems: editorItems
-        }
+        const updatedItemInstance = new Item({ packagePath, itemJSON });
+        const updatedItem = updatedItemInstance.toJSON();
 
         // Send the updated item data to both windows
         event.sender.send('item-updated', updatedItem) // Send to editor window
@@ -105,6 +83,40 @@ function reg_events(mainWindow) {
     ipcMain.handle("save-item", async (event, itemData) => {
         return handleItemSave(itemData, event, mainWindow)
     })
+
+    // IPC handler for Save Package
+    ipcMain.on("save-package", async (event) => {
+        try {
+            if (!currentPackageDir) throw new Error("No package loaded");
+            if (!lastSavedBpeePath) {
+                // If no previous path, fall back to Save As
+                event.sender.send("request-save-package-as");
+                return;
+            }
+            await savePackageAsBpee(currentPackageDir, lastSavedBpeePath);
+            event.sender.send("package-saved", { path: lastSavedBpeePath });
+        } catch (err) {
+            dialog.showErrorBox("Save Failed", err.message);
+        }
+    });
+
+    // IPC handler for Save Package As
+    ipcMain.on("save-package-as", async (event) => {
+        try {
+            if (!currentPackageDir) throw new Error("No package loaded");
+            const { canceled, filePath } = await dialog.showSaveDialog({
+                title: "Save Package As",
+                defaultPath: "package.bpee",
+                filters: [{ name: "BeePEE Package", extensions: ["bpee"] }],
+            });
+            if (canceled || !filePath) return;
+            await savePackageAsBpee(currentPackageDir, filePath);
+            lastSavedBpeePath = filePath;
+            event.sender.send("package-saved", { path: filePath });
+        } catch (err) {
+            dialog.showErrorBox("Save As Failed", err.message);
+        }
+    });
 }
 
 module.exports = { reg_events }
