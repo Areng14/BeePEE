@@ -10,11 +10,14 @@ import {
     DialogActions,
     TextField,
     IconButton,
-    DialogContentText
+    DialogContentText,
+    Tooltip
 } from "@mui/material"
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
+import CodeIcon from '@mui/icons-material/Code'
+import SubjectIcon from '@mui/icons-material/Subject'
 import { useState } from 'react'
 
 function Instances({ item }) {
@@ -24,12 +27,15 @@ function Instances({ item }) {
     const [instanceToDelete, setInstanceToDelete] = useState(null)
     const [error, setError] = useState('')
 
-    // Get all available instance keys
-    const instanceKeys = item?.instances ? Object.keys(item.instances) : []
+    // Get all instances from the item
+    const instances = Object.entries(item?.instances || {}).map(([index, instance]) => ({
+        ...instance,
+        index
+    }))
 
-    const handleEditInstance = async (packagePath, instanceName) => {
+    const handleEditInstance = async (packagePath, instancePath) => {
         try {
-            await window.package.editInstance({ packagePath, instanceName, itemId: item.id })
+            await window.package.editInstance({ packagePath, instanceName: instancePath, itemId: item.id })
         } catch (error) {
             console.error("Failed to edit instance:", error)
         }
@@ -78,15 +84,20 @@ function Instances({ item }) {
                 </Button>
             </Box>
 
-            {instanceKeys.length > 0 ? (
+            {instances.length > 0 ? (
                 <Stack spacing={2}>
-                    {instanceKeys.map((key) => {
-                        const instance = item.instances[key]
+                    {instances.map((instance) => {
+                        const isVBSP = instance.source === 'vbsp'
+                        const instanceNumber = instance.Name.match(/(\d+)\.vmf$/)?.[1] || '?'
+
                         return (
-                            <Paper key={key} variant="outlined" sx={{ p: 2 }}>
+                            <Paper key={instance.Name} variant="outlined" sx={{ p: 2 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Typography variant="subtitle1" sx={{ mr: 1, minWidth: 'auto' }}>
-                                        Instance {key}:
+                                    <Typography variant="subtitle1" sx={{ mr: 1, minWidth: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Tooltip title={isVBSP ? "VBSP Instance" : "Editor Instance"}>
+                                            {isVBSP ? <CodeIcon fontSize="small" /> : <SubjectIcon fontSize="small" />}
+                                        </Tooltip>
+                                        Instance {instanceNumber}:
                                     </Typography>
                                     <Typography 
                                         variant="body2" 
@@ -96,7 +107,9 @@ function Instances({ item }) {
                                             overflow: 'hidden',
                                             textOverflow: 'ellipsis',
                                             whiteSpace: 'nowrap',
-                                            flex: 1
+                                            flex: 1,
+                                            direction: 'rtl',  // Make text overflow from the left
+                                            textAlign: 'left'  // Keep text aligned normally
                                         }}
                                     >
                                         {instance.Name}
@@ -107,16 +120,27 @@ function Instances({ item }) {
                                     >
                                         <EditIcon fontSize="small" />
                                     </IconButton>
-                                    <IconButton
-                                        size="small"
-                                        color="error"
-                                        onClick={() => {
-                                            setInstanceToDelete(key)
-                                            setDeleteDialogOpen(true)
-                                        }}
-                                    >
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
+                                    <Tooltip title={isVBSP ? "VBSP instances cannot be deleted - To remove them, remove them in the VBSP tab." : "Delete instance"}>
+                                        <span>
+                                            <IconButton
+                                                size="small"
+                                                color="error"
+                                                disabled={isVBSP}
+                                                onClick={() => {
+                                                    setInstanceToDelete(instance.index)
+                                                    setDeleteDialogOpen(true)
+                                                }}
+                                                sx={isVBSP ? {
+                                                    opacity: 0.5,
+                                                    '&.Mui-disabled': {
+                                                        color: 'error.main'
+                                                    }
+                                                } : undefined}
+                                            >
+                                                <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                        </span>
+                                    </Tooltip>
                                 </Box>
                             </Paper>
                         )
@@ -176,33 +200,17 @@ function Instances({ item }) {
                     }
                 }}
             >
-                <DialogTitle sx={{ pb: 1 }}>
-                    Remove Instance
-                </DialogTitle>
-                <DialogContent sx={{ pb: 2 }}>
-                    <Typography>
-                        Are you sure you want to remove Instance {instanceToDelete}?
-                    </Typography>
+                <DialogTitle>Delete Instance?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText sx={{ color: 'text.secondary' }}>
+                        Are you sure you want to delete this instance? This cannot be undone.
+                    </DialogContentText>
                 </DialogContent>
-                <DialogActions sx={{ px: 2, pb: 2 }}>
-                    <Button 
-                        onClick={() => setDeleteDialogOpen(false)}
-                        sx={{ 
-                            color: '#888',
-                            '&:hover': {
-                                color: 'white',
-                                bgcolor: 'rgba(255,255,255,0.1)'
-                            }
-                        }}
-                    >
+                <DialogActions>
+                    <Button onClick={() => setDeleteDialogOpen(false)}>
                         Cancel
                     </Button>
-                    <Button 
-                        onClick={handleRemoveInstance}
-                        variant="contained"
-                        color="error"
-                        disableElevation
-                    >
+                    <Button onClick={handleRemoveInstance} color="error" variant="contained">
                         Delete
                     </Button>
                 </DialogActions>
