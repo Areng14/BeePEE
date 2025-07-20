@@ -6,6 +6,7 @@ const vdf = require("vdf-parser")
 const path7za = require("7zip-bin").path7za
 const { extractFull } = require("node-7z")
 const { add } = require("node-7z")
+const { timeOperation } = require("./utils/timing")
 
 var packages = []
 
@@ -80,83 +81,90 @@ const unloadPackage = async (packageName, remove = false) => {
 }
 
 const importPackage = async (pathToPackage) => {
-    try {
-        // Create temporary package to get paths
-        const tempPkg = new Package(pathToPackage)
+    return timeOperation("Import package", async () => {
+        try {
+            // Create temporary package to get paths
+            const tempPkg = new Package(pathToPackage)
 
-        // Extract package
-        fs.mkdirSync(tempPkg.packageDir, { recursive: true })
+            // Extract package
+            fs.mkdirSync(tempPkg.packageDir, { recursive: true })
 
-        const stream = extractFull(pathToPackage, tempPkg.packageDir, {
-            $bin: path7za,
-            recursive: true,
-        })
+            const stream = extractFull(pathToPackage, tempPkg.packageDir, {
+                $bin: path7za,
+                recursive: true,
+            })
 
-        await new Promise((resolve, reject) => {
-            stream.on("end", resolve)
-            stream.on("error", reject)
-        })
+            await new Promise((resolve, reject) => {
+                stream.on("end", resolve)
+                stream.on("error", reject)
+            })
 
-        const infoPath = path.join(tempPkg.packageDir, "info.txt")
-        if (!fs.existsSync(infoPath)) {
-            throw new Error("Package missing info.txt file")
-        }
-
-        // Process all VDF files recursively
-        processVdfFiles(tempPkg.packageDir)
-
-        return true
-    } catch (error) {
-        console.error("Failed to import package:", error.message)
-
-        // Cleanup on failure
-        if (tempPkg?.packageDir && fs.existsSync(tempPkg.packageDir)) {
-            try {
-                fs.rmSync(tempPkg.packageDir, { recursive: true, force: true })
-                console.log("Cleaned up failed package directory")
-            } catch (cleanupError) {
-                console.error(
-                    "Failed to cleanup package directory:",
-                    cleanupError.message,
-                )
+            const infoPath = path.join(tempPkg.packageDir, "info.txt")
+            if (!fs.existsSync(infoPath)) {
+                throw new Error("Package missing info.txt file")
             }
+
+            // Process all VDF files recursively
+            await timeOperation("Process VDF files", () => {
+                processVdfFiles(tempPkg.packageDir)
+                return Promise.resolve()
+            })
+
+            return true
+        } catch (error) {
+            console.error("Failed to import package:", error.message)
+
+            // Cleanup on failure
+            if (tempPkg?.packageDir && fs.existsSync(tempPkg.packageDir)) {
+                try {
+                    fs.rmSync(tempPkg.packageDir, { recursive: true, force: true })
+                    console.log("Cleaned up failed package directory")
+                } catch (cleanupError) {
+                    console.error(
+                        "Failed to cleanup package directory:",
+                        cleanupError.message,
+                    )
+                }
+            }
+
+            dialog.showErrorBox(
+                "Package Import Failed",
+                `Failed to import package ${path.parse(pathToPackage).name}: ${error.message}`,
+            )
+
+            throw error
         }
-
-        dialog.showErrorBox(
-            "Package Import Failed",
-            `Failed to import package ${path.parse(pathToPackage).name}: ${error.message}`,
-        )
-
-        throw error
-    }
+    })
 }
 
 const loadPackage = async (pathToPackage) => {
-    try {
-        // Create package instance
-        const pkg = new Package(pathToPackage)
+    return timeOperation("Load package", async () => {
+        try {
+            // Create package instance
+            const pkg = new Package(pathToPackage)
 
-        // Check if we need to import first
-        const infoJsonPath = path.join(pkg.packageDir, "info.json")
-        const infoTxtPath = path.join(pkg.packageDir, "info.txt")
+            // Check if we need to import first
+            const infoJsonPath = path.join(pkg.packageDir, "info.json")
+            const infoTxtPath = path.join(pkg.packageDir, "info.txt")
 
-        if (!fs.existsSync(infoJsonPath)) {
-            if (fs.existsSync(infoTxtPath)) {
-                // Need to import first
-                await importPackage(pathToPackage)
-            } else {
-                throw new Error("Package not found or not imported")
+            if (!fs.existsSync(infoJsonPath)) {
+                if (fs.existsSync(infoTxtPath)) {
+                    // Need to import first
+                    await importPackage(pathToPackage)
+                } else {
+                    throw new Error("Package not found or not imported")
+                }
             }
-        }
 
-        // Now load the package
-        await pkg.load()
-        packages.push(pkg)
-        return pkg
-    } catch (error) {
-        console.error("Failed to load package:", error)
-        throw error
-    }
+            // Now load the package
+            await pkg.load()
+            packages.push(pkg)
+            return pkg
+        } catch (error) {
+            console.error("Failed to load package:", error)
+            throw error
+        }
+    })
 }
 
 const reg_loadPackagePopup = () => {
