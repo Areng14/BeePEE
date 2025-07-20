@@ -49,7 +49,7 @@ class Item {
         }
 
         const parsedEditoritems = JSON.parse(
-            fs.readFileSync(this.paths.editorItems, "utf-8")
+            fs.readFileSync(this.paths.editorItems, "utf-8"),
         )
 
         //handle both single SubType and array of SubTypes
@@ -70,7 +70,7 @@ class Item {
         }
 
         const parsedProperties = JSON.parse(
-            fs.readFileSync(this.paths.properties, "utf-8")
+            fs.readFileSync(this.paths.properties, "utf-8"),
         )
 
         this.details = parsedProperties["Properties"]

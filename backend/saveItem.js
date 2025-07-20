@@ -46,7 +46,7 @@ async function saveItem(item) {
     // Update properties
     properties.Properties = {
         ...properties.Properties,
-        ...item.details
+        ...item.details,
     }
 
     // Save the files
@@ -60,4 +60,4 @@ async function saveItem(item) {
     return { editorItems, properties }
 }
 
-module.exports = { saveItem } 
+module.exports = { saveItem }

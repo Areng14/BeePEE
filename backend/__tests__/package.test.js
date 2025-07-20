@@ -88,19 +88,19 @@ describe("Package", () => {
                     ID: "TEST_ITEM_1",
                     Version: {
                         Styles: {
-                            BEE2_CLEAN: "test_item"
-                        }
-                    }
+                            BEE2_CLEAN: "test_item",
+                        },
+                    },
                 },
                 {
                     ID: "TEST_ITEM_2",
                     Version: {
                         Styles: {
-                            BEE2_CLEAN: "test_item_2"
-                        }
-                    }
-                }
-            ]
+                            BEE2_CLEAN: "test_item_2",
+                        },
+                    },
+                },
+            ],
         }
 
         test("should successfully load package with multiple items", async () => {
@@ -120,10 +120,10 @@ describe("Package", () => {
                     ID: "SINGLE_ITEM",
                     Version: {
                         Styles: {
-                            BEE2_CLEAN: "single"
-                        }
-                    }
-                }
+                            BEE2_CLEAN: "single",
+                        },
+                    },
+                },
             }
             fs.readFileSync.mockReturnValue(JSON.stringify(singleItemContent))
 
@@ -138,10 +138,12 @@ describe("Package", () => {
                 Item: {
                     ID: "TEST_ITEM",
                     "": "some value",
-                    desc_0: "another value"
-                }
+                    desc_0: "another value",
+                },
             }
-            fs.readFileSync.mockReturnValue(JSON.stringify(contentWithEmptyKeys))
+            fs.readFileSync.mockReturnValue(
+                JSON.stringify(contentWithEmptyKeys),
+            )
 
             const pkg = await Package.create(mockPackagePath)
 
