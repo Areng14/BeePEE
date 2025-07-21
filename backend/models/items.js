@@ -257,6 +257,108 @@ class Item {
         }
     }
 
+    // Input management functions
+    getInputs() {
+        const editoritems = this.getEditorItems()
+        return editoritems.Item?.Exporting?.Inputs || {}
+    }
+
+    addInput(inputName, inputConfig) {
+        if (!inputName || typeof inputName !== 'string') {
+            throw new Error('Input name must be a non-empty string')
+        }
+        
+        if (!inputConfig || typeof inputConfig !== 'object') {
+            throw new Error('Input config must be an object')
+        }
+
+        const editoritems = this.getEditorItems()
+        
+        // Ensure Exporting structure exists
+        if (!editoritems.Item.Exporting) {
+            editoritems.Item.Exporting = {}
+        }
+        if (!editoritems.Item.Exporting.Inputs) {
+            editoritems.Item.Exporting.Inputs = {}
+        }
+
+        // Add the new input
+        editoritems.Item.Exporting.Inputs[inputName] = inputConfig
+        
+        this.saveEditorItems(editoritems)
+        return inputName
+    }
+
+    updateInput(inputName, inputConfig) {
+        if (!inputName || typeof inputName !== 'string') {
+            throw new Error('Input name must be a non-empty string')
+        }
+
+        const editoritems = this.getEditorItems()
+        
+        // Check if input exists
+        if (!editoritems.Item?.Exporting?.Inputs?.[inputName]) {
+            throw new Error(`Input '${inputName}' not found`)
+        }
+
+        if (!inputConfig || typeof inputConfig !== 'object') {
+            throw new Error('Input config must be an object')
+        }
+
+        // Update the input
+        editoritems.Item.Exporting.Inputs[inputName] = inputConfig
+        
+        this.saveEditorItems(editoritems)
+        return inputName
+    }
+
+    removeInput(inputName) {
+        if (!inputName || typeof inputName !== 'string') {
+            throw new Error('Input name must be a non-empty string')
+        }
+
+        const editoritems = this.getEditorItems()
+        
+        // Check if input exists
+        if (!editoritems.Item?.Exporting?.Inputs?.[inputName]) {
+            throw new Error(`Input '${inputName}' not found`)
+        }
+
+        // Remove the input
+        delete editoritems.Item.Exporting.Inputs[inputName]
+        
+        // Clean up empty structures
+        if (Object.keys(editoritems.Item.Exporting.Inputs).length === 0) {
+            delete editoritems.Item.Exporting.Inputs
+            if (Object.keys(editoritems.Item.Exporting).length === 0) {
+                delete editoritems.Item.Exporting
+            }
+        }
+        
+        this.saveEditorItems(editoritems)
+        return inputName
+    }
+
+    // Utility function to get a specific input
+    getInput(inputName) {
+        if (!inputName || typeof inputName !== 'string') {
+            throw new Error('Input name must be a non-empty string')
+        }
+
+        const inputs = this.getInputs()
+        return inputs[inputName] || null
+    }
+
+    // Utility function to check if an input exists
+    hasInput(inputName) {
+        if (!inputName || typeof inputName !== 'string') {
+            throw new Error('Input name must be a non-empty string')
+        }
+
+        const inputs = this.getInputs()
+        return inputName in inputs
+    }
+
     exists() {
         return (
             fs.existsSync(this.paths.editorItems) &&
