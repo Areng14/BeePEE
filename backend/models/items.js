@@ -359,6 +359,108 @@ class Item {
         return inputName in inputs
     }
 
+    // Output management functions
+    getOutputs() {
+        const editoritems = this.getEditorItems()
+        return editoritems.Item?.Exporting?.Outputs || {}
+    }
+
+    addOutput(outputName, outputConfig) {
+        if (!outputName || typeof outputName !== 'string') {
+            throw new Error('Output name must be a non-empty string')
+        }
+        
+        if (!outputConfig || typeof outputConfig !== 'object') {
+            throw new Error('Output config must be an object')
+        }
+
+        const editoritems = this.getEditorItems()
+        
+        // Ensure Exporting structure exists
+        if (!editoritems.Item.Exporting) {
+            editoritems.Item.Exporting = {}
+        }
+        if (!editoritems.Item.Exporting.Outputs) {
+            editoritems.Item.Exporting.Outputs = {}
+        }
+
+        // Add the new output
+        editoritems.Item.Exporting.Outputs[outputName] = outputConfig
+        
+        this.saveEditorItems(editoritems)
+        return outputName
+    }
+
+    updateOutput(outputName, outputConfig) {
+        if (!outputName || typeof outputName !== 'string') {
+            throw new Error('Output name must be a non-empty string')
+        }
+
+        const editoritems = this.getEditorItems()
+        
+        // Check if output exists
+        if (!editoritems.Item?.Exporting?.Outputs?.[outputName]) {
+            throw new Error(`Output '${outputName}' not found`)
+        }
+
+        if (!outputConfig || typeof outputConfig !== 'object') {
+            throw new Error('Output config must be an object')
+        }
+
+        // Update the output
+        editoritems.Item.Exporting.Outputs[outputName] = outputConfig
+        
+        this.saveEditorItems(editoritems)
+        return outputName
+    }
+
+    removeOutput(outputName) {
+        if (!outputName || typeof outputName !== 'string') {
+            throw new Error('Output name must be a non-empty string')
+        }
+
+        const editoritems = this.getEditorItems()
+        
+        // Check if output exists
+        if (!editoritems.Item?.Exporting?.Outputs?.[outputName]) {
+            throw new Error(`Output '${outputName}' not found`)
+        }
+
+        // Remove the output
+        delete editoritems.Item.Exporting.Outputs[outputName]
+        
+        // Clean up empty structures
+        if (Object.keys(editoritems.Item.Exporting.Outputs).length === 0) {
+            delete editoritems.Item.Exporting.Outputs
+            if (Object.keys(editoritems.Item.Exporting).length === 0) {
+                delete editoritems.Item.Exporting
+            }
+        }
+        
+        this.saveEditorItems(editoritems)
+        return outputName
+    }
+
+    // Utility function to get a specific output
+    getOutput(outputName) {
+        if (!outputName || typeof outputName !== 'string') {
+            throw new Error('Output name must be a non-empty string')
+        }
+
+        const outputs = this.getOutputs()
+        return outputs[outputName] || null
+    }
+
+    // Utility function to check if an output exists
+    hasOutput(outputName) {
+        if (!outputName || typeof outputName !== 'string') {
+            throw new Error('Output name must be a non-empty string')
+        }
+
+        const outputs = this.getOutputs()
+        return outputName in outputs
+    }
+
     exists() {
         return (
             fs.existsSync(this.paths.editorItems) &&

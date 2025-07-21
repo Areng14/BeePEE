@@ -17,4 +17,16 @@ contextBridge.exposeInMainWorld("package", {
     editInstance: (instancePath) => ipcRenderer.invoke("edit-instance", instancePath),
     addInstance: (itemId, instanceName) => ipcRenderer.invoke("add-instance", { itemId, instanceName }),
     removeInstance: (itemId, instanceIndex) => ipcRenderer.invoke("remove-instance", { itemId, instanceIndex }),
+
+    // Input management functions
+    getInputs: (itemId) => ipcRenderer.invoke("get-inputs", { itemId }),
+    addInput: (itemId, inputName, inputConfig) => ipcRenderer.invoke("add-input", { itemId, inputName, inputConfig }),
+    updateInput: (itemId, inputName, inputConfig) => ipcRenderer.invoke("update-input", { itemId, inputName, inputConfig }),
+    removeInput: (itemId, inputName) => ipcRenderer.invoke("remove-input", { itemId, inputName }),
+
+    // Output management functions
+    getOutputs: (itemId) => ipcRenderer.invoke("get-outputs", { itemId }),
+    addOutput: (itemId, outputName, outputConfig) => ipcRenderer.invoke("add-output", { itemId, outputName, outputConfig }),
+    updateOutput: (itemId, outputName, outputConfig) => ipcRenderer.invoke("update-output", { itemId, outputName, outputConfig }),
+    removeOutput: (itemId, outputName) => ipcRenderer.invoke("remove-output", { itemId, outputName }),
 })

@@ -172,6 +172,108 @@ function reg_events(mainWindow) {
         }
     })
 
+    // Input management handlers
+    ipcMain.handle("get-inputs", async (event, { itemId }) => {
+        try {
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+            
+            return { success: true, inputs: item.getInputs() }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    ipcMain.handle("add-input", async (event, { itemId, inputName, inputConfig }) => {
+        try {
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+            
+            item.addInput(inputName, inputConfig)
+            return { success: true }
+        } catch (error) {
+            dialog.showErrorBox("Failed to Add Input", error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
+    ipcMain.handle("update-input", async (event, { itemId, inputName, inputConfig }) => {
+        try {
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+            
+            item.updateInput(inputName, inputConfig)
+            return { success: true }
+        } catch (error) {
+            dialog.showErrorBox("Failed to Update Input", error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
+    ipcMain.handle("remove-input", async (event, { itemId, inputName }) => {
+        try {
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+            
+            item.removeInput(inputName)
+            return { success: true }
+        } catch (error) {
+            dialog.showErrorBox("Failed to Remove Input", error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Output management handlers
+    ipcMain.handle("get-outputs", async (event, { itemId }) => {
+        try {
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+            
+            return { success: true, outputs: item.getOutputs() }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    ipcMain.handle("add-output", async (event, { itemId, outputName, outputConfig }) => {
+        try {
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+            
+            item.addOutput(outputName, outputConfig)
+            return { success: true }
+        } catch (error) {
+            dialog.showErrorBox("Failed to Add Output", error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
+    ipcMain.handle("update-output", async (event, { itemId, outputName, outputConfig }) => {
+        try {
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+            
+            item.updateOutput(outputName, outputConfig)
+            return { success: true }
+        } catch (error) {
+            dialog.showErrorBox("Failed to Update Output", error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
+    ipcMain.handle("remove-output", async (event, { itemId, outputName }) => {
+        try {
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+            
+            item.removeOutput(outputName)
+            return { success: true }
+        } catch (error) {
+            dialog.showErrorBox("Failed to Remove Output", error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
     // Register instance editing in Hammer
     ipcMain.handle("edit-instance", async (event, { packagePath, instanceName, itemId }) => {
         try {
