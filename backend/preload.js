@@ -29,4 +29,8 @@ contextBridge.exposeInMainWorld("package", {
     addOutput: (itemId, outputName, outputConfig) => ipcRenderer.invoke("add-output", { itemId, outputName, outputConfig }),
     updateOutput: (itemId, outputName, outputConfig) => ipcRenderer.invoke("update-output", { itemId, outputName, outputConfig }),
     removeOutput: (itemId, outputName) => ipcRenderer.invoke("remove-output", { itemId, outputName }),
+
+    // Entity and FGD data functions
+    getItemEntities: (itemId) => ipcRenderer.invoke("get-item-entities", { itemId }),
+    getFgdData: () => ipcRenderer.invoke("get-fgd-data"),
 })

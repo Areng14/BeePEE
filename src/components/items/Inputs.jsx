@@ -41,7 +41,7 @@ const INPUT_TYPES = [
     { value: 'OR', label: 'OR Logic' }
 ]
 
-function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit = false }) {
+function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit = false, itemId }) {
     const [formData, setFormData] = useState({
         Type: 'AND',
         Enable_cmd: '',
@@ -55,9 +55,31 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
         ...config
     })
     const [error, setError] = useState('')
+    const [entities, setEntities] = useState({})
+    const [fgdData, setFgdData] = useState({})
+    const [loading, setLoading] = useState(false)
+
+    // Command builder state
+    const [enableEntity, setEnableEntity] = useState('')
+    const [enableInput, setEnableInput] = useState('')
+    const [disableEntity, setDisableEntity] = useState('')
+    const [disableInput, setDisableInput] = useState('')
+    
+    // Secondary command builder state (for dual inputs)
+    const [secEnableEntity, setSecEnableEntity] = useState('')
+    const [secEnableInput, setSecEnableInput] = useState('')
+    const [secDisableEntity, setSecDisableEntity] = useState('')
+    const [secDisableInput, setSecDisableInput] = useState('')
+
+    // Output command builder state
+    const [activateEntity, setActivateEntity] = useState('')
+    const [activateOutput, setActivateOutput] = useState('')
+    const [deactivateEntity, setDeactivateEntity] = useState('')
+    const [deactivateOutput, setDeactivateOutput] = useState('')
 
     useEffect(() => {
-        if (open) {
+        if (open && itemId) {
+            loadEntityData()
             setFormData({
                 Type: 'AND',
                 Enable_cmd: '',
@@ -70,9 +92,74 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                 Out_Deactivate: '',
                 ...config
             })
+            parseExistingCommands()
             setError('')
         }
-    }, [open, config])
+    }, [open, config, itemId])
+
+    const loadEntityData = async () => {
+        setLoading(true)
+        try {
+            const [entitiesResult, fgdResult] = await Promise.all([
+                window.package.getItemEntities(itemId),
+                window.package.getFgdData()
+            ])
+            
+            if (entitiesResult.success) {
+                setEntities(entitiesResult.entities)
+            }
+            
+            if (fgdResult.success) {
+                setFgdData(fgdResult.entities)
+            }
+        } catch (error) {
+            console.error('Failed to load entity data:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const parseExistingCommands = () => {
+        // Parse existing command strings back into dropdown selections
+        if (config.Enable_cmd) {
+            const parts = config.Enable_cmd.split(',')
+            if (parts.length >= 2) {
+                setEnableEntity(parts[0])
+                setEnableInput(parts[1])
+            }
+        }
+        if (config.Disable_cmd) {
+            const parts = config.Disable_cmd.split(',')
+            if (parts.length >= 2) {
+                setDisableEntity(parts[0])
+                setDisableInput(parts[1])
+            }
+        }
+        // Similar parsing for other command types...
+    }
+
+    const buildCommand = (entity, inputOutput) => {
+        if (!entity || !inputOutput) return ''
+        return `${entity},${inputOutput},,0,-1`
+    }
+
+    const buildOutputCommand = (entity, outputName) => {
+        if (!entity || !outputName) return ''
+        return `instance:${entity};${outputName}`
+    }
+
+    // Update form data when selections change
+    useEffect(() => {
+        setFormData(prev => ({
+            ...prev,
+            Enable_cmd: buildCommand(enableEntity, enableInput),
+            Disable_cmd: buildCommand(disableEntity, disableInput),
+            Sec_Enable_cmd: buildCommand(secEnableEntity, secEnableInput),
+            Sec_Disable_cmd: buildCommand(secDisableEntity, secDisableInput),
+            Out_Activate: buildOutputCommand(activateEntity, activateOutput),
+            Out_Deactivate: buildOutputCommand(deactivateEntity, deactivateOutput)
+        }))
+    }, [enableEntity, enableInput, disableEntity, disableInput, secEnableEntity, secEnableInput, secDisableEntity, secDisableInput, activateEntity, activateOutput, deactivateEntity, deactivateOutput])
 
     const handleSave = () => {
         // Filter out empty fields
@@ -95,6 +182,33 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
 
     const isInput = title.includes('Input')
     const isDualInput = formData.Type === 'DUAL'
+
+    const entityOptions = Object.keys(entities).map(entityName => ({
+        value: entityName,
+        label: `${entityName} (${entities[entityName]})`
+    }))
+    
+    const getAvailableInputsForEntity = (entityName) => {
+        const entityClass = entities[entityName]
+        const fgdEntity = fgdData[entityClass]
+        return fgdEntity?.inputs || []
+    }
+
+    const getAvailableOutputsForEntity = (entityName) => {
+        const entityClass = entities[entityName]
+        const fgdEntity = fgdData[entityClass]
+        return fgdEntity?.outputs || []
+    }
+
+    if (loading) {
+        return (
+            <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+                <DialogContent sx={{ textAlign: 'center', py: 4 }}>
+                    <Typography>Loading entity data...</Typography>
+                </DialogContent>
+            </Dialog>
+        )
+    }
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -124,23 +238,98 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                     Primary Input Commands
                                 </Typography>
                                 <Stack spacing={2}>
-                                    <TextField
-                                        label="Enable Command"
-                                        value={formData.Enable_cmd}
-                                        onChange={(e) => updateFormData('Enable_cmd', e.target.value)}
-                                        fullWidth
-                                        placeholder="Activator,FireUser1,,0,-1"
-                                        helperText="Command to activate this input"
-                                    />
-                                    
-                                    <TextField
-                                        label="Disable Command"
-                                        value={formData.Disable_cmd}
-                                        onChange={(e) => updateFormData('Disable_cmd', e.target.value)}
-                                        fullWidth
-                                        placeholder="Activator,FireUser2,,0,-1"
-                                        helperText="Command to deactivate this input"
-                                    />
+                                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                        <TextField
+                                            select
+                                            label="Enable Entity"
+                                            value={enableEntity}
+                                            onChange={(e) => setEnableEntity(e.target.value)}
+                                            helperText="Entity to send enable signal to"
+                                        >
+                                            {entityOptions.length === 0 ? (
+                                                <MenuItem disabled>
+                                                    No entities found in instances
+                                                </MenuItem>
+                                            ) : (
+                                                entityOptions.map((option) => (
+                                                    <MenuItem key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </MenuItem>
+                                                ))
+                                            )}
+                                        </TextField>
+
+                                        <TextField
+                                            select
+                                            label="Enable Input"
+                                            value={enableInput}
+                                            onChange={(e) => setEnableInput(e.target.value)}
+                                            disabled={!enableEntity}
+                                            helperText="Input to trigger on entity"
+                                        >
+                                            {getAvailableInputsForEntity(enableEntity).map((input) => (
+                                                <MenuItem key={input} value={input}>
+                                                    {input}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                    </Box>
+
+                                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                        <TextField
+                                            select
+                                            label="Disable Entity"
+                                            value={disableEntity}
+                                            onChange={(e) => setDisableEntity(e.target.value)}
+                                            helperText="Entity to send disable signal to"
+                                        >
+                                            {entityOptions.length === 0 ? (
+                                                <MenuItem disabled>
+                                                    No entities found in instances
+                                                </MenuItem>
+                                            ) : (
+                                                entityOptions.map((option) => (
+                                                    <MenuItem key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </MenuItem>
+                                                ))
+                                            )}
+                                        </TextField>
+
+                                        <TextField
+                                            select
+                                            label="Disable Input"
+                                            value={disableInput}
+                                            onChange={(e) => setDisableInput(e.target.value)}
+                                            disabled={!disableEntity}
+                                            helperText="Input to trigger on entity"
+                                        >
+                                            {getAvailableInputsForEntity(disableEntity).map((input) => (
+                                                <MenuItem key={input} value={input}>
+                                                    {input}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                    </Box>
+
+                                    {/* Show the built commands as preview */}
+                                    {(formData.Enable_cmd || formData.Disable_cmd) && (
+                                        <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                            <Typography variant="caption" color="text.secondary">
+                                                Generated Commands:
+                                            </Typography>
+                                            {formData.Enable_cmd && (
+                                                <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                                    Enable: {formData.Enable_cmd}
+                                                </Typography>
+                                            )}
+                                            {formData.Disable_cmd && (
+                                                <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                                    Disable: {formData.Disable_cmd}
+                                                </Typography>
+                                            )}
+                                        </Box>
+                                    )}
                                 </Stack>
                             </Box>
 
@@ -150,23 +339,98 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                         Secondary Input Commands (Channel B)
                                     </Typography>
                                     <Stack spacing={2}>
-                                        <TextField
-                                            label="Enable Command (B)"
-                                            value={formData.Sec_Enable_cmd}
-                                            onChange={(e) => updateFormData('Sec_Enable_cmd', e.target.value)}
-                                            fullWidth
-                                            placeholder="Activator,FireUser3,,0,-1"
-                                            helperText="Command to activate secondary input"
-                                        />
-                                        
-                                        <TextField
-                                            label="Disable Command (B)"
-                                            value={formData.Sec_Disable_cmd}
-                                            onChange={(e) => updateFormData('Sec_Disable_cmd', e.target.value)}
-                                            fullWidth
-                                            placeholder="Activator,FireUser4,,0,-1"
-                                            helperText="Command to deactivate secondary input"
-                                        />
+                                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                            <TextField
+                                                select
+                                                label="Enable Entity (B)"
+                                                value={secEnableEntity}
+                                                onChange={(e) => setSecEnableEntity(e.target.value)}
+                                                helperText="Entity for secondary enable"
+                                            >
+                                                {entityOptions.length === 0 ? (
+                                                    <MenuItem disabled>
+                                                        No entities found in instances
+                                                    </MenuItem>
+                                                ) : (
+                                                    entityOptions.map((option) => (
+                                                        <MenuItem key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </MenuItem>
+                                                    ))
+                                                )}
+                                            </TextField>
+
+                                            <TextField
+                                                select
+                                                label="Enable Input (B)"
+                                                value={secEnableInput}
+                                                onChange={(e) => setSecEnableInput(e.target.value)}
+                                                disabled={!secEnableEntity}
+                                                helperText="Secondary enable input"
+                                            >
+                                                {getAvailableInputsForEntity(secEnableEntity).map((input) => (
+                                                    <MenuItem key={input} value={input}>
+                                                        {input}
+                                                    </MenuItem>
+                                                ))}
+                                            </TextField>
+                                        </Box>
+
+                                        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                            <TextField
+                                                select
+                                                label="Disable Entity (B)"
+                                                value={secDisableEntity}
+                                                onChange={(e) => setSecDisableEntity(e.target.value)}
+                                                helperText="Entity for secondary disable"
+                                            >
+                                                {entityOptions.length === 0 ? (
+                                                    <MenuItem disabled>
+                                                        No entities found in instances
+                                                    </MenuItem>
+                                                ) : (
+                                                    entityOptions.map((option) => (
+                                                        <MenuItem key={option.value} value={option.value}>
+                                                            {option.label}
+                                                        </MenuItem>
+                                                    ))
+                                                )}
+                                            </TextField>
+
+                                            <TextField
+                                                select
+                                                label="Disable Input (B)"
+                                                value={secDisableInput}
+                                                onChange={(e) => setSecDisableInput(e.target.value)}
+                                                disabled={!secDisableEntity}
+                                                helperText="Secondary disable input"
+                                            >
+                                                {getAvailableInputsForEntity(secDisableEntity).map((input) => (
+                                                    <MenuItem key={input} value={input}>
+                                                        {input}
+                                                    </MenuItem>
+                                                ))}
+                                            </TextField>
+                                        </Box>
+
+                                        {/* Show secondary commands preview */}
+                                        {(formData.Sec_Enable_cmd || formData.Sec_Disable_cmd) && (
+                                            <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    Generated Secondary Commands:
+                                                </Typography>
+                                                {formData.Sec_Enable_cmd && (
+                                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                                        Enable (B): {formData.Sec_Enable_cmd}
+                                                    </Typography>
+                                                )}
+                                                {formData.Sec_Disable_cmd && (
+                                                    <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                                        Disable (B): {formData.Sec_Disable_cmd}
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        )}
                                     </Stack>
                                 </Box>
                             )}
@@ -179,23 +443,98 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                 Output Commands
                             </Typography>
                             <Stack spacing={2}>
-                                <TextField
-                                    label="Activate Output"
-                                    value={formData.Out_Activate}
-                                    onChange={(e) => updateFormData('Out_Activate', e.target.value)}
-                                    fullWidth
-                                    placeholder="instance:btn;OnPressed"
-                                    helperText="Command when this output activates"
-                                />
-                                
-                                <TextField
-                                    label="Deactivate Output"
-                                    value={formData.Out_Deactivate}
-                                    onChange={(e) => updateFormData('Out_Deactivate', e.target.value)}
-                                    fullWidth
-                                    placeholder="instance:btn;OnUnPressed"
-                                    helperText="Command when this output deactivates"
-                                />
+                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                    <TextField
+                                        select
+                                        label="Activate Entity"
+                                        value={activateEntity}
+                                        onChange={(e) => setActivateEntity(e.target.value)}
+                                        helperText="Entity that sends activate signal"
+                                    >
+                                        {entityOptions.length === 0 ? (
+                                            <MenuItem disabled>
+                                                No entities found in instances
+                                            </MenuItem>
+                                        ) : (
+                                            entityOptions.map((option) => (
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuItem>
+                                            ))
+                                        )}
+                                    </TextField>
+
+                                    <TextField
+                                        select
+                                        label="Activate Output"
+                                        value={activateOutput}
+                                        onChange={(e) => setActivateOutput(e.target.value)}
+                                        disabled={!activateEntity}
+                                        helperText="Output to fire from entity"
+                                    >
+                                        {getAvailableOutputsForEntity(activateEntity).map((output) => (
+                                            <MenuItem key={output} value={output}>
+                                                {output}
+                                            </MenuItem>
+                                        ))}
+                                    </TextField>
+                                </Box>
+
+                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                    <TextField
+                                        select
+                                        label="Deactivate Entity"
+                                        value={deactivateEntity}
+                                        onChange={(e) => setDeactivateEntity(e.target.value)}
+                                        helperText="Entity that sends deactivate signal"
+                                    >
+                                        {entityOptions.length === 0 ? (
+                                            <MenuItem disabled>
+                                                No entities found in instances
+                                            </MenuItem>
+                                        ) : (
+                                            entityOptions.map((option) => (
+                                                <MenuItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuItem>
+                                            ))
+                                        )}
+                                    </TextField>
+
+                                    <TextField
+                                        select
+                                        label="Deactivate Output"
+                                        value={deactivateOutput}
+                                        onChange={(e) => setDeactivateOutput(e.target.value)}
+                                        disabled={!deactivateEntity}
+                                        helperText="Output to fire from entity"
+                                    >
+                                        {getAvailableOutputsForEntity(deactivateEntity).map((output) => (
+                                            <MenuItem key={output} value={output}>
+                                                {output}
+                                            </MenuItem>
+                                        ))}
+                                    </TextField>
+                                </Box>
+
+                                {/* Show output commands preview */}
+                                {(formData.Out_Activate || formData.Out_Deactivate) && (
+                                    <Box sx={{ mt: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Generated Output Commands:
+                                        </Typography>
+                                        {formData.Out_Activate && (
+                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                                Activate: {formData.Out_Activate}
+                                            </Typography>
+                                        )}
+                                        {formData.Out_Deactivate && (
+                                            <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.75rem' }}>
+                                                Deactivate: {formData.Out_Deactivate}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                )}
                             </Stack>
                         </Box>
                     )}
@@ -324,12 +663,12 @@ function Inputs({ item }) {
                     {type === 'input' ? 'INPUT' : 'OUTPUT'}
                 </Typography>
                 <Box>
-                    <Tooltip title={`Edit ${type}`}>
+                    <Tooltip title={`Edit the ${type} configuration - modify commands and settings`}>
                         <IconButton size="small" onClick={() => openEditDialog(name, config, type)}>
                             <Edit fontSize="small" />
                         </IconButton>
                     </Tooltip>
-                    <Tooltip title={`Delete ${type}`}>
+                    <Tooltip title={`Delete this ${type} configuration permanently`}>
                         <IconButton size="small" color="error" onClick={() => openDeleteDialog(name, type)}>
                             <Delete fontSize="small" />
                         </IconButton>
@@ -338,11 +677,13 @@ function Inputs({ item }) {
             </Box>
             
             <Accordion>
-                <AccordionSummary expandIcon={<ExpandMore />}>
-                    <Typography variant="body2" color="text.secondary">
-                        View Configuration ({Object.keys(config).length} properties)
-                    </Typography>
-                </AccordionSummary>
+                <Tooltip title="Click to view all the detailed configuration properties and their values">
+                    <AccordionSummary expandIcon={<ExpandMore />}>
+                        <Typography variant="body2" color="text.secondary">
+                            View Configuration ({Object.keys(config).length} properties)
+                        </Typography>
+                    </AccordionSummary>
+                </Tooltip>
                 <AccordionDetails>
                     <Stack spacing={1}>
                         {Object.entries(config).map(([key, value]) => (
@@ -365,27 +706,39 @@ function Inputs({ item }) {
                 <Typography variant="h6">
                     Inputs & Outputs
                 </Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    disabled={tabValue === 0 ? hasInput : hasOutput}
-                    onClick={() => {
-                        // Skip naming, go straight to config since items can only have one input/output
-                        const configName = tabValue === 0 ? "Input" : "Output"
-                        setEditingConfig({ name: configName, config: {}, type: tabValue === 0 ? 'input' : 'output' })
-                        setEditDialogOpen(true)
-                    }}
-                >
-                    {tabValue === 0 
-                        ? (hasInput ? 'Input Already Exists' : 'Add Input')
-                        : (hasOutput ? 'Output Already Exists' : 'Add Output')
-                    }
-                </Button>
+                <Tooltip title={
+                    tabValue === 0 
+                        ? (hasInput ? 'This item already has an input configured. Items can only have one input.' : 'Add an input configuration to allow this item to receive signals from other items.')
+                        : (hasOutput ? 'This item already has an output configured. Items can only have one output.' : 'Add an output configuration to allow this item to send signals to other items.')
+                }>
+                    <span>
+                        <Button
+                            variant="contained"
+                            startIcon={<Add />}
+                            disabled={tabValue === 0 ? hasInput : hasOutput}
+                            onClick={() => {
+                                // Skip naming, go straight to config since items can only have one input/output
+                                const configName = tabValue === 0 ? "Input" : "Output"
+                                setEditingConfig({ name: configName, config: {}, type: tabValue === 0 ? 'input' : 'output' })
+                                setEditDialogOpen(true)
+                            }}
+                        >
+                            {tabValue === 0 
+                                ? (hasInput ? 'Input Already Exists' : 'Add Input')
+                                : (hasOutput ? 'Output Already Exists' : 'Add Output')
+                            }
+                        </Button>
+                    </span>
+                </Tooltip>
             </Box>
 
             <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)} sx={{ mb: 2 }}>
-                <Tab label="Input" />
-                <Tab label="Output" />
+                <Tooltip title="Configure how this item receives signals from other items in the puzzle">
+                    <Tab label="Input" />
+                </Tooltip>
+                <Tooltip title="Configure how this item sends signals to other items in the puzzle">
+                    <Tab label="Output" />
+                </Tooltip>
             </Tabs>
 
             <Box sx={{ display: tabValue === 0 ? 'block' : 'none' }}>
@@ -427,6 +780,7 @@ function Inputs({ item }) {
                     : `Add ${editingConfig.type === 'input' ? 'Input' : 'Output'}`
                 }
                 isEdit={editingConfig.config && Object.keys(editingConfig.config).length > 0}
+                itemId={item.id}
             />
 
             {/* Delete Confirmation Dialog */}

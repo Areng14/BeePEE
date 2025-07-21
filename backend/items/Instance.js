@@ -42,7 +42,7 @@ class Instance {
         return path.normalize(path.join(packagePath, "resources", finalPath))
     }
 
-    // Placeholder: In the future, this would parse the VMF and return all entities
+    // Parse VMF and return all entities with better comprehensive parsing
     getAllEntities() {
         try {
             // Read and parse the VMF file
@@ -51,32 +51,27 @@ class Instance {
 
             const entities = {}
             
-            // VMF files have an 'entities' block that contains all entities
-            if (vmfData.world?.entity) {
-                // Handle world entity
-                if (vmfData.world.entity.targetname && vmfData.world.entity.classname) {
-                    entities[vmfData.world.entity.targetname] = vmfData.world.entity.classname
-                }
-            }
+            // Recursive function to find entities anywhere in the VMF structure
+            const findEntitiesRecursive = (obj, path = '') => {
+                if (typeof obj !== 'object' || obj === null) return
 
-            if (vmfData.entities) {
-                // Handle numbered entities (common format in VMF)
-                for (const [key, entity] of Object.entries(vmfData.entities)) {
-                    if (entity.targetname && entity.classname) {
-                        entities[entity.targetname] = entity.classname
+                // Check if this object is an entity (has both classname and targetname)
+                if (obj.classname && obj.targetname) {
+                    entities[obj.targetname] = obj.classname
+                    return
+                }
+
+                // Recursively search all properties
+                for (const [key, value] of Object.entries(obj)) {
+                    if (typeof value === 'object' && value !== null) {
+                        findEntitiesRecursive(value, path ? `${path}.${key}` : key)
                     }
                 }
-
-                // Handle array of entities (alternate format)
-                if (Array.isArray(vmfData.entities)) {
-                    vmfData.entities.forEach(entity => {
-                        if (entity.targetname && entity.classname) {
-                            entities[entity.targetname] = entity.classname
-                        }
-                    })
-                }
             }
 
+            // Start recursive search from root
+            findEntitiesRecursive(vmfData, 'root')
+            
             return entities
         } catch (error) {
             console.error(`Failed to parse VMF file ${this.path}:`, error)
