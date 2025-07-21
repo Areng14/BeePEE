@@ -152,6 +152,12 @@ const loadPackage = async (pathToPackage) => {
             fs.mkdirSync(pkg.packageDir, { recursive: true })
             await extractPackage(pathToPackage, pkg.packageDir)
 
+            // Process all VDF files recursively (convert .txt to .json)
+            await timeOperation("Process VDF files", () => {
+                processVdfFiles(pkg.packageDir)
+                return Promise.resolve()
+            })
+
             // Now load the package
             await pkg.load()
             packages.push(pkg)
