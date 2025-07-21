@@ -274,6 +274,50 @@ function reg_events(mainWindow) {
         }
     })
 
+    // Get entities from item instances for UI dropdowns
+    ipcMain.handle("get-item-entities", async (event, { itemId }) => {
+        try {
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+            
+            const allEntities = {}
+            
+            // Get entities from all instances
+            for (const [instanceIndex, instanceData] of Object.entries(item.instances)) {
+                const instance = item.getInstance(instanceIndex)
+                if (instance) {
+                    // Check if instance file actually exists
+                    if (!require('fs').existsSync(instance.path)) {
+                        continue
+                    }
+                    
+                    const entities = instance.getAllEntities()
+                    
+                    // Merge entities (Object.assign handles duplicates by overwriting)
+                    Object.assign(allEntities, entities)
+                }
+            }
+            
+            return { success: true, entities: allEntities }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Get Portal 2 FGD data for entity inputs/outputs
+    ipcMain.handle("get-fgd-data", async (event) => {
+        try {
+            const resources = await findPortal2Resources()
+            if (!resources || !resources.entities) {
+                return { success: false, error: "Portal 2 FGD data not available" }
+            }
+            
+            return { success: true, entities: resources.entities }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
     // Register instance editing in Hammer
     ipcMain.handle("edit-instance", async (event, { packagePath, instanceName, itemId }) => {
         try {
