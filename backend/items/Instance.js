@@ -44,8 +44,44 @@ class Instance {
 
     // Placeholder: In the future, this would parse the VMF and return all entities
     getAllEntities() {
-        // TODO: Implement VMF parsing and entity extraction
-        return []
+        try {
+            // Read and parse the VMF file
+            const vmfContent = fs.readFileSync(this.path, 'utf-8')
+            const vmfData = vdf.parse(vmfContent)
+
+            const entities = {}
+            
+            // VMF files have an 'entities' block that contains all entities
+            if (vmfData.world?.entity) {
+                // Handle world entity
+                if (vmfData.world.entity.targetname && vmfData.world.entity.classname) {
+                    entities[vmfData.world.entity.targetname] = vmfData.world.entity.classname
+                }
+            }
+
+            if (vmfData.entities) {
+                // Handle numbered entities (common format in VMF)
+                for (const [key, entity] of Object.entries(vmfData.entities)) {
+                    if (entity.targetname && entity.classname) {
+                        entities[entity.targetname] = entity.classname
+                    }
+                }
+
+                // Handle array of entities (alternate format)
+                if (Array.isArray(vmfData.entities)) {
+                    vmfData.entities.forEach(entity => {
+                        if (entity.targetname && entity.classname) {
+                            entities[entity.targetname] = entity.classname
+                        }
+                    })
+                }
+            }
+
+            return entities
+        } catch (error) {
+            console.error(`Failed to parse VMF file ${this.path}:`, error)
+            return {}
+        }
     }
 }
 
