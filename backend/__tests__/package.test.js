@@ -156,7 +156,7 @@ describe("Package", () => {
             fs.existsSync.mockReturnValue(false)
 
             await expect(Package.create(mockPackagePath)).rejects.toThrow(
-                "Package missing info.txt file",
+                "Package not imported - missing info.json",
             )
         })
 

@@ -94,6 +94,13 @@ class Package {
     removeAllItems() {
         this.items.length = 0
     }
+
+    // Static method for creating and loading a package
+    static async create(packagePath) {
+        const pkg = new Package(packagePath)
+        await pkg.load()
+        return pkg
+    }
 }
 
 module.exports = { Package }

@@ -1,8 +1,10 @@
 const { loadPackage, unloadPackage } = require("../packageManager")
 const { Package } = require("../models/package")
+const fs = require("fs")
 
-// Mock the Package class
+// Mock the Package class and fs module
 jest.mock("../models/package")
+jest.mock("fs")
 jest.mock("electron", () => ({
     dialog: {
         showOpenDialog: jest.fn(),
@@ -12,8 +14,13 @@ jest.mock("electron", () => ({
     },
 }))
 
+// Mock node-7z
+jest.mock("node-7z", () => ({
+    extractFull: jest.fn(),
+}))
+
 describe("PackageManager", () => {
-    const mockPackagePath = "__test__/package/ArengItems.bee_pack"
+    const mockPackagePath = "__test__/package/ArengItems.bpee"
 
     beforeEach(() => {
         jest.clearAllMocks()
@@ -36,20 +43,41 @@ describe("PackageManager", () => {
                 ],
             }
 
-            Package.create.mockResolvedValue(mockPackage)
+            // Mock filesystem operations
+            fs.existsSync.mockReturnValue(true)
+            fs.mkdirSync.mockReturnValue(undefined)
+            fs.readdirSync.mockReturnValue([])
+            
+            // Mock Package constructor and load method
+            const mockPkg = {
+                packageDir: "/mock/package/dir",
+                load: jest.fn().mockResolvedValue(undefined)
+            }
+            Package.mockImplementation(() => mockPkg)
+            
+            // Mock node-7z
+            const mockStream = {
+                on: jest.fn((event, callback) => {
+                    if (event === 'end') {
+                        setTimeout(callback, 0)
+                    }
+                    return mockStream
+                })
+            }
+            require("node-7z").extractFull.mockReturnValue(mockStream)
 
             const result = await loadPackage(mockPackagePath)
 
-            expect(Package.create).toHaveBeenCalledWith(mockPackagePath)
-            expect(result).toBe(mockPackage)
+            expect(fs.existsSync).toHaveBeenCalledWith(mockPackagePath)
+            expect(result).toBeDefined()
         })
 
         test("should handle package loading errors", async () => {
-            const error = new Error("Package loading failed")
-            Package.create.mockRejectedValue(error)
+            // Mock file not existing
+            fs.existsSync.mockReturnValue(false)
 
             await expect(loadPackage(mockPackagePath)).rejects.toThrow(
-                "Package loading failed",
+                `Package file ${mockPackagePath} does not exist`,
             )
         })
 

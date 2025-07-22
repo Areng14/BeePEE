@@ -219,6 +219,7 @@ describe("Item", () => {
             itemFolder: item.itemFolder,
             fullItemPath: item.fullItemPath,
             packagePath: item.packagePath,
+            instances: item.instances,
         })
     })
 })
