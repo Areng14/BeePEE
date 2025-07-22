@@ -587,7 +587,7 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                                         value={enableDelay}
                                                         onChange={(e) => setEnableDelay(e.target.value)}
                                                         type="number"
-                                                        inputProps={{ step: 0.1, min: 0 }}
+                                                        slotProps={{ htmlInput: { step: 0.1, min: 0 } }}
                                                         size="small"
                                                         sx={{ minWidth: '100px', height: '56px' }}
                                                     />
@@ -704,7 +704,7 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                                         value={disableDelay}
                                                         onChange={(e) => setDisableDelay(e.target.value)}
                                                         type="number"
-                                                        inputProps={{ step: 0.1, min: 0 }}
+                                                        slotProps={{ htmlInput: { step: 0.1, min: 0 } }}
                                                         size="small"
                                                         sx={{ minWidth: '100px', height: '56px' }}
                                                     />
@@ -848,7 +848,7 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                                             value={secEnableDelay}
                                                             onChange={(e) => setSecEnableDelay(e.target.value)}
                                                             type="number"
-                                                            inputProps={{ step: 0.1, min: 0 }}
+                                                            slotProps={{ htmlInput: { step: 0.1, min: 0 } }}
                                                             size="small"
                                                             sx={{ minWidth: '100px', height: '56px' }}
                                                         />
@@ -965,7 +965,7 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                                             value={secDisableDelay}
                                                             onChange={(e) => setSecDisableDelay(e.target.value)}
                                                             type="number"
-                                                            inputProps={{ step: 0.1, min: 0 }}
+                                                            slotProps={{ htmlInput: { step: 0.1, min: 0 } }}
                                                             size="small"
                                                             sx={{ minWidth: '100px', height: '56px' }}
                                                         />
@@ -1112,7 +1112,7 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                                     value={activateDelay}
                                                     onChange={(e) => setActivateDelay(e.target.value)}
                                                     type="number"
-                                                    inputProps={{ step: 0.1, min: 0 }}
+                                                    slotProps={{ htmlInput: { step: 0.1, min: 0 } }}
                                                     size="small"
                                                     sx={{ minWidth: '100px', height: '56px' }}
                                                 />
@@ -1229,7 +1229,7 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                                     value={deactivateDelay}
                                                     onChange={(e) => setDeactivateDelay(e.target.value)}
                                                     type="number"
-                                                    inputProps={{ step: 0.1, min: 0 }}
+                                                    slotProps={{ htmlInput: { step: 0.1, min: 0 } }}
                                                     size="small"
                                                     sx={{ minWidth: '100px', height: '56px' }}
                                                 />
