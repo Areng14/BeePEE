@@ -42,11 +42,41 @@ class Instance {
         return path.normalize(path.join(packagePath, "resources", finalPath))
     }
 
+    // Clean up malformed VMF content before parsing
+    cleanVmfContent(content) {
+        // Remove lines with empty key-value pairs like "" ""
+        // This handles the specific error we're seeing on line 270
+        content = content.replace(/^\s*""\s+""\s*$/gm, '')
+        
+        // Also handle variations of empty quotes
+        content = content.replace(/^\s*""\s*""\s*$/gm, '')
+        content = content.replace(/^\s*''\s*''\s*$/gm, '')
+        
+        // Remove empty lines after cleaning
+        content = content.replace(/^\s*\n/gm, '')
+        
+        // Fix common VMF formatting issues
+        // Remove trailing commas that might cause parsing issues
+        content = content.replace(/,(\s*[}\]])/g, '$1')
+        
+        // Normalize line endings
+        content = content.replace(/\r\n/g, '\n')
+        
+        // Remove any remaining problematic empty entries
+        content = content.replace(/^\s*""\s*\n/gm, '')
+        
+        return content
+    }
+
     // Parse VMF and return all entities with better comprehensive parsing
     getAllEntities() {
         try {
             // Read and parse the VMF file
-            const vmfContent = fs.readFileSync(this.path, 'utf-8')
+            let vmfContent = fs.readFileSync(this.path, 'utf-8')
+            
+            // Clean up malformed VMF content
+            vmfContent = this.cleanVmfContent(vmfContent)
+            
             const vmfData = vdf.parse(vmfContent)
 
             const entities = {}
@@ -74,7 +104,15 @@ class Instance {
             
             return entities
         } catch (error) {
-            console.error(`Failed to parse VMF file ${this.path}:`, error)
+            console.error(`Failed to parse VMF file ${this.path}:`, error.message)
+            
+            // Try to provide more context about the error
+            if (error.message && error.message.includes('line')) {
+                console.error(`VMF parsing failed. The file may contain malformed syntax.`)
+                console.error(`Consider checking the VMF file for syntax errors or corrupted content.`)
+            }
+            
+            // Return empty object instead of crashing
             return {}
         }
     }

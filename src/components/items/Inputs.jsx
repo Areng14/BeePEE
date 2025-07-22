@@ -33,7 +33,8 @@ import {
     Input as InputIcon, 
     Output as OutputIcon,
     ExpandMore,
-    EditNote
+    EditNote,
+    GroupWork
 } from "@mui/icons-material"
 import { useState, useEffect } from 'react'
 
@@ -317,10 +318,23 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
     const isInput = title.includes('Input')
     const isDualInput = formData.Type === 'DUAL'
 
-    const entityOptions = Object.keys(entities).map(entityName => ({
-        value: entityName,
-        label: `${entityName} (${entities[entityName]})`
-    }))
+    // Count entity name occurrences to detect duplicates
+    const entityNameCounts = {}
+    Object.keys(entities).forEach(entityName => {
+        const baseName = entityName.replace(/_\d+$/, '') // Remove trailing numbers
+        entityNameCounts[baseName] = (entityNameCounts[baseName] || 0) + 1
+    })
+    
+    const entityOptions = Object.keys(entities).map(entityName => {
+        const baseName = entityName.replace(/_\d+$/, '')
+        const hasDuplicates = entityNameCounts[baseName] > 1
+        
+        return {
+            value: entityName,
+            label: `${entityName} (${entities[entityName]})`,
+            hasDuplicates
+        }
+    })
     
     const getAvailableInputsForEntity = (entityName) => {
         const entityClass = entities[entityName]
@@ -345,6 +359,97 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
         const outputs = getAvailableOutputsForEntity(entityName)
         const output = outputs.find(out => out.name === outputName)
         return output?.needsParam || false
+    }
+
+    // Validation functions
+    const isValidInputConfig = () => {
+        if (!isInput) return true // Not validating output here
+        
+        // Must have enable entity and input
+        if (!enableEntity || !enableInput) return false
+        
+        // If input needs parameter, parameter must be provided
+        if (inputNeedsParam(enableEntity, enableInput) && !enableParam.trim()) return false
+        
+        // For dual inputs, must have disable entity and input
+        if (isDualInput) {
+            if (!disableEntity || !disableInput) return false
+            if (inputNeedsParam(disableEntity, disableInput) && !disableParam.trim()) return false
+        }
+        
+        return true
+    }
+
+    const isValidOutputConfig = () => {
+        if (isInput) return true // Not validating input here
+        
+        // Must have activate entity and output
+        if (!activateEntity || !activateOutput) return false
+        
+        // If output needs parameter, parameter must be provided
+        if (outputNeedsParam(activateEntity, activateOutput) && !activateParam.trim()) return false
+        
+        // If there's a secondary enable config, it must be complete
+        if (secEnableEntity || secEnableInput) {
+            if (!secEnableEntity || !secEnableInput) return false
+            if (inputNeedsParam(secEnableEntity, secEnableInput) && !secEnableParam.trim()) return false
+        }
+        
+        // If there's a secondary disable config, it must be complete
+        if (secDisableEntity || secDisableInput) {
+            if (!secDisableEntity || !secDisableInput) return false
+            if (inputNeedsParam(secDisableEntity, secDisableInput) && !secDisableParam.trim()) return false
+        }
+        
+        // If there's a deactivate config, it must be complete
+        if (deactivateEntity || deactivateOutput) {
+            if (!deactivateEntity || !deactivateOutput) return false
+            if (outputNeedsParam(deactivateEntity, deactivateOutput) && !deactivateParam.trim()) return false
+        }
+        
+        return true
+    }
+
+    const isConfigValid = isInput ? isValidInputConfig() : isValidOutputConfig()
+
+    // Get specific validation error message
+    const getValidationError = () => {
+        if (isInput) {
+            if (!enableEntity) return "Please select an enable entity"
+            if (!enableInput) return "Please select an enable input"
+            if (inputNeedsParam(enableEntity, enableInput) && !enableParam.trim()) {
+                return "This input requires a parameter"
+            }
+            if (isDualInput) {
+                if (!disableEntity) return "Please select a disable entity"
+                if (!disableInput) return "Please select a disable input"
+                if (inputNeedsParam(disableEntity, disableInput) && !disableParam.trim()) {
+                    return "This disable input requires a parameter"
+                }
+            }
+        } else {
+            if (!activateEntity) return "Please select an activate entity"
+            if (!activateOutput) return "Please select an activate output"
+            if (outputNeedsParam(activateEntity, activateOutput) && !activateParam.trim()) {
+                return "This output requires a parameter"
+            }
+            if (secEnableEntity && !secEnableInput) return "Please select a secondary enable input"
+            if (!secEnableEntity && secEnableInput) return "Please select a secondary enable entity"
+            if (secEnableEntity && secEnableInput && inputNeedsParam(secEnableEntity, secEnableInput) && !secEnableParam.trim()) {
+                return "This secondary enable input requires a parameter"
+            }
+            if (secDisableEntity && !secDisableInput) return "Please select a secondary disable input"
+            if (!secDisableEntity && secDisableInput) return "Please select a secondary disable entity"
+            if (secDisableEntity && secDisableInput && inputNeedsParam(secDisableEntity, secDisableInput) && !secDisableParam.trim()) {
+                return "This secondary disable input requires a parameter"
+            }
+            if (deactivateEntity && !deactivateOutput) return "Please select a deactivate output"
+            if (!deactivateEntity && deactivateOutput) return "Please select a deactivate entity"
+            if (deactivateEntity && deactivateOutput && outputNeedsParam(deactivateEntity, deactivateOutput) && !deactivateParam.trim()) {
+                return "This deactivate output requires a parameter"
+            }
+        }
+        return ""
     }
 
     if (loading) {
@@ -432,7 +537,12 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                                         ) : (
                                                             entityOptions.map((option) => (
                                                                 <MenuItem key={option.value} value={option.value}>
-                                                                    {option.label}
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                                                        <span style={{ fontWeight: option.hasDuplicates ? 'bold' : 'normal' }}>
+                                                                            {option.label}
+                                                                        </span>
+                                                                        {option.hasDuplicates && <GroupWork sx={{ fontSize: 16, opacity: 0.6, color: 'primary.main' }} />}
+                                                                    </Box>
                                                                 </MenuItem>
                                                             ))
                                                         )}
@@ -544,7 +654,12 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                                         ) : (
                                                             entityOptions.map((option) => (
                                                                 <MenuItem key={option.value} value={option.value}>
-                                                                    {option.label}
+                                                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                                                        <span style={{ fontWeight: option.hasDuplicates ? 'bold' : 'normal' }}>
+                                                                            {option.label}
+                                                                        </span>
+                                                                        {option.hasDuplicates && <GroupWork sx={{ fontSize: 16, opacity: 0.6, color: 'primary.main' }} />}
+                                                                    </Box>
                                                                 </MenuItem>
                                                             ))
                                                         )}
@@ -683,7 +798,12 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                                             ) : (
                                                                 entityOptions.map((option) => (
                                                                     <MenuItem key={option.value} value={option.value}>
-                                                                        {option.label}
+                                                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                                                            <span style={{ fontWeight: option.hasDuplicates ? 'bold' : 'normal' }}>
+                                                                                {option.label}
+                                                                            </span>
+                                                                            {option.hasDuplicates && <GroupWork sx={{ fontSize: 16, opacity: 0.6, color: 'primary.main' }} />}
+                                                                        </Box>
                                                                     </MenuItem>
                                                                 ))
                                                             )}
@@ -795,7 +915,12 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                                             ) : (
                                                                 entityOptions.map((option) => (
                                                                     <MenuItem key={option.value} value={option.value}>
-                                                                        {option.label}
+                                                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                                                            <span style={{ fontWeight: option.hasDuplicates ? 'bold' : 'normal' }}>
+                                                                                {option.label}
+                                                                            </span>
+                                                                            {option.hasDuplicates && <GroupWork sx={{ fontSize: 16, opacity: 0.6, color: 'primary.main' }} />}
+                                                                        </Box>
                                                                     </MenuItem>
                                                                 ))
                                                             )}
@@ -937,7 +1062,12 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                                     ) : (
                                                         entityOptions.map((option) => (
                                                             <MenuItem key={option.value} value={option.value}>
-                                                                {option.label}
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                                                    <span style={{ fontWeight: option.hasDuplicates ? 'bold' : 'normal' }}>
+                                                                        {option.label}
+                                                                    </span>
+                                                                    {option.hasDuplicates && <GroupWork sx={{ fontSize: 16, opacity: 0.6, color: 'primary.main' }} />}
+                                                                </Box>
                                                             </MenuItem>
                                                         ))
                                                     )}
@@ -1049,7 +1179,12 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
                                                     ) : (
                                                         entityOptions.map((option) => (
                                                             <MenuItem key={option.value} value={option.value}>
-                                                                {option.label}
+                                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                                                                    <span style={{ fontWeight: option.hasDuplicates ? 'bold' : 'normal' }}>
+                                                                        {option.label}
+                                                                    </span>
+                                                                    {option.hasDuplicates && <GroupWork sx={{ fontSize: 16, opacity: 0.6, color: 'primary.main' }} />}
+                                                                </Box>
                                                             </MenuItem>
                                                         ))
                                                     )}
@@ -1145,9 +1280,17 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
             </DialogContent>
             <DialogActions sx={{ py: 3, px: 3 }}>
                 <Button onClick={onClose}>Cancel</Button>
-                <Button onClick={handleSave} variant="contained">
-                    {isEdit ? 'Update' : 'Add'}
-                </Button>
+                <Tooltip title={!isConfigValid ? getValidationError() : ""}>
+                    <span>
+                        <Button 
+                            onClick={handleSave} 
+                            variant="contained"
+                            disabled={!isConfigValid}
+                        >
+                            {isEdit ? 'Update' : 'Add'}
+                        </Button>
+                    </span>
+                </Tooltip>
             </DialogActions>
         </Dialog>
     )
