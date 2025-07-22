@@ -79,7 +79,7 @@ function createMainMenu(mainWindow) {
                             filters: [
                                 {
                                     name: "BEE Package",
-                                    extensions: ["bee_pack", "zip"],
+                                    extensions: ["bpee", "zip"],
                                 },
                             ],
                         })
