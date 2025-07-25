@@ -141,6 +141,51 @@ class Item {
         console.log(`Added item: ${this.name} (id: ${this.id})`)
     }
 
+    reloadInstances() {
+        // Clear current instances
+        this.instances = {}
+        this._loadedInstances.clear()
+
+        // Re-read editoritems file
+        const parsedEditoritems = JSON.parse(
+            fs.readFileSync(this.paths.editorItems, "utf-8")
+        )
+
+        // Re-add editor instances
+        const editorInstances = parsedEditoritems.Item?.Exporting?.Instances || {}
+        Object.entries(editorInstances).forEach(([key, instance]) => {
+            this.instances[key] = {
+                Name: instance.Name,
+                source: 'editor'
+            }
+        })
+
+        // Re-add VBSP instances if they exist
+        if (this.paths.vbsp_config && fs.existsSync(this.paths.vbsp_config)) {
+            try {
+                const vbspContent = fs.readFileSync(this.paths.vbsp_config, 'utf-8')
+                const matches = [...vbspContent.matchAll(/"Changeinstance"\s+"([^"]+)"/g)]
+                
+                // Start index after the last editor instance
+                let nextIndex = Object.keys(this.instances).length
+                
+                for (const match of matches) {
+                    const instancePath = match[1]
+                    // Only add if not already present
+                    if (!Object.values(this.instances).some(inst => inst.Name === instancePath)) {
+                        this.instances[nextIndex.toString()] = {
+                            Name: instancePath,
+                            source: 'vbsp'
+                        }
+                        nextIndex++
+                    }
+                }
+            } catch (error) {
+                console.error(`Failed to parse VBSP config for ${this.name}:`, error.message)
+            }
+        }
+    }
+
     getEditorItems(raw = false) {
         //Returns a JSON that is editoritems.
         const rawEditoritems = fs.readFileSync(this.paths.editorItems, "utf-8")
@@ -224,6 +269,9 @@ class Item {
         }
         this.saveEditorItems(editoritems)
 
+        // Reload instances from file to ensure consistency
+        this.reloadInstances()
+
         return nextIndex.toString()
     }
 
@@ -255,6 +303,9 @@ class Item {
             }
             this.saveEditorItems(editoritems)
         }
+
+        // Reload instances from file to ensure consistency
+        this.reloadInstances()
     }
 
     // Input management functions

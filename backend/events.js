@@ -142,11 +142,162 @@ function reg_events(mainWindow) {
             }
 
             const newIndex = item.addInstance(instanceName)
+            
+            // Send updated item data to frontend
+            const updatedItem = item.toJSON()
+            console.log('Sending updated item after add instance:', {
+                id: updatedItem.id,
+                instances: updatedItem.instances
+            })
+            mainWindow.webContents.send("item-updated", updatedItem)
+            
             return { success: true, index: newIndex }
         } catch (error) {
             dialog.showErrorBox(
                 "Failed to Add Instance",
                 `Could not add instance: ${error.message}`
+            )
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Add instance with file dialog
+    ipcMain.handle("add-instance-file-dialog", async (event, { itemId }) => {
+        try {
+            // Find the item in any loaded package
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) {
+                throw new Error("Item not found")
+            }
+
+            // Show file dialog to select VMF file
+            const result = await dialog.showOpenDialog(mainWindow, {
+                title: "Select VMF Instance File",
+                properties: ["openFile"],
+                filters: [
+                    {
+                        name: "VMF Files",
+                        extensions: ["vmf"]
+                    },
+                    {
+                        name: "All Files",
+                        extensions: ["*"]
+                    }
+                ]
+            })
+
+            if (result.canceled || result.filePaths.length === 0) {
+                return { success: false, canceled: true }
+            }
+
+            const selectedFilePath = result.filePaths[0]
+            const fileName = path.basename(selectedFilePath)
+            
+            // Check if it's a VMF file
+            if (!fileName.toLowerCase().endsWith('.vmf')) {
+                throw new Error("Selected file must be a VMF file")
+            }
+
+            // Create the relative path for the instance (instances/filename.vmf)
+            const instanceName = path.join("instances", fileName)
+            
+            // Copy the file to the package resources directory
+            const targetPath = path.join(item.packagePath, "resources", instanceName)
+            const targetDir = path.dirname(targetPath)
+            
+            // Ensure the instances directory exists
+            if (!fs.existsSync(targetDir)) {
+                fs.mkdirSync(targetDir, { recursive: true })
+            }
+            
+            // Copy the file
+            fs.copyFileSync(selectedFilePath, targetPath)
+
+            // Add to editoritems
+            const newIndex = item.addInstance(instanceName)
+            
+            // Send updated item data to frontend
+            const updatedItem = item.toJSON()
+            console.log('Sending updated item after file dialog add instance:', {
+                id: updatedItem.id,
+                instances: updatedItem.instances
+            })
+            mainWindow.webContents.send("item-updated", updatedItem)
+            
+            return { success: true, index: newIndex, instanceName: instanceName }
+        } catch (error) {
+            dialog.showErrorBox(
+                "Failed to Add Instance",
+                `Could not add instance: ${error.message}`
+            )
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Replace instance with file dialog
+    ipcMain.handle("replace-instance-file-dialog", async (event, { itemId, instanceIndex }) => {
+        try {
+            // Find the item in any loaded package
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) {
+                throw new Error("Item not found")
+            }
+
+            const instanceData = item.instances[instanceIndex]
+            if (!instanceData) {
+                throw new Error(`Instance ${instanceIndex} not found`)
+            }
+
+            // Show file dialog to select new VMF file
+            const result = await dialog.showOpenDialog(mainWindow, {
+                title: "Select Replacement VMF Instance File",
+                properties: ["openFile"],
+                filters: [
+                    {
+                        name: "VMF Files",
+                        extensions: ["vmf"]
+                    },
+                    {
+                        name: "All Files",
+                        extensions: ["*"]
+                    }
+                ]
+            })
+
+            if (result.canceled || result.filePaths.length === 0) {
+                return { success: false, canceled: true }
+            }
+
+            const selectedFilePath = result.filePaths[0]
+            const fileName = path.basename(selectedFilePath)
+            
+            // Check if it's a VMF file
+            if (!fileName.toLowerCase().endsWith('.vmf')) {
+                throw new Error("Selected file must be a VMF file")
+            }
+
+            // Get the current instance file path
+            const currentInstancePath = Instance.getCleanPath(item.packagePath, instanceData.Name)
+            
+            // Copy the new file over the existing one
+            fs.copyFileSync(selectedFilePath, currentInstancePath)
+
+            // Clear the cached instance so it gets reloaded
+            item._loadedInstances.delete(instanceIndex)
+            
+            // Send updated item data to frontend
+            const updatedItem = item.toJSON()
+            console.log('Sending updated item after replace instance:', {
+                id: updatedItem.id,
+                instances: updatedItem.instances
+            })
+            mainWindow.webContents.send("item-updated", updatedItem)
+            
+            return { success: true, instanceName: instanceData.Name }
+        } catch (error) {
+            dialog.showErrorBox(
+                "Failed to Replace Instance",
+                `Could not replace instance: ${error.message}`
             )
             return { success: false, error: error.message }
         }
@@ -162,6 +313,15 @@ function reg_events(mainWindow) {
             }
 
             item.removeInstance(instanceIndex)
+            
+            // Send updated item data to frontend
+            const updatedItem = item.toJSON()
+            console.log('Sending updated item after remove instance:', {
+                id: updatedItem.id,
+                instances: updatedItem.instances
+            })
+            mainWindow.webContents.send("item-updated", updatedItem)
+            
             return { success: true }
         } catch (error) {
             dialog.showErrorBox(
