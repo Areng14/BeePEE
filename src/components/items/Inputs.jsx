@@ -45,7 +45,7 @@ const INPUT_TYPES = [
     { value: 'OR', label: 'OR Logic' }
 ]
 
-function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit = false, itemId }) {
+function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit = false, itemId, item }) {
     const [formData, setFormData] = useState({
         Type: 'AND',
         Enable_cmd: '',
@@ -120,7 +120,32 @@ function InputOutputConfigDialog({ open, onClose, onSave, config, title, isEdit 
             // Don't parse existing commands here - wait for FGD data to load
             setError('')
         }
-    }, [open, config, itemId])
+    }, [open, config, itemId, JSON.stringify(item?.instances)])
+
+    // Clear entity selections when instances change (to handle deleted instances)
+    useEffect(() => {
+        if (open && itemId && item?.instances) {
+            // Clear all entity selections when instances change
+            setEnableEntity('')
+            setEnableInput('')
+            setEnableParam('')
+            setDisableEntity('')
+            setDisableInput('')
+            setDisableParam('')
+            setSecEnableEntity('')
+            setSecEnableInput('')
+            setSecEnableParam('')
+            setSecDisableEntity('')
+            setSecDisableInput('')
+            setSecDisableParam('')
+            setActivateEntity('')
+            setActivateOutput('')
+            setActivateParam('')
+            setDeactivateEntity('')
+            setDeactivateOutput('')
+            setDeactivateParam('')
+        }
+    }, [JSON.stringify(item?.instances), open, itemId])
 
     const loadEntityData = async () => {
         setLoading(true)
@@ -1521,6 +1546,7 @@ function Inputs({ item }) {
                 }
                 isEdit={editingConfig.config && Object.keys(editingConfig.config).length > 0}
                 itemId={item.id}
+                item={item}
             />
 
             {/* Delete Confirmation Dialog */}

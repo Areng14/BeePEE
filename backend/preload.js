@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.on("item-updated", (event, item) => callback(event, item)),
     editInstance: (instancePath) => ipcRenderer.invoke("edit-instance", instancePath),
     addInstance: (itemId, instanceName) => ipcRenderer.invoke("add-instance", { itemId, instanceName }),
+    addInstanceFileDialog: (itemId) => ipcRenderer.invoke("add-instance-file-dialog", { itemId }),
+    replaceInstanceFileDialog: (itemId, instanceIndex) => ipcRenderer.invoke("replace-instance-file-dialog", { itemId, instanceIndex }),
     removeInstance: (itemId, instanceIndex) => ipcRenderer.invoke("remove-instance", { itemId, instanceIndex }),
 
     // Input management functions

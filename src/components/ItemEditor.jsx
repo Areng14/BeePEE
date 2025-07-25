@@ -31,6 +31,17 @@ function ItemEditor() {
         // Add other fields as needed for other tabs
     })
 
+    // Add reloadItem function
+    const reloadItem = async (itemId) => {
+        if (!itemId) return;
+        try {
+            const updatedItem = await window.package.getItem(itemId)
+            setItem(updatedItem)
+        } catch (err) {
+            console.error('Failed to reload item:', err)
+        }
+    }
+
     useEffect(() => {
         const handleLoadItem = (event, loadedItem) => {
             setItem(loadedItem)
@@ -67,6 +78,10 @@ function ItemEditor() {
         }
 
         const handleItemUpdate = (event, updatedItem) => {
+            console.log('ItemEditor received updated item:', {
+                id: updatedItem.id,
+                instances: updatedItem.instances
+            })
             setItem(updatedItem)
             document.title = `Edit ${updatedItem.name}`
 
@@ -234,6 +249,7 @@ function ItemEditor() {
                         item={item}
                         formData={formData}
                         onUpdate={updateFormData}
+                        onInstancesChanged={() => reloadItem(item.id)}
                     />
                 </Box>
                 <Box sx={{ display: tabValue === 3 ? "block" : "none" }}>
