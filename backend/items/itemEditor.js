@@ -43,4 +43,15 @@ function createItemEditor(item, mainWindow) {
     })
 }
 
-module.exports = { createItemEditor }
+// Function to send item-updated event to the correct editor window
+function sendItemUpdateToEditor(itemId, updatedItem) {
+    const editorWindow = openEditors.get(itemId)
+    if (editorWindow && !editorWindow.isDestroyed()) {
+        console.log(`Sending item-updated to editor window for item: ${itemId}`)
+        editorWindow.webContents.send("item-updated", updatedItem)
+    } else {
+        console.log(`No open editor window found for item: ${itemId}`)
+    }
+}
+
+module.exports = { createItemEditor, sendItemUpdateToEditor, openEditors }

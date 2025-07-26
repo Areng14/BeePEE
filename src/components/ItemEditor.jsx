@@ -15,9 +15,10 @@ import Inputs from "./items/Inputs"
 import Instances from "./items/Instances"
 import Vbsp from "./items/Vbsp"
 import Other from "./items/Other"
+import { useItemContext } from "../contexts/ItemContext"
 
 function ItemEditor() {
-    const [item, setItem] = useState(null)
+    const { item, reloadItem } = useItemContext()
     const [tabValue, setTabValue] = useState(0)
     const [iconSrc, setIconSrc] = useState(null)
     const [saveError, setSaveError] = useState(null)
@@ -31,24 +32,13 @@ function ItemEditor() {
         // Add other fields as needed for other tabs
     })
 
-    // Add reloadItem function
-    const reloadItem = async (itemId) => {
-        if (!itemId) return;
-        try {
-            const updatedItem = await window.package.getItem(itemId)
-            setItem(updatedItem)
-        } catch (err) {
-            console.error('Failed to reload item:', err)
-        }
-    }
-
     useEffect(() => {
-        const handleLoadItem = (event, loadedItem) => {
-            setItem(loadedItem)
-            document.title = `Edit ${loadedItem.name}`
+        // Initialize form data when item changes
+        if (item) {
+            document.title = `Edit ${item.name}`
 
             // Initialize form data with loaded item
-            const desc = loadedItem.details?.Description
+            const desc = item.details?.Description
             let description = ""
 
             if (desc && typeof desc === "object") {
@@ -65,60 +55,22 @@ function ItemEditor() {
             }
 
             setFormData({
-                name: loadedItem.name || "",
-                author: loadedItem.details?.Authors || "",
+                name: item.name || "",
+                author: item.details?.Authors || "",
                 description: description,
                 // Add other fields here
             })
 
             // Load the icon
-            if (loadedItem.icon) {
-                window.package.loadFile(loadedItem.icon).then(setIconSrc)
+            if (item.icon) {
+                window.package.loadFile(item.icon).then(setIconSrc)
             }
         }
+    }, [item])
 
-        const handleItemUpdate = (event, updatedItem) => {
-            console.log('ItemEditor received updated item:', {
-                id: updatedItem.id,
-                instances: updatedItem.instances
-            })
-            setItem(updatedItem)
-            document.title = `Edit ${updatedItem.name}`
-
-            // Update form data with new values
-            const desc = updatedItem.details?.Description
-            let description = ""
-
-            if (desc && typeof desc === "object") {
-                const descValues = Object.keys(desc)
-                    .filter((key) => key.startsWith("desc_"))
-                    .sort()
-                    .map((key) => desc[key])
-                    .filter((value) => value && value.trim() !== "")
-                    .join("\n")
-                    .trim()
-                description = descValues
-            } else {
-                description = desc || ""
-            }
-
-            setFormData({
-                name: updatedItem.name || "",
-                author: updatedItem.details?.Authors || "",
-                description: description,
-                // Add other fields here
-            })
-        }
-
-        window.package?.onItemLoaded?.(handleLoadItem)
-        window.package?.onItemUpdated?.(handleItemUpdate)
+    useEffect(() => {
+        // Notify backend that editor is ready
         window.package?.editorReady?.()
-
-        // Cleanup
-        return () => {
-            window.package?.onItemLoaded?.(null)
-            window.package?.onItemUpdated?.(null)
-        }
     }, [])
 
     const handleTabChange = (event, newValue) => {
