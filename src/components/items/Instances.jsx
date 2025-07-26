@@ -28,80 +28,44 @@ function Instances({ item, onInstancesChanged }) {
     const [newInstanceName, setNewInstanceName] = useState('')
     const [instanceToDelete, setInstanceToDelete] = useState(null)
     const [error, setError] = useState('')
-    const [instances, setInstances] = useState([])
-    const [itemId, setItemId] = useState('')
-    const [refreshKey, setRefreshKey] = useState(0)
 
-    // Force refresh function
-    const forceRefresh = () => {
-        console.log('Force refreshing instances component')
-        setRefreshKey(prev => prev + 1)
-    }
+    // Convert item instances to array format for rendering
+    const instances = item?.instances ? Object.entries(item.instances).map(([index, instance]) => ({
+        ...instance,
+        index
+    })) : []
 
+    // Debug effect to log when instances change
     useEffect(() => {
-        console.log('=== Instances useEffect triggered ===')
-        console.log('Current item prop:', item)
-        console.log('Current item instances:', item?.instances)
-        console.log('Current local instances state:', instances)
-        console.log('Current local itemId state:', itemId)
-        console.log('Refresh key:', refreshKey)
-        
-        // Update local state when item changes
-        if (item?.instances) {
-            const instancesArray = Object.entries(item.instances).map(([index, instance]) => ({
-                ...instance,
-                index
-            }))
-            console.log('New instances array to set:', instancesArray)
-            console.log('Updating instances state to:', instancesArray)
-            setInstances(instancesArray)
-            setItemId(item.id)
-        } else {
-            console.log('Clearing instances state (no instances found)')
-            setInstances([])
-            setItemId('')
-        }
-        console.log('=== End useEffect ===')
-    }, [item, item?.instances, item?.id, refreshKey])
-
-    // Additional useEffect with stringified dependency to catch any changes
-    useEffect(() => {
-        console.log('=== JSON stringify useEffect triggered ===')
-        if (item?.instances) {
-            const instancesArray = Object.entries(item.instances).map(([index, instance]) => ({
-                ...instance,
-                index
-            }))
-            console.log('Setting instances from JSON stringify effect:', instancesArray)
-            setInstances(instancesArray)
-        }
-    }, [JSON.stringify(item?.instances)])
-
-    useEffect(() => {
-        console.log('Instances state changed:', instances)
-    }, [instances])
+        console.log('Instances component: Item or instances changed:', {
+            itemId: item?.id,
+            instances: item?.instances,
+            instanceCount: instances.length,
+            instanceNames: instances.map(i => i.Name)
+        })
+    }, [item, instances])
 
     const handleEditInstance = async (packagePath, instancePath) => {
         try {
-            await window.package.editInstance({ packagePath, instanceName: instancePath, itemId: itemId })
+            await window.package.editInstance({ packagePath, instanceName: instancePath, itemId: item.id })
         } catch (error) {
             console.error("Failed to edit instance:", error)
         }
     }
 
     const handleAddInstanceWithFileDialog = async () => {
+        console.log('Instances: Adding instance with file dialog for item:', item.id)
         try {
-            const result = await window.package.addInstanceFileDialog(itemId)
+            const result = await window.package.addInstanceFileDialog(item.id)
             if (result.success) {
-                console.log(`Added instance: ${result.instanceName}`)
-                // Force refresh to ensure UI updates
-                setTimeout(() => forceRefresh(), 100)
+                console.log(`Instances: Added instance: ${result.instanceName}`)
+                // Backend will automatically send item-updated event
                 if (onInstancesChanged) onInstancesChanged();
             } else if (!result.canceled) {
-                console.error("Failed to add instance:", result.error)
+                console.error("Instances: Failed to add instance:", result.error)
             }
         } catch (error) {
-            console.error("Failed to add instance:", error)
+            console.error("Instances: Failed to add instance:", error)
         }
     }
 
@@ -110,46 +74,46 @@ function Instances({ item, onInstancesChanged }) {
             setError('Instance name is required')
             return
         }
+        console.log('Instances: Adding instance manually:', newInstanceName, 'for item:', item.id)
         try {
-            await window.package.addInstance(itemId, newInstanceName)
+            await window.package.addInstance(item.id, newInstanceName)
             setAddDialogOpen(false)
             setNewInstanceName('')
             setError('')
-            // Force refresh to ensure UI updates
-            setTimeout(() => forceRefresh(), 100)
+            // Backend will automatically send item-updated event
             if (onInstancesChanged) onInstancesChanged();
         } catch (error) {
-            console.error("Failed to add instance:", error)
+            console.error("Instances: Failed to add instance:", error)
         }
     }
 
     const handleReplaceInstance = async (instanceIndex) => {
+        console.log('Instances: Replacing instance at index:', instanceIndex, 'for item:', item.id)
         try {
-            const result = await window.package.replaceInstanceFileDialog(itemId, instanceIndex)
+            const result = await window.package.replaceInstanceFileDialog(item.id, instanceIndex)
             if (result.success) {
-                console.log(`Replaced instance: ${result.instanceName}`)
-                // Force refresh to ensure UI updates
-                setTimeout(() => forceRefresh(), 100)
+                console.log(`Instances: Replaced instance: ${result.instanceName}`)
+                // Backend will automatically send item-updated event
                 if (onInstancesChanged) onInstancesChanged();
             } else if (!result.canceled) {
-                console.error("Failed to replace instance:", result.error)
+                console.error("Instances: Failed to replace instance:", result.error)
             }
         } catch (error) {
-            console.error("Failed to replace instance:", error)
+            console.error("Instances: Failed to replace instance:", error)
         }
     }
 
     const handleRemoveInstance = async () => {
         if (instanceToDelete === null) return
+        console.log('Instances: Removing instance at index:', instanceToDelete, 'for item:', item.id)
         try {
-            await window.package.removeInstance(itemId, instanceToDelete)
+            await window.package.removeInstance(item.id, instanceToDelete)
             setDeleteDialogOpen(false)
             setInstanceToDelete(null)
-            // Force refresh to ensure UI updates
-            setTimeout(() => forceRefresh(), 100)
+            // Backend will automatically send item-updated event
             if (onInstancesChanged) onInstancesChanged();
         } catch (error) {
-            console.error("Failed to remove instance:", error)
+            console.error("Instances: Failed to remove instance:", error)
         }
     }
 
@@ -157,7 +121,7 @@ function Instances({ item, onInstancesChanged }) {
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Typography variant="h6">
-                    Instance Files
+                    Instance Files ({instances.length})
                 </Typography>
                 <Box sx={{ display: 'flex', gap: 1 }}>
                     <Tooltip title="Select a VMF file to add as a new instance">
@@ -177,16 +141,6 @@ function Instances({ item, onInstancesChanged }) {
                             size="small"
                         >
                             Manual
-                        </Button>
-                    </Tooltip>
-                    <Tooltip title="Debug: Force refresh instances display">
-                        <Button
-                            variant="outlined"
-                            onClick={forceRefresh}
-                            size="small"
-                            color="warning"
-                        >
-                            🔄 Debug Refresh
                         </Button>
                     </Tooltip>
                 </Box>

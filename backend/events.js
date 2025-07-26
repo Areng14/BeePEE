@@ -1,5 +1,5 @@
 const { reg_loadPackagePopup, packages } = require("./packageManager")
-const { createItemEditor } = require("./items/itemEditor")
+const { createItemEditor, sendItemUpdateToEditor } = require("./items/itemEditor")
 const { ipcMain, dialog, BrowserWindow } = require("electron")
 const fs = require("fs")
 const path = require("path")
@@ -150,6 +150,7 @@ function reg_events(mainWindow) {
                 instances: updatedItem.instances
             })
             mainWindow.webContents.send("item-updated", updatedItem)
+            sendItemUpdateToEditor(itemId, updatedItem)
             
             return { success: true, index: newIndex }
         } catch (error) {
@@ -223,6 +224,7 @@ function reg_events(mainWindow) {
                 instances: updatedItem.instances
             })
             mainWindow.webContents.send("item-updated", updatedItem)
+            sendItemUpdateToEditor(itemId, updatedItem)
             
             return { success: true, index: newIndex, instanceName: instanceName }
         } catch (error) {
@@ -292,6 +294,7 @@ function reg_events(mainWindow) {
                 instances: updatedItem.instances
             })
             mainWindow.webContents.send("item-updated", updatedItem)
+            sendItemUpdateToEditor(itemId, updatedItem)
             
             return { success: true, instanceName: instanceData.Name }
         } catch (error) {
@@ -321,6 +324,7 @@ function reg_events(mainWindow) {
                 instances: updatedItem.instances
             })
             mainWindow.webContents.send("item-updated", updatedItem)
+            sendItemUpdateToEditor(itemId, updatedItem)
             
             return { success: true }
         } catch (error) {
