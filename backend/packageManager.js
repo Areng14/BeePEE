@@ -100,7 +100,11 @@ const importPackage = async (pathToPackage) => {
         try {
             tempPkg = new Package(pathToPackage)
 
-            // Extract package
+            // Extract package - wipe existing directory first
+            if (fs.existsSync(tempPkg.packageDir)) {
+                fs.rmSync(tempPkg.packageDir, { recursive: true, force: true })
+                console.log("Wiped existing package directory before import extraction")
+            }
             fs.mkdirSync(tempPkg.packageDir, { recursive: true })
             await extractPackage(pathToPackage, tempPkg.packageDir)
 
@@ -148,7 +152,11 @@ const loadPackage = async (pathToPackage) => {
                 throw new Error(`Package file ${pathToPackage} does not exist`)
             }
 
-            // Always extract fresh
+            // Always extract fresh - wipe existing directory first
+            if (fs.existsSync(pkg.packageDir)) {
+                fs.rmSync(pkg.packageDir, { recursive: true, force: true })
+                console.log("Wiped existing package directory before extraction")
+            }
             fs.mkdirSync(pkg.packageDir, { recursive: true })
             await extractPackage(pathToPackage, pkg.packageDir)
 

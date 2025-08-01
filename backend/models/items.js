@@ -247,6 +247,62 @@ class Item {
         return Object.keys(this.instances)
     }
 
+    // Check if an instance file actually exists
+    instanceExists(index) {
+        const instanceData = this.instances[index]
+        if (!instanceData) {
+            return false
+        }
+        
+        // Apply path fixing to remove BEE2/ prefix for actual file structure
+        const actualInstancePath = this.fixInstancePath(instanceData.Name)
+        const fullInstancePath = Instance.getCleanPath(this.packagePath, actualInstancePath)
+        
+        return fs.existsSync(fullInstancePath)
+    }
+
+    // Get only valid instances (files exist)
+    getValidInstances() {
+        const validInstances = {}
+        
+        for (const [index, instanceData] of Object.entries(this.instances)) {
+            if (this.instanceExists(index)) {
+                validInstances[index] = instanceData
+            }
+        }
+        
+        return validInstances
+    }
+
+    // Get instances with their existence status
+    getInstancesWithStatus() {
+        const instancesWithStatus = {}
+        
+        for (const [index, instanceData] of Object.entries(this.instances)) {
+            const exists = this.instanceExists(index)
+            instancesWithStatus[index] = {
+                ...instanceData,
+                exists: exists
+            }
+        }
+        
+        return instancesWithStatus
+    }
+
+    // Helper function to fix instance paths by removing BEE2/ prefix
+    fixInstancePath(instancePath) {
+        // Normalize path separators to forward slashes
+        let normalizedPath = instancePath.replace(/\\/g, '/')
+        
+        if (normalizedPath.startsWith('instances/BEE2/')) {
+            return normalizedPath.replace('instances/BEE2/', 'instances/')
+        }
+        if (normalizedPath.startsWith('instances/bee2/')) {
+            return normalizedPath.replace('instances/bee2/', 'instances/')
+        }
+        return normalizedPath
+    }
+
     addInstance(instanceName) {
         // Find the next available index
         const keys = Object.keys(this.instances)
@@ -652,7 +708,23 @@ class Item {
             itemFolder: this.itemFolder,
             fullItemPath: this.fullItemPath,
             packagePath: this.packagePath,
-            instances: this.instances,
+            instances: this.instances, // Regular instances without existence check
+            metadata: this.metadata
+        }
+    }
+
+    // Special method for item editor that includes existence status
+    toJSONWithExistence() {
+        return {
+            id: this.id,
+            name: this.name,
+            details: this.details,
+            icon: this.icon,
+            paths: this.paths,
+            itemFolder: this.itemFolder,
+            fullItemPath: this.fullItemPath,
+            packagePath: this.packagePath,
+            instances: this.getInstancesWithStatus(), // Include existence status
             metadata: this.metadata
         }
     }

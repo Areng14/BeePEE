@@ -50,7 +50,8 @@ contextBridge.exposeInMainWorld("package", {
     // ========================================
     // ENTITY AND FGD DATA FUNCTIONS
     // ========================================
-    getItemEntities: (itemId) => ipcRenderer.invoke("get-item-entities", { itemId }),
+            getItemEntities: (itemId) => ipcRenderer.invoke("get-item-entities", { itemId }),
+        getValidInstances: (itemId) => ipcRenderer.invoke("get-valid-instances", { itemId }),
     getFgdData: () => ipcRenderer.invoke("get-fgd-data"),
 
     // ========================================

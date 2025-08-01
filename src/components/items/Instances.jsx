@@ -39,10 +39,9 @@ function Instances({ item, onInstancesChanged }) {
     useEffect(() => {
         console.log('Instances component: Item or instances changed:', {
             itemId: item?.id,
-            instances: item?.instances,
             instanceCount: instances.length,
             instanceNames: instances.map(i => i.Name),
-            rawInstances: item?.instances
+            instanceExists: instances.map(i => ({ name: i.Name, exists: i.exists }))
         })
     }, [item, instances])
 
@@ -156,18 +155,30 @@ function Instances({ item, onInstancesChanged }) {
                 <Stack spacing={2}>
                                          {instances.map((instance, arrayIndex) => {
                          const isVBSP = instance.source === 'vbsp'
+                         const instanceExists = instance.exists !== false // Default to true if not specified
+                         const isDisabled = !instanceExists
                          // Use the array index for sequential numbering instead of trying to parse from filename
                          const instanceNumber = arrayIndex
 
                          return (
-                             <Paper key={instance.Name || 'unknown'} variant="outlined" sx={{ p: 2 }}>
+                             <Paper 
+                                 key={instance.Name || 'unknown'} 
+                                 variant="outlined" 
+                                 sx={{ 
+                                     p: 2,
+                                     backgroundColor: isDisabled ? 'rgba(0, 0, 0, 0.3)' : 'background.paper',
+                                     borderColor: isDisabled ? 'error.main' : 'divider',
+                                     borderWidth: isDisabled ? 1 : 1,
+                                     opacity: isDisabled ? 0.8 : 1
+                                 }}
+                             >
                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                     <Typography variant="subtitle1" sx={{ mr: 1, minWidth: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
-                                         <Tooltip title={isVBSP ? "VBSP Instance" : "Editor Instance"}>
+                                                                          <Typography variant="subtitle1" sx={{ mr: 1, minWidth: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                         <Tooltip title={isDisabled ? "Missing File" : (isVBSP ? "VBSP Instance" : "Editor Instance")}>
                                              {isVBSP ? <CodeIcon fontSize="small" /> : <SubjectIcon fontSize="small" />}
                                          </Tooltip>
                                          Instance {instanceNumber}:
-                                    </Typography>
+                                     </Typography>
                                     <Typography 
                                         variant="body2" 
                                         color="text.secondary"
@@ -185,41 +196,44 @@ function Instances({ item, onInstancesChanged }) {
                                     </Typography>
                                     
                                     <Box sx={{ display: 'flex', gap: 1 }}>
-                                        <Tooltip title="Edit this instance file in Hammer">
-                                            <IconButton 
-                                                size="small" 
-                                                onClick={() => handleEditInstance(item.packagePath, instance.Name)}
-                                            >
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
+                                                                                 <Tooltip title={isDisabled ? "Cannot edit - file is missing" : "Edit this instance file in Hammer"}>
+                                             <span> {/* Wrapper needed for disabled IconButton */}
+                                                 <IconButton 
+                                                     size="small" 
+                                                     onClick={() => handleEditInstance(item.packagePath, instance.Name)}
+                                                     disabled={isDisabled}
+                                                 >
+                                                     <EditIcon fontSize="small" />
+                                                 </IconButton>
+                                             </span>
+                                         </Tooltip>
                                         
-                                        {!isVBSP && (
-                                            <Tooltip title="Replace this instance file with a different VMF file">
-                                                <IconButton 
-                                                    size="small" 
-                                                    onClick={() => handleReplaceInstance(instance.index)}
-                                                    color="warning"
-                                                >
-                                                    <SwapHorizIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        )}
+                                                                                 {!isVBSP && (
+                                             <Tooltip title={isDisabled ? "Replace missing file with a VMF file" : "Replace this instance file with a different VMF file"}>
+                                                 <IconButton 
+                                                     size="small" 
+                                                     onClick={() => handleReplaceInstance(instance.index)}
+                                                     color={isDisabled ? "primary" : "warning"}
+                                                 >
+                                                     <SwapHorizIcon fontSize="small" />
+                                                 </IconButton>
+                                             </Tooltip>
+                                         )}
                                         
-                                        {!isVBSP && (
-                                            <Tooltip title="Delete this instance permanently">
-                                                <IconButton 
-                                                    size="small" 
-                                                    color="error"
-                                                    onClick={() => {
-                                                        setInstanceToDelete(instance.index)
-                                                        setDeleteDialogOpen(true)
-                                                    }}
-                                                >
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        )}
+                                                                                 {!isVBSP && (
+                                             <Tooltip title="Delete this instance permanently">
+                                                 <IconButton 
+                                                     size="small" 
+                                                     color="error"
+                                                     onClick={() => {
+                                                         setInstanceToDelete(instance.index)
+                                                         setDeleteDialogOpen(true)
+                                                     }}
+                                                 >
+                                                     <DeleteIcon fontSize="small" />
+                                                 </IconButton>
+                                             </Tooltip>
+                                         )}
                                     </Box>
                                 </Box>
                             </Paper>

@@ -26,6 +26,29 @@ body {
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
+    overflow: hidden; /* Hide root scrollbars */
+}
+
+/* Hide scrollbars globally */
+html {
+    overflow: hidden;
+}
+
+/* Hide scrollbars only on the root level, not on components */
+#root {
+    overflow: hidden;
+}
+
+/* Hide scrollbars for webkit browsers only on root elements */
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbars for Firefox only on root elements */
+html, body, #root {
+    scrollbar-width: none;
 }
 
 h1 {

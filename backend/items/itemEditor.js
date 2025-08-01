@@ -11,7 +11,7 @@ function createItemEditor(item, mainWindow) {
     const isDev = !require("electron").app.isPackaged
 
     const window = new BrowserWindow({
-        width: 1056,
+        width: 960,
         height: 1024,
         parent: mainWindow,
         webPreferences: {
@@ -38,7 +38,7 @@ function createItemEditor(item, mainWindow) {
 
     window.webContents.once("did-finish-load", () => {
         setTimeout(() => {
-            window.webContents.send("load-item", item)
+            window.webContents.send("load-item", item.toJSONWithExistence())
         }, 100)
     })
 }
