@@ -95,7 +95,12 @@ function reg_events(mainWindow) {
 
     // Register item editor opening
     ipcMain.handle("open-item-editor", async (event, item) => {
-        createItemEditor(item, mainWindow)
+        // Find the actual Item instance from the packages
+        const actualItem = packages.flatMap(p => p.items).find(i => i.id === item.id)
+        if (!actualItem) {
+            throw new Error(`Item not found: ${item.id}`)
+        }
+        createItemEditor(actualItem, mainWindow)
     })
 
     // Register item saving
@@ -564,18 +569,15 @@ function reg_events(mainWindow) {
             
             const allEntities = {}
             
-            // Get entities from all instances
+            // Get entities from all valid instances only
             for (const [instanceIndex, instanceData] of Object.entries(item.instances)) {
+                // Only process instances that actually exist
+                if (!item.instanceExists(instanceIndex)) {
+                    continue
+                }
+                
                 const instance = item.getInstance(instanceIndex)
                 if (instance) {
-                    // Check if instance file actually exists
-                    // Apply path fixing to remove BEE2/ prefix for actual file structure
-                    const actualInstancePath = fixInstancePath(instanceData.Name)
-                    const fullInstancePath = Instance.getCleanPath(item.packagePath, actualInstancePath)
-                    if (!require('fs').existsSync(fullInstancePath)) {
-                        continue
-                    }
-                    
                     const entities = instance.getAllEntities()
                     
                     // Merge entities (Object.assign handles duplicates by overwriting)
@@ -584,6 +586,19 @@ function reg_events(mainWindow) {
             }
             
             return { success: true, entities: allEntities }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Get valid instances only (for UI filtering)
+    ipcMain.handle("get-valid-instances", async (event, { itemId }) => {
+        try {
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+            
+            const validInstances = item.getValidInstances()
+            return { success: true, instances: validInstances }
         } catch (error) {
             return { success: false, error: error.message }
         }
