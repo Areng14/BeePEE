@@ -187,13 +187,16 @@ function reg_events(mainWindow) {
 
     // Helper function to fix instance paths by removing BEE2/ prefix
     function fixInstancePath(instancePath) {
-        if (instancePath.startsWith('instances/BEE2/')) {
-            return instancePath.replace('instances/BEE2/', 'instances/')
+        // Normalize path separators to forward slashes
+        let normalizedPath = instancePath.replace(/\\/g, '/')
+        
+        if (normalizedPath.startsWith('instances/BEE2/')) {
+            return normalizedPath.replace('instances/BEE2/', 'instances/')
         }
-        if (instancePath.startsWith('instances/bee2/')) {
-            return instancePath.replace('instances/bee2/', 'instances/')
+        if (normalizedPath.startsWith('instances/bee2/')) {
+            return normalizedPath.replace('instances/bee2/', 'instances/')
         }
-        return instancePath
+        return normalizedPath
     }
 
     // Helper function to fix all instances in an item
@@ -269,27 +272,54 @@ function reg_events(mainWindow) {
             }
 
             // Always save new instances in the instances/ directory directly
-            // Strip out BEE2/ from the path if it exists
-            let instanceName = path.join("instances", fileName)
+            // Use existing instance paths as template, or reconstruct from source file path
+            let instanceName
             
-            // If the original file was in a BEE2 subdirectory, preserve the rest of the path
-            const selectedDir = path.dirname(selectedFilePath)
-            const pathParts = selectedDir.split(path.sep)
-            
-            // Find the index of 'BEE2' in the path
-            const bee2Index = pathParts.findIndex(part => part.toLowerCase() === 'bee2')
-            
-            if (bee2Index !== -1) {
-                // Remove BEE2 from the path and get everything after it
-                const pathAfterBee2 = pathParts.slice(bee2Index + 1)
-                if (pathAfterBee2.length > 0) {
-                    // Reconstruct the path without BEE2
-                    instanceName = path.join("instances", ...pathAfterBee2, fileName)
+            // Check if this item has existing instances to use as template
+            const existingInstances = Object.values(item.instances)
+            if (existingInstances.length > 0) {
+                // Use the first existing instance path as template
+                const templatePath = existingInstances[0].Name
+                const templateDir = path.dirname(templatePath)
+                
+                // Create the new instance path using the template structure (keep BEE2/ for display)
+                instanceName = templateDir + "/" + fileName
+            } else {
+                // No existing instances - reconstruct path from source file
+                const selectedDir = path.dirname(selectedFilePath)
+                const pathParts = selectedDir.split(path.sep)
+                
+                // Find the index of 'instances' in the source path
+                const instancesIndex = pathParts.findIndex(part => part.toLowerCase() === 'instances')
+                
+                if (instancesIndex !== -1 && instancesIndex + 1 < pathParts.length) {
+                    // Get everything after 'instances' in the source path
+                    const pathAfterInstances = pathParts.slice(instancesIndex + 1)
+                    
+                    // Skip 'bee' if it's the first part after instances
+                    let finalPathParts = pathAfterInstances
+                    if (pathAfterInstances.length > 0 && pathAfterInstances[0].toLowerCase() === 'bee') {
+                        finalPathParts = pathAfterInstances.slice(1)
+                    }
+                    
+                    if (finalPathParts.length > 0) {
+                        // Reconstruct the path: instances/rest/of/path/filename
+                        instanceName = "instances/" + finalPathParts.join("/") + "/" + fileName
+                    } else {
+                        // Fallback to simple instances/filename
+                        instanceName = "instances/" + fileName
+                    }
+                } else {
+                    // No instances found in path - create simple structure
+                    const itemId = item.id.toLowerCase()
+                    instanceName = `instances/${itemId}/${fileName}`
                 }
             }
             
             // Copy the file to the package resources directory
-            const targetPath = path.join(item.packagePath, "resources", instanceName)
+            // Apply path fixing to remove BEE2/ prefix for actual file structure
+            const actualFilePath = fixInstancePath(instanceName)
+            const targetPath = path.join(item.packagePath, "resources", actualFilePath)
             const targetDir = path.dirname(targetPath)
             
             // Ensure the instances directory exists
@@ -365,7 +395,9 @@ function reg_events(mainWindow) {
             }
 
             // Get the current instance file path
-            const currentInstancePath = Instance.getCleanPath(item.packagePath, instanceData.Name)
+            // Apply path fixing to remove BEE2/ prefix for actual file structure
+            const actualInstancePath = fixInstancePath(instanceData.Name)
+            const currentInstancePath = Instance.getCleanPath(item.packagePath, actualInstancePath)
             
             // Copy the new file over the existing one
             fs.copyFileSync(selectedFilePath, currentInstancePath)
@@ -537,7 +569,10 @@ function reg_events(mainWindow) {
                 const instance = item.getInstance(instanceIndex)
                 if (instance) {
                     // Check if instance file actually exists
-                    if (!require('fs').existsSync(instance.path)) {
+                    // Apply path fixing to remove BEE2/ prefix for actual file structure
+                    const actualInstancePath = fixInstancePath(instanceData.Name)
+                    const fullInstancePath = Instance.getCleanPath(item.packagePath, actualInstancePath)
+                    if (!require('fs').existsSync(fullInstancePath)) {
                         continue
                     }
                     
@@ -615,7 +650,9 @@ function reg_events(mainWindow) {
             }
 
             // Build absolute path to instance file
-            const instancePath = path.normalize(Instance.getCleanPath(packagePath, instanceName))
+            // Apply path fixing to remove BEE2/ prefix for actual file structure
+            const actualInstancePath = fixInstancePath(instanceName)
+            const instancePath = path.normalize(Instance.getCleanPath(packagePath, actualInstancePath))
             
             // Verify the path is within the package resources directory
             const resourcesDir = path.normalize(path.join(packagePath, "resources"))
