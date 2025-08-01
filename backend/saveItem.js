@@ -53,6 +53,20 @@ async function saveItem(item) {
     try {
         fs.writeFileSync(editorItemsPath, JSON.stringify(editorItems, null, 4))
         fs.writeFileSync(propertiesPath, JSON.stringify(properties, null, 4))
+        
+        // Update metadata lastModified timestamp if item has metadata
+        if (item.metadata) {
+            const metaPath = path.join(item.fullItemPath, "meta.json")
+            if (fs.existsSync(metaPath)) {
+                try {
+                    const metadata = JSON.parse(fs.readFileSync(metaPath, "utf-8"))
+                    metadata.lastModified = new Date().toISOString()
+                    fs.writeFileSync(metaPath, JSON.stringify(metadata, null, 4))
+                } catch (error) {
+                    console.warn("Failed to update metadata timestamp:", error.message)
+                }
+            }
+        }
     } catch (error) {
         throw new Error(`Failed to write files: ${error.message}`)
     }
