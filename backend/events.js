@@ -64,8 +64,7 @@ function createIconPreviewWindow(iconPath, itemName, parentWindow) {
         maximizable: false,
         minimizable: false,
         title: title,
-        parent: parentWindow,
-        modal: false,
+        alwaysOnTop: true, // Keep preview on top without parent relationship
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
