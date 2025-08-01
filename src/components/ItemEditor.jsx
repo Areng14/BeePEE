@@ -67,6 +67,9 @@ function ItemEditor() {
             if (item.icon) {
                 window.package.loadFile(item.icon).then(setIconSrc)
             }
+            
+            // Clear unsaved changes indicator when loading a new item
+            window.package?.setUnsavedChanges?.(false)
         }
     }, [item])
 
@@ -80,10 +83,36 @@ function ItemEditor() {
     }
 
     const updateFormData = (field, value) => {
-        setFormData((prev) => ({
-            ...prev,
-            [field]: value,
-        }))
+        setFormData((prev) => {
+            const newData = {
+                ...prev,
+                [field]: value,
+            }
+            
+            // Check if data has changed from original item
+            const hasChanges = 
+                newData.name !== (item?.name || "") ||
+                newData.author !== (item?.details?.Authors || "") ||
+                newData.description !== (() => {
+                    const desc = item?.details?.Description
+                    if (desc && typeof desc === "object") {
+                        const descValues = Object.keys(desc)
+                            .filter((key) => key.startsWith("desc_"))
+                            .sort()
+                            .map((key) => desc[key])
+                            .filter((value) => value && value.trim() !== "")
+                            .join("\n")
+                            .trim()
+                        return descValues
+                    }
+                    return desc || ""
+                })()
+            
+            // Update window title with unsaved changes indicator
+            window.package?.setUnsavedChanges?.(hasChanges)
+            
+            return newData
+        })
     }
 
     const handleSave = async () => {
@@ -114,6 +143,9 @@ function ItemEditor() {
                 setShowSaveSuccess(true)
                 setSaveError(null)
                 setTimeout(() => setShowSaveSuccess(false), 2000)
+                
+                // Clear unsaved changes indicator
+                window.package?.setUnsavedChanges?.(false)
             } else {
                 throw new Error("Failed to save item")
             }

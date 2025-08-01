@@ -68,6 +68,11 @@ async function handleItemSave(item, event, mainWindow) {
         event.sender.send("item-updated", updatedItem) // Send to editor window
         mainWindow.webContents.send("item-updated", updatedItem) // Send to main window
 
+        // Clear unsaved changes indicator
+        if (global.titleManager) {
+            global.titleManager.setUnsavedChanges(false)
+        }
+
         return { success: true }
     } catch (error) {
         console.error("Failed to save item:", error)
@@ -98,6 +103,14 @@ function reg_events(mainWindow) {
         return handleItemSave(itemData, event, mainWindow)
     })
 
+    // Register unsaved changes tracking
+    ipcMain.handle("set-unsaved-changes", async (event, hasChanges) => {
+        if (global.titleManager) {
+            global.titleManager.setUnsavedChanges(hasChanges)
+        }
+        return { success: true }
+    })
+
     // IPC handler for Save Package
     ipcMain.on("save-package", async (event) => {
         try {
@@ -109,6 +122,11 @@ function reg_events(mainWindow) {
             }
             await savePackageAsBpee(currentPackageDir, lastSavedBpeePath)
             event.sender.send("package-saved", { path: lastSavedBpeePath })
+            
+            // Clear unsaved changes indicator
+            if (global.titleManager) {
+                global.titleManager.setUnsavedChanges(false)
+            }
         } catch (err) {
             dialog.showErrorBox("Save Failed", err.message)
         }
@@ -127,6 +145,11 @@ function reg_events(mainWindow) {
             await savePackageAsBpee(currentPackageDir, filePath)
             lastSavedBpeePath = filePath
             event.sender.send("package-saved", { path: filePath })
+            
+            // Clear unsaved changes indicator
+            if (global.titleManager) {
+                global.titleManager.setUnsavedChanges(false)
+            }
         } catch (err) {
             dialog.showErrorBox("Save As Failed", err.message)
         }
