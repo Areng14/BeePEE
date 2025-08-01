@@ -90,6 +90,16 @@ function reg_events(mainWindow) {
 
     // Register item editor opening
     ipcMain.handle("open-item-editor", async (event, item) => {
+        // Fix instance paths before opening editor
+        const itemInstance = packages.flatMap(p => p.items).find(i => i.id === item.id)
+        if (itemInstance) {
+            const hasChanges = fixItemInstances(itemInstance)
+            if (hasChanges) {
+                // Send updated item to frontend
+                const updatedItem = itemInstance.toJSON()
+                mainWindow.webContents.send("item-updated", updatedItem)
+            }
+        }
         createItemEditor(item, mainWindow)
     })
 
@@ -162,6 +172,52 @@ function reg_events(mainWindow) {
         }
     })
 
+    // Helper function to fix instance paths by removing BEE2/ prefix
+    function fixInstancePath(instancePath) {
+        if (instancePath.startsWith('instances/BEE2/')) {
+            return instancePath.replace('instances/BEE2/', 'instances/')
+        }
+        if (instancePath.startsWith('instances/bee2/')) {
+            return instancePath.replace('instances/bee2/', 'instances/')
+        }
+        return instancePath
+    }
+
+    // Helper function to fix all instances in an item
+    function fixItemInstances(item) {
+        let hasChanges = false
+        
+        // Fix instances in memory
+        for (const [index, instanceData] of Object.entries(item.instances)) {
+            const oldPath = instanceData.Name
+            const newPath = fixInstancePath(oldPath)
+            
+            if (oldPath !== newPath) {
+                console.log(`Fixing instance path: ${oldPath} -> ${newPath}`)
+                instanceData.Name = newPath
+                hasChanges = true
+            }
+        }
+        
+        // Fix instances in editoritems file
+        if (hasChanges) {
+            const editoritems = item.getEditorItems()
+            if (editoritems.Item?.Exporting?.Instances) {
+                for (const [index, instanceData] of Object.entries(editoritems.Item.Exporting.Instances)) {
+                    const oldPath = instanceData.Name
+                    const newPath = fixInstancePath(oldPath)
+                    
+                    if (oldPath !== newPath) {
+                        instanceData.Name = newPath
+                    }
+                }
+                item.saveEditorItems(editoritems)
+            }
+        }
+        
+        return hasChanges
+    }
+
     // Add instance with file dialog
     ipcMain.handle("add-instance-file-dialog", async (event, { itemId }) => {
         try {
@@ -199,8 +255,25 @@ function reg_events(mainWindow) {
                 throw new Error("Selected file must be a VMF file")
             }
 
-            // Create the relative path for the instance (instances/filename.vmf)
-            const instanceName = path.join("instances", fileName)
+            // Always save new instances in the instances/ directory directly
+            // Strip out BEE2/ from the path if it exists
+            let instanceName = path.join("instances", fileName)
+            
+            // If the original file was in a BEE2 subdirectory, preserve the rest of the path
+            const selectedDir = path.dirname(selectedFilePath)
+            const pathParts = selectedDir.split(path.sep)
+            
+            // Find the index of 'BEE2' in the path
+            const bee2Index = pathParts.findIndex(part => part.toLowerCase() === 'bee2')
+            
+            if (bee2Index !== -1) {
+                // Remove BEE2 from the path and get everything after it
+                const pathAfterBee2 = pathParts.slice(bee2Index + 1)
+                if (pathAfterBee2.length > 0) {
+                    // Reconstruct the path without BEE2
+                    instanceName = path.join("instances", ...pathAfterBee2, fileName)
+                }
+            }
             
             // Copy the file to the package resources directory
             const targetPath = path.join(item.packagePath, "resources", instanceName)

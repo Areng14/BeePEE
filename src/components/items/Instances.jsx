@@ -41,7 +41,8 @@ function Instances({ item, onInstancesChanged }) {
             itemId: item?.id,
             instances: item?.instances,
             instanceCount: instances.length,
-            instanceNames: instances.map(i => i.Name)
+            instanceNames: instances.map(i => i.Name),
+            rawInstances: item?.instances
         })
     }, [item, instances])
 
@@ -57,10 +58,15 @@ function Instances({ item, onInstancesChanged }) {
         console.log('Instances: Adding instance with file dialog for item:', item.id)
         try {
             const result = await window.package.addInstanceFileDialog(item.id)
+            console.log('Instances: File dialog result:', result)
             if (result.success) {
                 console.log(`Instances: Added instance: ${result.instanceName}`)
+                console.log('Instances: Current item instances before callback:', item?.instances)
                 // Backend will automatically send item-updated event
-                if (onInstancesChanged) onInstancesChanged();
+                if (onInstancesChanged) {
+                    console.log('Instances: Calling onInstancesChanged callback')
+                    onInstancesChanged();
+                }
             } else if (!result.canceled) {
                 console.error("Instances: Failed to add instance:", result.error)
             }
@@ -148,18 +154,19 @@ function Instances({ item, onInstancesChanged }) {
 
             {instances.length > 0 ? (
                 <Stack spacing={2}>
-                    {instances.map((instance) => {
-                        const isVBSP = instance.source === 'vbsp'
-                        const instanceNumber = instance?.Name?.match?.(/(\d+)\.vmf$/)?.[1] || '?'
+                                         {instances.map((instance, arrayIndex) => {
+                         const isVBSP = instance.source === 'vbsp'
+                         // Use the array index for sequential numbering instead of trying to parse from filename
+                         const instanceNumber = arrayIndex
 
-                        return (
-                            <Paper key={instance.Name || 'unknown'} variant="outlined" sx={{ p: 2 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Typography variant="subtitle1" sx={{ mr: 1, minWidth: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Tooltip title={isVBSP ? "VBSP Instance" : "Editor Instance"}>
-                                            {isVBSP ? <CodeIcon fontSize="small" /> : <SubjectIcon fontSize="small" />}
-                                        </Tooltip>
-                                        Instance {instanceNumber}:
+                         return (
+                             <Paper key={instance.Name || 'unknown'} variant="outlined" sx={{ p: 2 }}>
+                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                     <Typography variant="subtitle1" sx={{ mr: 1, minWidth: 'auto', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                         <Tooltip title={isVBSP ? "VBSP Instance" : "Editor Instance"}>
+                                             {isVBSP ? <CodeIcon fontSize="small" /> : <SubjectIcon fontSize="small" />}
+                                         </Tooltip>
+                                         Instance {instanceNumber}:
                                     </Typography>
                                     <Typography 
                                         variant="body2" 
