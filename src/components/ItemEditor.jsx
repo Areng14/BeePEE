@@ -22,7 +22,6 @@ import { useItemContext } from "../contexts/ItemContext"
 function ItemEditor() {
     const { item, reloadItem } = useItemContext()
     const [tabValue, setTabValue] = useState(0)
-    const [iconSrc, setIconSrc] = useState(null)
     const [saveError, setSaveError] = useState(null)
     const [showSaveSuccess, setShowSaveSuccess] = useState(false)
 
@@ -63,10 +62,7 @@ function ItemEditor() {
                 // Add other fields here
             })
 
-            // Load the icon
-            if (item.icon) {
-                window.package.loadFile(item.icon).then(setIconSrc)
-            }
+
             
             // Clear unsaved changes indicator when loading a new item
             window.package?.setUnsavedChanges?.(false)
@@ -76,6 +72,14 @@ function ItemEditor() {
     useEffect(() => {
         // Notify backend that editor is ready
         window.package?.editorReady?.()
+        
+        // Add class to body to hide scrollbars for ItemEditor
+        document.body.classList.add('item-editor-active')
+        
+        // Cleanup: remove class when component unmounts
+        return () => {
+            document.body.classList.remove('item-editor-active')
+        }
     }, [])
 
     const handleTabChange = (event, newValue) => {
@@ -164,28 +168,12 @@ function ItemEditor() {
     console.log(item)
 
     return (
-        <Box sx={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-            {/* Icon Banner */}
-            <Box
-                sx={{
-                    height: 120,
-                    background:
-                        "linear-gradient(135deg, #d2b019ff 0%, #b8951a 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                }}>
-                <img
-                    src={iconSrc || "placeholder.png"}
-                    alt={item.name}
-                    style={{
-                        width: 64,
-                        height: 64,
-                        border: "2px solid white",
-                        borderRadius: 4,
-                    }}
-                />
-            </Box>
+        <Box sx={{ 
+            height: "100vh", 
+            display: "flex", 
+            flexDirection: "column",
+            overflow: "hidden"
+        }}>
 
             {/* Main Content Area with Vertical Sidebar */}
             <Box sx={{ display: "flex", flex: 1, overflow: "hidden" }}>

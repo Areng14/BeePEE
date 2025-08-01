@@ -26,29 +26,33 @@ body {
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
-    overflow: hidden; /* Hide root scrollbars */
 }
 
-/* Hide scrollbars globally */
-html {
-    overflow: hidden;
+/* Hide scrollbars only when ItemEditor is active */
+body.item-editor-active {
+    overflow: hidden !important;
 }
 
-/* Hide scrollbars only on the root level, not on components */
-#root {
-    overflow: hidden;
+body.item-editor-active html {
+    overflow: hidden !important;
 }
 
-/* Hide scrollbars for webkit browsers only on root elements */
-html::-webkit-scrollbar,
-body::-webkit-scrollbar,
-#root::-webkit-scrollbar {
-    display: none;
+body.item-editor-active #root {
+    overflow: hidden !important;
 }
 
-/* Hide scrollbars for Firefox only on root elements */
-html, body, #root {
-    scrollbar-width: none;
+/* Hide scrollbars for webkit browsers when ItemEditor is active */
+body.item-editor-active::-webkit-scrollbar,
+body.item-editor-active html::-webkit-scrollbar,
+body.item-editor-active #root::-webkit-scrollbar {
+    display: none !important;
+}
+
+/* Hide scrollbars for Firefox when ItemEditor is active */
+body.item-editor-active,
+body.item-editor-active html,
+body.item-editor-active #root {
+    scrollbar-width: none !important;
 }
 
 h1 {

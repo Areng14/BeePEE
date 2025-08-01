@@ -1,10 +1,33 @@
-import { Stack, TextField, Box, Typography, IconButton } from "@mui/material"
-import { Visibility, Edit } from "@mui/icons-material"
+import { Stack, TextField, Box, Typography, IconButton, Button, InputAdornment } from "@mui/material"
+import { Visibility, Edit, FolderOpen, Image } from "@mui/icons-material"
 import ReactMarkdown from "react-markdown"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 
 function BasicInfo({ item, formData, onUpdate }) {
+    const [iconSrc, setIconSrc] = useState(null)
     const [isPreview, setIsPreview] = useState(false)
+
+    useEffect(() => {
+        // Load the icon when item changes
+        if (item?.icon) {
+            window.package.loadFile(item.icon).then(setIconSrc)
+        }
+    }, [item])
+
+    // Get relative path from package root
+    const getRelativeIconPath = () => {
+        if (!item?.icon || !item?.packagePath) return ""
+        
+        // Remove the package path from the full icon path to get relative path
+        const fullIconPath = item.icon
+        const packagePath = item.packagePath
+        
+        if (fullIconPath.startsWith(packagePath)) {
+            return fullIconPath.substring(packagePath.length).replace(/^[\\\/]/, '')
+        }
+        
+        return item.icon // fallback to full path if something goes wrong
+    }
 
     // Process markdown to handle single line breaks properly
     const processMarkdown = (text) => {
@@ -52,6 +75,7 @@ function BasicInfo({ item, formData, onUpdate }) {
             </Box>
 
             <Stack spacing={2} sx={{ height: "100%" }}>
+
                 <TextField
                     label="Name"
                     value={formData.name}
@@ -66,6 +90,41 @@ function BasicInfo({ item, formData, onUpdate }) {
                     onChange={(e) => onUpdate("author", e.target.value)}
                     fullWidth
                     variant="outlined"
+                />
+
+                <TextField
+                    label="Icon"
+                    value={getRelativeIconPath()}
+                    fullWidth
+                    variant="outlined"
+                    InputProps={{
+                        readOnly: true,
+                        endAdornment: (
+                            <InputAdornment position="end">
+                                <IconButton
+                                    size="small"
+                                    onClick={() => {
+                                        // TODO: Implement icon browse functionality
+                                        console.log("Browse for icon clicked")
+                                    }}
+                                    title="Browse for Icon"
+                                    sx={{ mr: 0.5 }}
+                                >
+                                    <FolderOpen />
+                                </IconButton>
+                                <IconButton
+                                    size="small"
+                                    onClick={() => {
+                                        // TODO: Implement icon view functionality
+                                        console.log("View icon clicked")
+                                    }}
+                                    title="View Icon"
+                                >
+                                    <Image />
+                                </IconButton>
+                            </InputAdornment>
+                        )
+                    }}
                 />
 
                 {/* Description with preview toggle */}
