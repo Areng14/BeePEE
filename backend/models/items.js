@@ -37,6 +37,7 @@ class Item {
         this.paths = {
             editorItems: path.join(fullItemPath, "editoritems.json"),
             properties: path.join(fullItemPath, "properties.json"),
+            meta: path.join(fullItemPath, "meta.json"),
         }
 
         //If there is vbsp add it (keeping .cfg as it's not VDF)
@@ -103,6 +104,9 @@ class Item {
         // Initialize instances from editoritems
         this.instances = {}
         this._loadedInstances = new Map() // Cache for loaded Instance objects
+
+        // Load metadata
+        this.metadata = this.loadMetadata()
 
         // Add editor instances
         const editorInstances = parsedEditoritems.Item?.Exporting?.Instances || {}
@@ -519,6 +523,125 @@ class Item {
         )
     }
 
+    // Metadata methods
+    loadMetadata() {
+        try {
+            if (fs.existsSync(this.paths.meta)) {
+                const metadata = JSON.parse(fs.readFileSync(this.paths.meta, "utf-8"))
+                return metadata
+            }
+        } catch (error) {
+            console.warn(`Failed to load metadata for item ${this.id}:`, error.message)
+        }
+        
+        // Get actual file creation and modification dates
+        const fileDates = this.getFileDates()
+        
+        // Create default metadata structure with actual file dates
+        const defaultMetadata = {
+            created: fileDates.created.toISOString(),
+            lastModified: fileDates.lastModified.toISOString()
+        }
+        
+        // Create the meta.json file if it doesn't exist
+        this.saveMetadata(defaultMetadata)
+        
+        return defaultMetadata
+    }
+
+    getFileDates() {
+        let earliestCreated = new Date()
+        let latestModified = new Date(0) // Start with epoch time
+        
+        // Check all item files for creation and modification dates
+        const filesToCheck = [
+            this.paths.editorItems,
+            this.paths.properties
+        ]
+        
+        // Add VBSP config if it exists
+        if (this.paths.vbsp_config) {
+            filesToCheck.push(this.paths.vbsp_config)
+        }
+        
+        for (const filePath of filesToCheck) {
+            if (fs.existsSync(filePath)) {
+                try {
+                    const stats = fs.statSync(filePath)
+                    
+                    // Use birthtime (creation) if available, otherwise use mtime
+                    const created = stats.birthtime || stats.mtime
+                    const modified = stats.mtime
+                    
+                    // Find earliest creation date
+                    if (created < earliestCreated) {
+                        earliestCreated = created
+                    }
+                    
+                    // Find latest modification date
+                    if (modified > latestModified) {
+                        latestModified = modified
+                    }
+                } catch (error) {
+                    console.warn(`Failed to get stats for ${filePath}:`, error.message)
+                }
+            }
+        }
+        
+        // If we couldn't get any valid dates, use current time
+        if (earliestCreated.getTime() === new Date().getTime() && latestModified.getTime() === 0) {
+            const now = new Date()
+            return {
+                created: now,
+                lastModified: now
+            }
+        }
+        
+        return {
+            created: earliestCreated,
+            lastModified: latestModified
+        }
+    }
+
+    saveMetadata(metadata = null) {
+        try {
+            const dataToSave = metadata || this.metadata
+            
+            // Get current file modification date
+            const fileDates = this.getFileDates()
+            dataToSave.lastModified = fileDates.lastModified.toISOString()
+            
+            // Ensure required fields exist
+            if (!dataToSave.created) {
+                dataToSave.created = fileDates.created.toISOString()
+            }
+            
+            fs.writeFileSync(this.paths.meta, JSON.stringify(dataToSave, null, 4))
+            this.metadata = dataToSave
+            return true
+        } catch (error) {
+            console.error(`Failed to save metadata for item ${this.id}:`, error.message)
+            return false
+        }
+    }
+
+    updateMetadata(updates) {
+        if (!updates || typeof updates !== 'object') {
+            throw new Error('Metadata updates must be an object')
+        }
+        
+        this.metadata = {
+            ...this.metadata,
+            ...updates
+        }
+        
+        return this.saveMetadata()
+    }
+
+    getMetadata() {
+        return this.metadata
+    }
+
     toJSON() {
         return {
             id: this.id,
@@ -529,7 +652,8 @@ class Item {
             itemFolder: this.itemFolder,
             fullItemPath: this.fullItemPath,
             packagePath: this.packagePath,
-            instances: this.instances
+            instances: this.instances,
+            metadata: this.metadata
         }
     }
 }

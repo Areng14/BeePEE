@@ -52,4 +52,10 @@ contextBridge.exposeInMainWorld("package", {
     // ========================================
     getItemEntities: (itemId) => ipcRenderer.invoke("get-item-entities", { itemId }),
     getFgdData: () => ipcRenderer.invoke("get-fgd-data"),
+
+    // ========================================
+    // METADATA MANAGEMENT FUNCTIONS
+    // ========================================
+    getItemMetadata: (itemId) => ipcRenderer.invoke("get-item-metadata", { itemId }),
+    updateItemMetadata: (itemId, metadata) => ipcRenderer.invoke("update-item-metadata", { itemId, metadata }),
 })

@@ -90,16 +90,6 @@ function reg_events(mainWindow) {
 
     // Register item editor opening
     ipcMain.handle("open-item-editor", async (event, item) => {
-        // Fix instance paths before opening editor
-        const itemInstance = packages.flatMap(p => p.items).find(i => i.id === item.id)
-        if (itemInstance) {
-            const hasChanges = fixItemInstances(itemInstance)
-            if (hasChanges) {
-                // Send updated item to frontend
-                const updatedItem = itemInstance.toJSON()
-                mainWindow.webContents.send("item-updated", updatedItem)
-            }
-        }
         createItemEditor(item, mainWindow)
     })
 
@@ -551,6 +541,38 @@ function reg_events(mainWindow) {
             
             return { success: true, entities: resources.entities }
         } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Metadata management handlers
+    ipcMain.handle("get-item-metadata", async (event, { itemId }) => {
+        try {
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+            
+            return { success: true, metadata: item.getMetadata() }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    ipcMain.handle("update-item-metadata", async (event, { itemId, metadata }) => {
+        try {
+            const item = packages.flatMap(p => p.items).find(i => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+            
+            const success = item.updateMetadata(metadata)
+            if (success) {
+                // Send updated item to frontend
+                const updatedItem = item.toJSON()
+                mainWindow.webContents.send("item-updated", updatedItem)
+                sendItemUpdateToEditor(itemId, updatedItem)
+            }
+            
+            return { success }
+        } catch (error) {
+            dialog.showErrorBox("Failed to Update Metadata", error.message)
             return { success: false, error: error.message }
         }
     })

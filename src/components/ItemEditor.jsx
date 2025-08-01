@@ -9,12 +9,14 @@ import {
     Close,
     Construction,
     CheckCircle,
+    Description,
 } from "@mui/icons-material"
 import BasicInfo from "./items/BasicInfo"
 import Inputs from "./items/Inputs"
 import Instances from "./items/Instances"
 import Vbsp from "./items/Vbsp"
 import Other from "./items/Other"
+import Metadata from "./items/Metadata"
 import { useItemContext } from "../contexts/ItemContext"
 
 function ItemEditor() {
@@ -178,6 +180,9 @@ function ItemEditor() {
                 <Tooltip title="Other - Additional item settings">
                     <Tab icon={<Construction />} />
                 </Tooltip>
+                <Tooltip title="Metadata - Item metadata and tags">
+                    <Tab icon={<Description />} />
+                </Tooltip>
             </Tabs>
 
             {/* Tab Content */}
@@ -217,6 +222,9 @@ function ItemEditor() {
                         formData={formData}
                         onUpdate={updateFormData}
                     />
+                </Box>
+                <Box sx={{ display: tabValue === 5 ? "block" : "none" }}>
+                    <Metadata item={item} />
                 </Box>
             </Box>
 

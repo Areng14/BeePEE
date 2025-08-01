@@ -78,8 +78,8 @@ function createMainMenu(mainWindow) {
                             properties: ["openFile"],
                             filters: [
                                 {
-                                    name: "BEE Package",
-                                    extensions: ["bpee", "zip"],
+                                    name: "BEEmod Package",
+                                    extensions: ["bee_pack", "zip"],
                                 },
                             ],
                         })
