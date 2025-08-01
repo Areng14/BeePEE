@@ -8,7 +8,6 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    TextField,
     IconButton,
     DialogContentText,
     Tooltip
@@ -23,11 +22,9 @@ import { useState, useEffect } from 'react'
 import ViewInAr from '@mui/icons-material/ViewInAr'
 
 function Instances({ item, onInstancesChanged }) {
-    const [addDialogOpen, setAddDialogOpen] = useState(false)
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-    const [newInstanceName, setNewInstanceName] = useState('')
     const [instanceToDelete, setInstanceToDelete] = useState(null)
-    const [error, setError] = useState('')
+    const [isRemovingMissing, setIsRemovingMissing] = useState(false)
 
     // Convert item instances to array format for rendering
     const instances = item?.instances ? Object.entries(item.instances).map(([index, instance]) => ({
@@ -74,23 +71,7 @@ function Instances({ item, onInstancesChanged }) {
         }
     }
 
-    const handleAddInstance = async () => {
-        if (!newInstanceName) {
-            setError('Instance name is required')
-            return
-        }
-        console.log('Instances: Adding instance manually:', newInstanceName, 'for item:', item.id)
-        try {
-            await window.package.addInstance(item.id, newInstanceName)
-            setAddDialogOpen(false)
-            setNewInstanceName('')
-            setError('')
-            // Backend will automatically send item-updated event
-            if (onInstancesChanged) onInstancesChanged();
-        } catch (error) {
-            console.error("Instances: Failed to add instance:", error)
-        }
-    }
+
 
     const handleReplaceInstance = async (instanceIndex) => {
         console.log('Instances: Replacing instance at index:', instanceIndex, 'for item:', item.id)
@@ -122,6 +103,28 @@ function Instances({ item, onInstancesChanged }) {
         }
     }
 
+    const handleRemoveAllMissingInstances = async () => {
+        const missingInstances = instances.filter(instance => !instance.exists && instance.source !== 'vbsp')
+        if (missingInstances.length === 0) return
+        
+        setIsRemovingMissing(true)
+        console.log('Instances: Removing all missing instances (excluding VBSP):', missingInstances.length, 'for item:', item.id)
+        try {
+            // Remove instances in reverse order to avoid index shifting issues
+            const sortedInstances = missingInstances.sort((a, b) => parseInt(b.index) - parseInt(a.index))
+            
+            for (const instance of sortedInstances) {
+                await window.package.removeInstance(item.id, instance.index)
+            }
+            
+            // Backend will automatically send item-updated event
+            if (onInstancesChanged) onInstancesChanged();
+        } catch (error) {
+            console.error("Instances: Failed to remove all missing instances:", error)
+            setIsRemovingMissing(false) // Reset on error so user can try again
+        }
+    }
+
     return (
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -138,16 +141,19 @@ function Instances({ item, onInstancesChanged }) {
                             Add VMF Instance
                         </Button>
                     </Tooltip>
-                    <Tooltip title="Add instance by typing path manually (advanced)">
-                        <Button
-                            variant="outlined"
-                            startIcon={<AddIcon />}
-                            onClick={() => setAddDialogOpen(true)}
-                            size="small"
-                        >
-                            Manual
-                        </Button>
-                    </Tooltip>
+                    {instances.some(instance => !instance.exists && instance.source !== 'vbsp') && !isRemovingMissing && (
+                        <Tooltip title="Remove all instances with missing files (excluding VBSP instances)">
+                            <Button
+                                variant="outlined"
+                                color="error"
+                                startIcon={<DeleteIcon />}
+                                onClick={handleRemoveAllMissingInstances}
+                                size="small"
+                            >
+                                Remove Missing
+                            </Button>
+                        </Tooltip>
+                    )}
                 </Box>
             </Box>
 
@@ -266,44 +272,7 @@ function Instances({ item, onInstancesChanged }) {
                 </Box>
             )}
 
-            {/* Manual Add Instance Dialog */}
-            <Dialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)}>
-                <DialogTitle>Add Instance Manually</DialogTitle>
-                <DialogContent>
-                    <DialogContentText>
-                        Enter the path to the instance file (relative to resources folder).
-                        <br />
-                        <strong>Tip:</strong> Use "Add VMF Instance" button for easier file selection.
-                    </DialogContentText>
-                    <TextField
-                        autoFocus
-                        margin="dense"
-                        label="Instance Path"
-                        placeholder="instances/my_instance.vmf"
-                        fullWidth
-                        variant="outlined"
-                        value={newInstanceName}
-                        onChange={(e) => {
-                            setNewInstanceName(e.target.value)
-                            setError('')
-                        }}
-                        error={!!error}
-                        helperText={error}
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => {
-                        setAddDialogOpen(false)
-                        setNewInstanceName('')
-                        setError('')
-                    }}>
-                        Cancel
-                    </Button>
-                    <Button onClick={handleAddInstance} variant="contained">
-                        Add
-                    </Button>
-                </DialogActions>
-            </Dialog>
+
 
             {/* Delete Confirmation Dialog */}
             <Dialog 
