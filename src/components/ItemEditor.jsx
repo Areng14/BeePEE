@@ -187,38 +187,53 @@ function ItemEditor() {
                 />
             </Box>
 
-            {/* Tabs */}
-            <Tabs
-                value={tabValue}
-                onChange={handleTabChange}
-                variant="fullWidth"
-                sx={{
-                    borderBottom: 1,
-                    borderColor: "divider",
-                    minHeight: 48,
-                }}>
-                <Tooltip title="Basic Info - Edit name, author, description">
-                    <Tab icon={<Info />} />
-                </Tooltip>
-                <Tooltip title="Inputs - Configure item inputs and outputs">
-                    <Tab icon={<Input />} />
-                </Tooltip>
-                <Tooltip title="Instances - Manage item's VMF instances">
-                    <Tab icon={<ViewInAr />} />
-                </Tooltip>
-                <Tooltip title="VBSP - Configure instance swapping and conditions">
-                    <Tab icon={<Code />} />
-                </Tooltip>
-                <Tooltip title="Other - Additional item settings">
-                    <Tab icon={<Construction />} />
-                </Tooltip>
-                <Tooltip title="Metadata - Item metadata and tags">
-                    <Tab icon={<Description />} />
-                </Tooltip>
-            </Tabs>
+            {/* Main Content Area with Vertical Sidebar */}
+            <Box sx={{ display: "flex", flex: 1, overflow: "hidden" }}>
+                {/* Vertical Sidebar */}
+                <Tabs
+                    value={tabValue}
+                    onChange={handleTabChange}
+                    orientation="vertical"
+                    variant="scrollable"
+                    sx={{
+                        borderRight: 1,
+                        borderColor: "divider",
+                        minWidth: 80,
+                        maxWidth: 80,
+                        bgcolor: "background.paper",
+                        '& .MuiTabs-indicator': {
+                            left: 0,
+                            width: 3,
+                        },
+                        '& .MuiTab-root': {
+                            minWidth: 80,
+                            width: 80,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                        },
+                    }}>
+                    <Tooltip title="Basic Info - Edit name, author, description" placement="right">
+                        <Tab icon={<Info />} />
+                    </Tooltip>
+                    <Tooltip title="Inputs - Configure item inputs and outputs" placement="right">
+                        <Tab icon={<Input />} />
+                    </Tooltip>
+                    <Tooltip title="Instances - Manage item's VMF instances" placement="right">
+                        <Tab icon={<ViewInAr />} />
+                    </Tooltip>
+                    <Tooltip title="VBSP - Configure instance swapping and conditions" placement="right">
+                        <Tab icon={<Code />} />
+                    </Tooltip>
+                    <Tooltip title="Other - Additional item settings" placement="right">
+                        <Tab icon={<Construction />} />
+                    </Tooltip>
+                    <Tooltip title="Metadata - Item metadata and tags" placement="right">
+                        <Tab icon={<Description />} />
+                    </Tooltip>
+                </Tabs>
 
-            {/* Tab Content */}
-            <Box sx={{ flex: 1, p: 2, overflow: "auto" }}>
+                {/* Tab Content */}
+                <Box sx={{ flex: 1, p: 2, overflow: "auto" }}>
                 <Box sx={{ display: tabValue === 0 ? "block" : "none" }}>
                     <BasicInfo
                         item={item}
@@ -257,6 +272,7 @@ function ItemEditor() {
                 </Box>
                 <Box sx={{ display: tabValue === 5 ? "block" : "none" }}>
                     <Metadata item={item} />
+                </Box>
                 </Box>
             </Box>
 
