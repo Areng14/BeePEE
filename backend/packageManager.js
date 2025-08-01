@@ -54,10 +54,15 @@ function processVdfFiles(directory) {
             // Ensure instance paths in editoritems.json use .vmf extension
             const jsonData = JSON.parse(fs.readFileSync(fullPath, "utf-8"))
             if (jsonData.Item?.Exporting?.Instances) {
-                for (const instance of Object.values(jsonData.Item.Exporting.Instances)) {
+                for (const instance of Object.values(
+                    jsonData.Item.Exporting.Instances,
+                )) {
                     if (instance.Name) {
                         // Ensure instance paths use .vmf extension
-                        instance.Name = instance.Name.replace(/\.json$/i, '.vmf')
+                        instance.Name = instance.Name.replace(
+                            /\.json$/i,
+                            ".vmf",
+                        )
                     }
                 }
                 fs.writeFileSync(fullPath, JSON.stringify(jsonData, null, 4))
@@ -103,7 +108,9 @@ const importPackage = async (pathToPackage) => {
             // Extract package - wipe existing directory first
             if (fs.existsSync(tempPkg.packageDir)) {
                 fs.rmSync(tempPkg.packageDir, { recursive: true, force: true })
-                console.log("Wiped existing package directory before import extraction")
+                console.log(
+                    "Wiped existing package directory before import extraction",
+                )
             }
             fs.mkdirSync(tempPkg.packageDir, { recursive: true })
             await extractPackage(pathToPackage, tempPkg.packageDir)
@@ -121,7 +128,10 @@ const importPackage = async (pathToPackage) => {
             // Cleanup on failure
             if (tempPkg?.packageDir && fs.existsSync(tempPkg.packageDir)) {
                 try {
-                    fs.rmSync(tempPkg.packageDir, { recursive: true, force: true })
+                    fs.rmSync(tempPkg.packageDir, {
+                        recursive: true,
+                        force: true,
+                    })
                     console.log("Cleaned up failed package directory")
                 } catch (cleanupError) {
                     console.error(
@@ -155,7 +165,9 @@ const loadPackage = async (pathToPackage) => {
             // Always extract fresh - wipe existing directory first
             if (fs.existsSync(pkg.packageDir)) {
                 fs.rmSync(pkg.packageDir, { recursive: true, force: true })
-                console.log("Wiped existing package directory before extraction")
+                console.log(
+                    "Wiped existing package directory before extraction",
+                )
             }
             fs.mkdirSync(pkg.packageDir, { recursive: true })
             await extractPackage(pathToPackage, pkg.packageDir)
@@ -169,12 +181,12 @@ const loadPackage = async (pathToPackage) => {
             // Now load the package
             await pkg.load()
             packages.push(pkg)
-            
+
             // Update window title with package name
             if (global.titleManager) {
                 global.titleManager.setCurrentPackage(pathToPackage)
             }
-            
+
             return pkg
         } catch (error) {
             console.error("Failed to load package:", error)
@@ -227,7 +239,7 @@ function savePackageAsBpee(packageDir, outputBpeePath) {
  * @returns {Promise<void>} Resolves when done, rejects on error.
  */
 async function clearPackagesDirectory() {
-    const packagesDir = path.resolve(__dirname, '../packages')
+    const packagesDir = path.resolve(__dirname, "../packages")
     if (fs.existsSync(packagesDir)) {
         const entries = fs.readdirSync(packagesDir)
         for (const entry of entries) {
@@ -240,12 +252,12 @@ async function clearPackagesDirectory() {
 const closePackage = async () => {
     // Remove all packages from memory
     packages.length = 0
-    
+
     // Clear window title
     if (global.titleManager) {
         global.titleManager.clearPackage()
     }
-    
+
     return true
 }
 

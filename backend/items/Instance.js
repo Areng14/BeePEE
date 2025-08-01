@@ -26,16 +26,16 @@ class Instance {
     static getCleanPath(packagePath, instanceName) {
         // First normalize the instance name to use OS-specific path separators
         const normalizedName = instanceName.replace(/[/\\]/g, path.sep)
-        
+
         // Remove any BEE2 prefix and ensure proper instances prefix
         const cleanInstanceName = normalizedName
             .split(path.sep)
-            .filter(part => part !== "BEE2")
+            .filter((part) => part !== "BEE2")
             .join(path.sep)
 
         // Ensure the path starts with "instances"
-        const finalPath = cleanInstanceName.startsWith("instances" + path.sep) 
-            ? cleanInstanceName 
+        const finalPath = cleanInstanceName.startsWith("instances" + path.sep)
+            ? cleanInstanceName
             : path.join("instances", cleanInstanceName)
 
         // Join with the package resources directory
@@ -46,25 +46,25 @@ class Instance {
     cleanVmfContent(content) {
         // Remove lines with empty key-value pairs like "" ""
         // This handles the specific error we're seeing on line 270
-        content = content.replace(/^\s*""\s+""\s*$/gm, '')
-        
+        content = content.replace(/^\s*""\s+""\s*$/gm, "")
+
         // Also handle variations of empty quotes
-        content = content.replace(/^\s*""\s*""\s*$/gm, '')
-        content = content.replace(/^\s*''\s*''\s*$/gm, '')
-        
+        content = content.replace(/^\s*""\s*""\s*$/gm, "")
+        content = content.replace(/^\s*''\s*''\s*$/gm, "")
+
         // Remove empty lines after cleaning
-        content = content.replace(/^\s*\n/gm, '')
-        
+        content = content.replace(/^\s*\n/gm, "")
+
         // Fix common VMF formatting issues
         // Remove trailing commas that might cause parsing issues
-        content = content.replace(/,(\s*[}\]])/g, '$1')
-        
+        content = content.replace(/,(\s*[}\]])/g, "$1")
+
         // Normalize line endings
-        content = content.replace(/\r\n/g, '\n')
-        
+        content = content.replace(/\r\n/g, "\n")
+
         // Remove any remaining problematic empty entries
-        content = content.replace(/^\s*""\s*\n/gm, '')
-        
+        content = content.replace(/^\s*""\s*\n/gm, "")
+
         return content
     }
 
@@ -72,18 +72,18 @@ class Instance {
     getAllEntities() {
         try {
             // Read and parse the VMF file
-            let vmfContent = fs.readFileSync(this.path, 'utf-8')
-            
+            let vmfContent = fs.readFileSync(this.path, "utf-8")
+
             // Clean up malformed VMF content
             vmfContent = this.cleanVmfContent(vmfContent)
-            
+
             const vmfData = vdf.parse(vmfContent)
 
             const entities = {}
-            
+
             // Recursive function to find entities anywhere in the VMF structure
-            const findEntitiesRecursive = (obj, path = '') => {
-                if (typeof obj !== 'object' || obj === null) return
+            const findEntitiesRecursive = (obj, path = "") => {
+                if (typeof obj !== "object" || obj === null) return
 
                 // Check if this object is an entity (has both classname and targetname)
                 if (obj.classname && obj.targetname) {
@@ -93,25 +93,35 @@ class Instance {
 
                 // Recursively search all properties
                 for (const [key, value] of Object.entries(obj)) {
-                    if (typeof value === 'object' && value !== null) {
-                        findEntitiesRecursive(value, path ? `${path}.${key}` : key)
+                    if (typeof value === "object" && value !== null) {
+                        findEntitiesRecursive(
+                            value,
+                            path ? `${path}.${key}` : key,
+                        )
                     }
                 }
             }
 
             // Start recursive search from root
-            findEntitiesRecursive(vmfData, 'root')
-            
+            findEntitiesRecursive(vmfData, "root")
+
             return entities
         } catch (error) {
-            console.error(`Failed to parse VMF file ${this.path}:`, error.message)
-            
+            console.error(
+                `Failed to parse VMF file ${this.path}:`,
+                error.message,
+            )
+
             // Try to provide more context about the error
-            if (error.message && error.message.includes('line')) {
-                console.error(`VMF parsing failed. The file may contain malformed syntax.`)
-                console.error(`Consider checking the VMF file for syntax errors or corrupted content.`)
+            if (error.message && error.message.includes("line")) {
+                console.error(
+                    `VMF parsing failed. The file may contain malformed syntax.`,
+                )
+                console.error(
+                    `Consider checking the VMF file for syntax errors or corrupted content.`,
+                )
             }
-            
+
             // Return empty object instead of crashing
             return {}
         }

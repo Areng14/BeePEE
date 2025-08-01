@@ -17,11 +17,11 @@ function getRawInstancePath(packagePath, instanceName) {
  * @returns {string} Full path to the instance file with BEE2 prefix removed
  */
 function getCleanInstancePath(packagePath, instanceName) {
-    const cleanInstanceName = instanceName.replace(/^BEE2\//, '')
+    const cleanInstanceName = instanceName.replace(/^BEE2\//, "")
     return path.join(packagePath, "resources", cleanInstanceName)
 }
 
 module.exports = {
     getRawInstancePath,
-    getCleanInstancePath
-} 
+    getCleanInstancePath,
+}

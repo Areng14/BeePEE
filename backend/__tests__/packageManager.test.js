@@ -47,22 +47,22 @@ describe("PackageManager", () => {
             fs.existsSync.mockReturnValue(true)
             fs.mkdirSync.mockReturnValue(undefined)
             fs.readdirSync.mockReturnValue([])
-            
+
             // Mock Package constructor and load method
             const mockPkg = {
                 packageDir: "/mock/package/dir",
-                load: jest.fn().mockResolvedValue(undefined)
+                load: jest.fn().mockResolvedValue(undefined),
             }
             Package.mockImplementation(() => mockPkg)
-            
+
             // Mock node-7z
             const mockStream = {
                 on: jest.fn((event, callback) => {
-                    if (event === 'end') {
+                    if (event === "end") {
                         setTimeout(callback, 0)
                     }
                     return mockStream
-                })
+                }),
             }
             require("node-7z").extractFull.mockReturnValue(mockStream)
 

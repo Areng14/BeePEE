@@ -1,4 +1,4 @@
-const { ipcMain } = require('electron')
+const { ipcMain } = require("electron")
 
 class Timer {
     constructor(name) {
@@ -34,5 +34,5 @@ async function timeOperation(name, operation) {
 
 module.exports = {
     Timer,
-    timeOperation
-} 
+    timeOperation,
+}

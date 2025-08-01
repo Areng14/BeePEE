@@ -19,7 +19,7 @@ function getCurrentPackageName() {
     if (currentPackageDir) {
         return path.basename(currentPackageDir)
     }
-    return 'package'
+    return "package"
 }
 
 function createMainMenu(mainWindow) {
@@ -51,7 +51,11 @@ function createMainMenu(mainWindow) {
                         if (result.canceled) return null
                         try {
                             // Ensure packages directory exists
-                            const packagesDir = path.join(__dirname, "..", "packages")
+                            const packagesDir = path.join(
+                                __dirname,
+                                "..",
+                                "packages",
+                            )
                             if (!fs.existsSync(packagesDir)) {
                                 fs.mkdirSync(packagesDir, { recursive: true })
                             }
@@ -113,7 +117,7 @@ function createMainMenu(mainWindow) {
                         } catch (error) {
                             dialog.showErrorBox(
                                 "Close Failed",
-                                `Failed to close package: ${error.message}`
+                                `Failed to close package: ${error.message}`,
                             )
                         }
                     },
@@ -131,7 +135,8 @@ function createMainMenu(mainWindow) {
                                 const { canceled, filePath } =
                                     await dialog.showSaveDialog(mainWindow, {
                                         title: "Save Package As",
-                                        defaultPath: getCurrentPackageName() + ".bpee",
+                                        defaultPath:
+                                            getCurrentPackageName() + ".bpee",
                                         filters: [
                                             {
                                                 name: "BeePEE Package",
@@ -165,7 +170,8 @@ function createMainMenu(mainWindow) {
                             const { canceled, filePath } =
                                 await dialog.showSaveDialog(mainWindow, {
                                     title: "Save Package As",
-                                    defaultPath: getCurrentPackageName() + ".bpee",
+                                    defaultPath:
+                                        getCurrentPackageName() + ".bpee",
                                     filters: [
                                         {
                                             name: "BeePEE Package",
@@ -226,22 +232,27 @@ function createMainMenu(mainWindow) {
                 {
                     label: "Clear Packages Directory",
                     click: async () => {
-                        const { response } = await dialog.showMessageBox(mainWindow, {
-                            type: "warning",
-                            buttons: ["Cancel", "Clear"],
-                            defaultId: 0,
-                            cancelId: 0,
-                            title: "Clear Packages Directory",
-                            message: "Are you sure you want to clear all contents of the packages directory? This cannot be undone.",
-                        })
-                        if (response === 1) { // User chose 'Clear'
+                        const { response } = await dialog.showMessageBox(
+                            mainWindow,
+                            {
+                                type: "warning",
+                                buttons: ["Cancel", "Clear"],
+                                defaultId: 0,
+                                cancelId: 0,
+                                title: "Clear Packages Directory",
+                                message:
+                                    "Are you sure you want to clear all contents of the packages directory? This cannot be undone.",
+                            },
+                        )
+                        if (response === 1) {
+                            // User chose 'Clear'
                             try {
                                 // Close any open packages first
                                 await closePackage()
                                 currentPackageDir = null
                                 lastSavedBpeePath = null
                                 mainWindow.webContents.send("package:closed")
-                                
+
                                 // Then clear the directory
                                 await clearPackagesDirectory()
                                 dialog.showMessageBox(mainWindow, {

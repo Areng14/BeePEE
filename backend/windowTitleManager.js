@@ -20,17 +20,17 @@ class WindowTitleManager {
 
     updateTitle() {
         let title = "BeePEE"
-        
+
         if (this.currentPackagePath) {
             // Get the package name from the path
             const packageName = path.basename(this.currentPackagePath)
             title = `${packageName} - BeePEE`
         }
-        
+
         if (this.hasUnsavedChanges) {
             title = `*${title}`
         }
-        
+
         this.mainWindow.setTitle(title)
     }
 
@@ -41,4 +41,4 @@ class WindowTitleManager {
     }
 }
 
-module.exports = { WindowTitleManager } 
+module.exports = { WindowTitleManager }
