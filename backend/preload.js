@@ -58,4 +58,9 @@ contextBridge.exposeInMainWorld("package", {
     // ========================================
     getItemMetadata: (itemId) => ipcRenderer.invoke("get-item-metadata", { itemId }),
     updateItemMetadata: (itemId, metadata) => ipcRenderer.invoke("update-item-metadata", { itemId, metadata }),
+
+    // ========================================
+    // WINDOW TITLE MANAGEMENT
+    // ========================================
+    setUnsavedChanges: (hasChanges) => ipcRenderer.invoke("set-unsaved-changes", hasChanges),
 })

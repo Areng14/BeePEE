@@ -3,6 +3,7 @@ const path = require("path")
 const { createMainMenu } = require("./menu.js")
 const fs = require("fs")
 const { reg_events } = require("./events.js")
+const { WindowTitleManager } = require("./windowTitleManager.js")
 
 const createWindow = () => {
     const isDev = !app.isPackaged
@@ -16,6 +17,10 @@ const createWindow = () => {
         },
         devTools: isDev,
     })
+
+    // Initialize window title manager
+    const titleManager = new WindowTitleManager(win)
+    global.titleManager = titleManager
 
     createMainMenu(win)
 

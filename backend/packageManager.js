@@ -161,6 +161,12 @@ const loadPackage = async (pathToPackage) => {
             // Now load the package
             await pkg.load()
             packages.push(pkg)
+            
+            // Update window title with package name
+            if (global.titleManager) {
+                global.titleManager.setCurrentPackage(pathToPackage)
+            }
+            
             return pkg
         } catch (error) {
             console.error("Failed to load package:", error)
@@ -226,6 +232,12 @@ async function clearPackagesDirectory() {
 const closePackage = async () => {
     // Remove all packages from memory
     packages.length = 0
+    
+    // Clear window title
+    if (global.titleManager) {
+        global.titleManager.clearPackage()
+    }
+    
     return true
 }
 
