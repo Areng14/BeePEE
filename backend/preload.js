@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld("package", {
     onItemLoaded: (callback) =>
         ipcRenderer.on("load-item", (event, item) => callback(event, item)),
     editorReady: () => ipcRenderer.send("editor-ready"),
+    showIconPreview: (iconPath, itemName) =>
+        ipcRenderer.invoke("show-icon-preview", { iconPath, itemName }),
     saveItem: (itemData) => ipcRenderer.invoke("save-item", itemData),
     onItemUpdated: (callback) =>
         ipcRenderer.on("item-updated", (event, item) => callback(event, item)),
@@ -25,43 +27,66 @@ contextBridge.exposeInMainWorld("package", {
     // ========================================
     // INSTANCE MANAGEMENT FUNCTIONS
     // ========================================
-    editInstance: (instancePath) => ipcRenderer.invoke("edit-instance", instancePath),
-    addInstance: (itemId, instanceName) => ipcRenderer.invoke("add-instance", { itemId, instanceName }),
-    addInstanceFileDialog: (itemId) => ipcRenderer.invoke("add-instance-file-dialog", { itemId }),
-    replaceInstanceFileDialog: (itemId, instanceIndex) => ipcRenderer.invoke("replace-instance-file-dialog", { itemId, instanceIndex }),
-    removeInstance: (itemId, instanceIndex) => ipcRenderer.invoke("remove-instance", { itemId, instanceIndex }),
+    editInstance: (instancePath) =>
+        ipcRenderer.invoke("edit-instance", instancePath),
+    addInstance: (itemId, instanceName) =>
+        ipcRenderer.invoke("add-instance", { itemId, instanceName }),
+    addInstanceFileDialog: (itemId) =>
+        ipcRenderer.invoke("add-instance-file-dialog", { itemId }),
+    replaceInstanceFileDialog: (itemId, instanceIndex) =>
+        ipcRenderer.invoke("replace-instance-file-dialog", {
+            itemId,
+            instanceIndex,
+        }),
+    removeInstance: (itemId, instanceIndex) =>
+        ipcRenderer.invoke("remove-instance", { itemId, instanceIndex }),
 
     // ========================================
     // INPUT MANAGEMENT FUNCTIONS
     // ========================================
     getInputs: (itemId) => ipcRenderer.invoke("get-inputs", { itemId }),
-    addInput: (itemId, inputName, inputConfig) => ipcRenderer.invoke("add-input", { itemId, inputName, inputConfig }),
-    updateInput: (itemId, inputName, inputConfig) => ipcRenderer.invoke("update-input", { itemId, inputName, inputConfig }),
-    removeInput: (itemId, inputName) => ipcRenderer.invoke("remove-input", { itemId, inputName }),
+    addInput: (itemId, inputName, inputConfig) =>
+        ipcRenderer.invoke("add-input", { itemId, inputName, inputConfig }),
+    updateInput: (itemId, inputName, inputConfig) =>
+        ipcRenderer.invoke("update-input", { itemId, inputName, inputConfig }),
+    removeInput: (itemId, inputName) =>
+        ipcRenderer.invoke("remove-input", { itemId, inputName }),
 
     // ========================================
     // OUTPUT MANAGEMENT FUNCTIONS
     // ========================================
     getOutputs: (itemId) => ipcRenderer.invoke("get-outputs", { itemId }),
-    addOutput: (itemId, outputName, outputConfig) => ipcRenderer.invoke("add-output", { itemId, outputName, outputConfig }),
-    updateOutput: (itemId, outputName, outputConfig) => ipcRenderer.invoke("update-output", { itemId, outputName, outputConfig }),
-    removeOutput: (itemId, outputName) => ipcRenderer.invoke("remove-output", { itemId, outputName }),
+    addOutput: (itemId, outputName, outputConfig) =>
+        ipcRenderer.invoke("add-output", { itemId, outputName, outputConfig }),
+    updateOutput: (itemId, outputName, outputConfig) =>
+        ipcRenderer.invoke("update-output", {
+            itemId,
+            outputName,
+            outputConfig,
+        }),
+    removeOutput: (itemId, outputName) =>
+        ipcRenderer.invoke("remove-output", { itemId, outputName }),
 
     // ========================================
     // ENTITY AND FGD DATA FUNCTIONS
     // ========================================
-            getItemEntities: (itemId) => ipcRenderer.invoke("get-item-entities", { itemId }),
-        getValidInstances: (itemId) => ipcRenderer.invoke("get-valid-instances", { itemId }),
+    getItemEntities: (itemId) =>
+        ipcRenderer.invoke("get-item-entities", { itemId }),
+    getValidInstances: (itemId) =>
+        ipcRenderer.invoke("get-valid-instances", { itemId }),
     getFgdData: () => ipcRenderer.invoke("get-fgd-data"),
 
     // ========================================
     // METADATA MANAGEMENT FUNCTIONS
     // ========================================
-    getItemMetadata: (itemId) => ipcRenderer.invoke("get-item-metadata", { itemId }),
-    updateItemMetadata: (itemId, metadata) => ipcRenderer.invoke("update-item-metadata", { itemId, metadata }),
+    getItemMetadata: (itemId) =>
+        ipcRenderer.invoke("get-item-metadata", { itemId }),
+    updateItemMetadata: (itemId, metadata) =>
+        ipcRenderer.invoke("update-item-metadata", { itemId, metadata }),
 
     // ========================================
     // WINDOW TITLE MANAGEMENT
     // ========================================
-    setUnsavedChanges: (hasChanges) => ipcRenderer.invoke("set-unsaved-changes", hasChanges),
+    setUnsavedChanges: (hasChanges) =>
+        ipcRenderer.invoke("set-unsaved-changes", hasChanges),
 })

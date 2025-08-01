@@ -109,36 +109,49 @@ class Item {
         this.metadata = this.loadMetadata()
 
         // Add editor instances
-        const editorInstances = parsedEditoritems.Item?.Exporting?.Instances || {}
+        const editorInstances =
+            parsedEditoritems.Item?.Exporting?.Instances || {}
         Object.entries(editorInstances).forEach(([key, instance]) => {
             this.instances[key] = {
                 Name: instance.Name,
-                source: 'editor'
+                source: "editor",
             }
         })
 
         // Add VBSP instances if they exist
         if (this.paths.vbsp_config && fs.existsSync(this.paths.vbsp_config)) {
             try {
-                const vbspContent = fs.readFileSync(this.paths.vbsp_config, 'utf-8')
-                const matches = [...vbspContent.matchAll(/"Changeinstance"\s+"([^"]+)"/g)]
-                
+                const vbspContent = fs.readFileSync(
+                    this.paths.vbsp_config,
+                    "utf-8",
+                )
+                const matches = [
+                    ...vbspContent.matchAll(/"Changeinstance"\s+"([^"]+)"/g),
+                ]
+
                 // Start index after the last editor instance
                 let nextIndex = Object.keys(this.instances).length
-                
+
                 for (const match of matches) {
                     const instancePath = match[1]
                     // Only add if not already present
-                    if (!Object.values(this.instances).some(inst => inst.Name === instancePath)) {
+                    if (
+                        !Object.values(this.instances).some(
+                            (inst) => inst.Name === instancePath,
+                        )
+                    ) {
                         this.instances[nextIndex.toString()] = {
                             Name: instancePath,
-                            source: 'vbsp'
+                            source: "vbsp",
                         }
                         nextIndex++
                     }
                 }
             } catch (error) {
-                console.error(`Failed to parse VBSP config for ${this.name}:`, error.message)
+                console.error(
+                    `Failed to parse VBSP config for ${this.name}:`,
+                    error.message,
+                )
             }
         }
 
@@ -152,40 +165,53 @@ class Item {
 
         // Re-read editoritems file
         const parsedEditoritems = JSON.parse(
-            fs.readFileSync(this.paths.editorItems, "utf-8")
+            fs.readFileSync(this.paths.editorItems, "utf-8"),
         )
 
         // Re-add editor instances
-        const editorInstances = parsedEditoritems.Item?.Exporting?.Instances || {}
+        const editorInstances =
+            parsedEditoritems.Item?.Exporting?.Instances || {}
         Object.entries(editorInstances).forEach(([key, instance]) => {
             this.instances[key] = {
                 Name: instance.Name,
-                source: 'editor'
+                source: "editor",
             }
         })
 
         // Re-add VBSP instances if they exist
         if (this.paths.vbsp_config && fs.existsSync(this.paths.vbsp_config)) {
             try {
-                const vbspContent = fs.readFileSync(this.paths.vbsp_config, 'utf-8')
-                const matches = [...vbspContent.matchAll(/"Changeinstance"\s+"([^"]+)"/g)]
-                
+                const vbspContent = fs.readFileSync(
+                    this.paths.vbsp_config,
+                    "utf-8",
+                )
+                const matches = [
+                    ...vbspContent.matchAll(/"Changeinstance"\s+"([^"]+)"/g),
+                ]
+
                 // Start index after the last editor instance
                 let nextIndex = Object.keys(this.instances).length
-                
+
                 for (const match of matches) {
                     const instancePath = match[1]
                     // Only add if not already present
-                    if (!Object.values(this.instances).some(inst => inst.Name === instancePath)) {
+                    if (
+                        !Object.values(this.instances).some(
+                            (inst) => inst.Name === instancePath,
+                        )
+                    ) {
                         this.instances[nextIndex.toString()] = {
                             Name: instancePath,
-                            source: 'vbsp'
+                            source: "vbsp",
                         }
                         nextIndex++
                     }
                 }
             } catch (error) {
-                console.error(`Failed to parse VBSP config for ${this.name}:`, error.message)
+                console.error(
+                    `Failed to parse VBSP config for ${this.name}:`,
+                    error.message,
+                )
             }
         }
     }
@@ -229,7 +255,10 @@ class Item {
         }
 
         // Build full path to instance file using Instance class
-        const instancePath = Instance.getCleanPath(this.packagePath, instanceData.Name)
+        const instancePath = Instance.getCleanPath(
+            this.packagePath,
+            instanceData.Name,
+        )
 
         // Check if file actually exists
         if (!fs.existsSync(instancePath)) {
@@ -239,7 +268,7 @@ class Item {
         // Create and cache the instance
         const instance = new Instance({ path: instancePath })
         this._loadedInstances.set(index, instance)
-        
+
         return instance
     }
 
@@ -253,52 +282,55 @@ class Item {
         if (!instanceData) {
             return false
         }
-        
+
         // Apply path fixing to remove BEE2/ prefix for actual file structure
         const actualInstancePath = this.fixInstancePath(instanceData.Name)
-        const fullInstancePath = Instance.getCleanPath(this.packagePath, actualInstancePath)
-        
+        const fullInstancePath = Instance.getCleanPath(
+            this.packagePath,
+            actualInstancePath,
+        )
+
         return fs.existsSync(fullInstancePath)
     }
 
     // Get only valid instances (files exist)
     getValidInstances() {
         const validInstances = {}
-        
+
         for (const [index, instanceData] of Object.entries(this.instances)) {
             if (this.instanceExists(index)) {
                 validInstances[index] = instanceData
             }
         }
-        
+
         return validInstances
     }
 
     // Get instances with their existence status
     getInstancesWithStatus() {
         const instancesWithStatus = {}
-        
+
         for (const [index, instanceData] of Object.entries(this.instances)) {
             const exists = this.instanceExists(index)
             instancesWithStatus[index] = {
                 ...instanceData,
-                exists: exists
+                exists: exists,
             }
         }
-        
+
         return instancesWithStatus
     }
 
     // Helper function to fix instance paths by removing BEE2/ prefix
     fixInstancePath(instancePath) {
         // Normalize path separators to forward slashes
-        let normalizedPath = instancePath.replace(/\\/g, '/')
-        
-        if (normalizedPath.startsWith('instances/BEE2/')) {
-            return normalizedPath.replace('instances/BEE2/', 'instances/')
+        let normalizedPath = instancePath.replace(/\\/g, "/")
+
+        if (normalizedPath.startsWith("instances/BEE2/")) {
+            return normalizedPath.replace("instances/BEE2/", "instances/")
         }
-        if (normalizedPath.startsWith('instances/bee2/')) {
-            return normalizedPath.replace('instances/bee2/', 'instances/')
+        if (normalizedPath.startsWith("instances/bee2/")) {
+            return normalizedPath.replace("instances/bee2/", "instances/")
         }
         return normalizedPath
     }
@@ -306,14 +338,13 @@ class Item {
     addInstance(instanceName) {
         // Find the next available index
         const keys = Object.keys(this.instances)
-        const nextIndex = keys.length > 0 ? 
-            Math.max(...keys.map(k => parseInt(k))) + 1 : 
-            0
-        
+        const nextIndex =
+            keys.length > 0 ? Math.max(...keys.map((k) => parseInt(k))) + 1 : 0
+
         // Add the new instance
         this.instances[nextIndex.toString()] = {
             Name: instanceName,
-            source: 'editor'
+            source: "editor",
         }
 
         // Update editoritems file
@@ -325,7 +356,7 @@ class Item {
             editoritems.Item.Exporting.Instances = {}
         }
         editoritems.Item.Exporting.Instances[nextIndex.toString()] = {
-            Name: instanceName
+            Name: instanceName,
         }
         this.saveEditorItems(editoritems)
 
@@ -342,8 +373,8 @@ class Item {
         }
 
         // Only allow removing editor instances
-        if (instance.source === 'vbsp') {
-            throw new Error('Cannot remove VBSP instances')
+        if (instance.source === "vbsp") {
+            throw new Error("Cannot remove VBSP instances")
         }
 
         // Remove from memory
@@ -355,7 +386,9 @@ class Item {
         if (editoritems.Item.Exporting?.Instances) {
             delete editoritems.Item.Exporting.Instances[index]
             // If no instances left, clean up the structure
-            if (Object.keys(editoritems.Item.Exporting.Instances).length === 0) {
+            if (
+                Object.keys(editoritems.Item.Exporting.Instances).length === 0
+            ) {
                 delete editoritems.Item.Exporting.Instances
                 if (Object.keys(editoritems.Item.Exporting).length === 0) {
                     delete editoritems.Item.Exporting
@@ -375,16 +408,16 @@ class Item {
     }
 
     addInput(inputName, inputConfig) {
-        if (!inputName || typeof inputName !== 'string') {
-            throw new Error('Input name must be a non-empty string')
+        if (!inputName || typeof inputName !== "string") {
+            throw new Error("Input name must be a non-empty string")
         }
-        
-        if (!inputConfig || typeof inputConfig !== 'object') {
-            throw new Error('Input config must be an object')
+
+        if (!inputConfig || typeof inputConfig !== "object") {
+            throw new Error("Input config must be an object")
         }
 
         const editoritems = this.getEditorItems()
-        
+
         // Ensure Exporting structure exists
         if (!editoritems.Item.Exporting) {
             editoritems.Item.Exporting = {}
@@ -395,41 +428,41 @@ class Item {
 
         // Add the new input
         editoritems.Item.Exporting.Inputs[inputName] = inputConfig
-        
+
         this.saveEditorItems(editoritems)
         return inputName
     }
 
     updateInput(inputName, inputConfig) {
-        if (!inputName || typeof inputName !== 'string') {
-            throw new Error('Input name must be a non-empty string')
+        if (!inputName || typeof inputName !== "string") {
+            throw new Error("Input name must be a non-empty string")
         }
 
         const editoritems = this.getEditorItems()
-        
+
         // Check if input exists
         if (!editoritems.Item?.Exporting?.Inputs?.[inputName]) {
             throw new Error(`Input '${inputName}' not found`)
         }
 
-        if (!inputConfig || typeof inputConfig !== 'object') {
-            throw new Error('Input config must be an object')
+        if (!inputConfig || typeof inputConfig !== "object") {
+            throw new Error("Input config must be an object")
         }
 
         // Update the input
         editoritems.Item.Exporting.Inputs[inputName] = inputConfig
-        
+
         this.saveEditorItems(editoritems)
         return inputName
     }
 
     removeInput(inputName) {
-        if (!inputName || typeof inputName !== 'string') {
-            throw new Error('Input name must be a non-empty string')
+        if (!inputName || typeof inputName !== "string") {
+            throw new Error("Input name must be a non-empty string")
         }
 
         const editoritems = this.getEditorItems()
-        
+
         // Check if input exists
         if (!editoritems.Item?.Exporting?.Inputs?.[inputName]) {
             throw new Error(`Input '${inputName}' not found`)
@@ -437,7 +470,7 @@ class Item {
 
         // Remove the input
         delete editoritems.Item.Exporting.Inputs[inputName]
-        
+
         // Clean up empty structures
         if (Object.keys(editoritems.Item.Exporting.Inputs).length === 0) {
             delete editoritems.Item.Exporting.Inputs
@@ -445,15 +478,15 @@ class Item {
                 delete editoritems.Item.Exporting
             }
         }
-        
+
         this.saveEditorItems(editoritems)
         return inputName
     }
 
     // Utility function to get a specific input
     getInput(inputName) {
-        if (!inputName || typeof inputName !== 'string') {
-            throw new Error('Input name must be a non-empty string')
+        if (!inputName || typeof inputName !== "string") {
+            throw new Error("Input name must be a non-empty string")
         }
 
         const inputs = this.getInputs()
@@ -462,8 +495,8 @@ class Item {
 
     // Utility function to check if an input exists
     hasInput(inputName) {
-        if (!inputName || typeof inputName !== 'string') {
-            throw new Error('Input name must be a non-empty string')
+        if (!inputName || typeof inputName !== "string") {
+            throw new Error("Input name must be a non-empty string")
         }
 
         const inputs = this.getInputs()
@@ -477,16 +510,16 @@ class Item {
     }
 
     addOutput(outputName, outputConfig) {
-        if (!outputName || typeof outputName !== 'string') {
-            throw new Error('Output name must be a non-empty string')
+        if (!outputName || typeof outputName !== "string") {
+            throw new Error("Output name must be a non-empty string")
         }
-        
-        if (!outputConfig || typeof outputConfig !== 'object') {
-            throw new Error('Output config must be an object')
+
+        if (!outputConfig || typeof outputConfig !== "object") {
+            throw new Error("Output config must be an object")
         }
 
         const editoritems = this.getEditorItems()
-        
+
         // Ensure Exporting structure exists
         if (!editoritems.Item.Exporting) {
             editoritems.Item.Exporting = {}
@@ -497,41 +530,41 @@ class Item {
 
         // Add the new output
         editoritems.Item.Exporting.Outputs[outputName] = outputConfig
-        
+
         this.saveEditorItems(editoritems)
         return outputName
     }
 
     updateOutput(outputName, outputConfig) {
-        if (!outputName || typeof outputName !== 'string') {
-            throw new Error('Output name must be a non-empty string')
+        if (!outputName || typeof outputName !== "string") {
+            throw new Error("Output name must be a non-empty string")
         }
 
         const editoritems = this.getEditorItems()
-        
+
         // Check if output exists
         if (!editoritems.Item?.Exporting?.Outputs?.[outputName]) {
             throw new Error(`Output '${outputName}' not found`)
         }
 
-        if (!outputConfig || typeof outputConfig !== 'object') {
-            throw new Error('Output config must be an object')
+        if (!outputConfig || typeof outputConfig !== "object") {
+            throw new Error("Output config must be an object")
         }
 
         // Update the output
         editoritems.Item.Exporting.Outputs[outputName] = outputConfig
-        
+
         this.saveEditorItems(editoritems)
         return outputName
     }
 
     removeOutput(outputName) {
-        if (!outputName || typeof outputName !== 'string') {
-            throw new Error('Output name must be a non-empty string')
+        if (!outputName || typeof outputName !== "string") {
+            throw new Error("Output name must be a non-empty string")
         }
 
         const editoritems = this.getEditorItems()
-        
+
         // Check if output exists
         if (!editoritems.Item?.Exporting?.Outputs?.[outputName]) {
             throw new Error(`Output '${outputName}' not found`)
@@ -539,7 +572,7 @@ class Item {
 
         // Remove the output
         delete editoritems.Item.Exporting.Outputs[outputName]
-        
+
         // Clean up empty structures
         if (Object.keys(editoritems.Item.Exporting.Outputs).length === 0) {
             delete editoritems.Item.Exporting.Outputs
@@ -547,15 +580,15 @@ class Item {
                 delete editoritems.Item.Exporting
             }
         }
-        
+
         this.saveEditorItems(editoritems)
         return outputName
     }
 
     // Utility function to get a specific output
     getOutput(outputName) {
-        if (!outputName || typeof outputName !== 'string') {
-            throw new Error('Output name must be a non-empty string')
+        if (!outputName || typeof outputName !== "string") {
+            throw new Error("Output name must be a non-empty string")
         }
 
         const outputs = this.getOutputs()
@@ -564,8 +597,8 @@ class Item {
 
     // Utility function to check if an output exists
     hasOutput(outputName) {
-        if (!outputName || typeof outputName !== 'string') {
-            throw new Error('Output name must be a non-empty string')
+        if (!outputName || typeof outputName !== "string") {
+            throw new Error("Output name must be a non-empty string")
         }
 
         const outputs = this.getOutputs()
@@ -583,114 +616,128 @@ class Item {
     loadMetadata() {
         try {
             if (fs.existsSync(this.paths.meta)) {
-                const metadata = JSON.parse(fs.readFileSync(this.paths.meta, "utf-8"))
+                const metadata = JSON.parse(
+                    fs.readFileSync(this.paths.meta, "utf-8"),
+                )
                 return metadata
             }
         } catch (error) {
-            console.warn(`Failed to load metadata for item ${this.id}:`, error.message)
+            console.warn(
+                `Failed to load metadata for item ${this.id}:`,
+                error.message,
+            )
         }
-        
+
         // Get actual file creation and modification dates
         const fileDates = this.getFileDates()
-        
+
         // Create default metadata structure with actual file dates
         const defaultMetadata = {
             created: fileDates.created.toISOString(),
-            lastModified: fileDates.lastModified.toISOString()
+            lastModified: fileDates.lastModified.toISOString(),
         }
-        
+
         // Create the meta.json file if it doesn't exist
         this.saveMetadata(defaultMetadata)
-        
+
         return defaultMetadata
     }
 
     getFileDates() {
         let earliestCreated = new Date()
         let latestModified = new Date(0) // Start with epoch time
-        
+
         // Check all item files for creation and modification dates
-        const filesToCheck = [
-            this.paths.editorItems,
-            this.paths.properties
-        ]
-        
+        const filesToCheck = [this.paths.editorItems, this.paths.properties]
+
         // Add VBSP config if it exists
         if (this.paths.vbsp_config) {
             filesToCheck.push(this.paths.vbsp_config)
         }
-        
+
         for (const filePath of filesToCheck) {
             if (fs.existsSync(filePath)) {
                 try {
                     const stats = fs.statSync(filePath)
-                    
+
                     // Use birthtime (creation) if available, otherwise use mtime
                     const created = stats.birthtime || stats.mtime
                     const modified = stats.mtime
-                    
+
                     // Find earliest creation date
                     if (created < earliestCreated) {
                         earliestCreated = created
                     }
-                    
+
                     // Find latest modification date
                     if (modified > latestModified) {
                         latestModified = modified
                     }
                 } catch (error) {
-                    console.warn(`Failed to get stats for ${filePath}:`, error.message)
+                    console.warn(
+                        `Failed to get stats for ${filePath}:`,
+                        error.message,
+                    )
                 }
             }
         }
-        
+
         // If we couldn't get any valid dates, use current time
-        if (earliestCreated.getTime() === new Date().getTime() && latestModified.getTime() === 0) {
+        if (
+            earliestCreated.getTime() === new Date().getTime() &&
+            latestModified.getTime() === 0
+        ) {
             const now = new Date()
             return {
                 created: now,
-                lastModified: now
+                lastModified: now,
             }
         }
-        
+
         return {
             created: earliestCreated,
-            lastModified: latestModified
+            lastModified: latestModified,
         }
     }
 
     saveMetadata(metadata = null) {
         try {
             const dataToSave = metadata || this.metadata
-            
+
             // Get current file modification date
             const fileDates = this.getFileDates()
             dataToSave.lastModified = fileDates.lastModified.toISOString()
-            
+
             // Ensure required fields exist
             if (!dataToSave.created) {
                 dataToSave.created = fileDates.created.toISOString()
             }
-            
-            fs.writeFileSync(this.paths.meta, JSON.stringify(dataToSave, null, 4))
+
+            fs.writeFileSync(
+                this.paths.meta,
+                JSON.stringify(dataToSave, null, 4),
+            )
             this.metadata = dataToSave
             return true
         } catch (error) {
-            console.error(`Failed to save metadata for item ${this.id}:`, error.message)
+            console.error(
+                `Failed to save metadata for item ${this.id}:`,
+                error.message,
+            )
             return false
         }
     }
 
     updateMetadata(updates) {
-        if (!updates || typeof updates !== 'object') {
-            throw new Error('Metadata updates must be an object')
+        if (!updates || typeof updates !== "object") {
+            throw new Error("Metadata updates must be an object")
         }
-        
+
         this.metadata = {
             ...this.metadata,
-            ...updates
+            ...updates,
         }
-        
+
         return this.saveMetadata()
     }
 
@@ -709,7 +756,7 @@ class Item {
             fullItemPath: this.fullItemPath,
             packagePath: this.packagePath,
             instances: this.instances, // Regular instances without existence check
-            metadata: this.metadata
+            metadata: this.metadata,
         }
     }
 
@@ -725,7 +772,7 @@ class Item {
             fullItemPath: this.fullItemPath,
             packagePath: this.packagePath,
             instances: this.getInstancesWithStatus(), // Include existence status
-            metadata: this.metadata
+            metadata: this.metadata,
         }
     }
 }

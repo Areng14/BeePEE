@@ -1,4 +1,12 @@
-import { Stack, TextField, Box, Typography, IconButton, Button, InputAdornment } from "@mui/material"
+import {
+    Stack,
+    TextField,
+    Box,
+    Typography,
+    IconButton,
+    Button,
+    InputAdornment,
+} from "@mui/material"
 import { Visibility, Edit, FolderOpen, Image } from "@mui/icons-material"
 import ReactMarkdown from "react-markdown"
 import { useState, useEffect } from "react"
@@ -17,15 +25,17 @@ function BasicInfo({ item, formData, onUpdate }) {
     // Get relative path from package root
     const getRelativeIconPath = () => {
         if (!item?.icon || !item?.packagePath) return ""
-        
+
         // Remove the package path from the full icon path to get relative path
         const fullIconPath = item.icon
         const packagePath = item.packagePath
-        
+
         if (fullIconPath.startsWith(packagePath)) {
-            return fullIconPath.substring(packagePath.length).replace(/^[\\\/]/, '')
+            return fullIconPath
+                .substring(packagePath.length)
+                .replace(/^[\\\/]/, "")
         }
-        
+
         return item.icon // fallback to full path if something goes wrong
     }
 
@@ -68,14 +78,17 @@ function BasicInfo({ item, formData, onUpdate }) {
 
     return (
         <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography variant="h6">
-                    Basic Information
-                </Typography>
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mb: 2,
+                }}>
+                <Typography variant="h6">Basic Information</Typography>
             </Box>
 
             <Stack spacing={2} sx={{ height: "100%" }}>
-
                 <TextField
                     label="Name"
                     value={formData.name}
@@ -108,22 +121,32 @@ function BasicInfo({ item, formData, onUpdate }) {
                                         console.log("Browse for icon clicked")
                                     }}
                                     title="Browse for Icon"
-                                    sx={{ mr: 0.5 }}
-                                >
+                                    sx={{ mr: 0.5 }}>
                                     <FolderOpen />
                                 </IconButton>
                                 <IconButton
                                     size="small"
-                                    onClick={() => {
-                                        // TODO: Implement icon view functionality
-                                        console.log("View icon clicked")
+                                    onClick={async () => {
+                                        if (item?.icon) {
+                                            try {
+                                                await window.package.showIconPreview(
+                                                    item.icon,
+                                                    item.name,
+                                                )
+                                            } catch (error) {
+                                                console.error(
+                                                    "Failed to show icon preview:",
+                                                    error,
+                                                )
+                                            }
+                                        }
                                     }}
                                     title="View Icon"
-                                >
+                                    disabled={!item?.icon}>
                                     <Image />
                                 </IconButton>
                             </InputAdornment>
-                        )
+                        ),
                     }}
                 />
 

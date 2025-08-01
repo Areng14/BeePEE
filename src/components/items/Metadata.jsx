@@ -1,20 +1,14 @@
-import React, { useState, useEffect } from 'react'
-import {
-    Box,
-    Paper,
-    Typography,
-    Stack,
-    Alert
-} from '@mui/material'
-import { Info as InfoIcon } from '@mui/icons-material'
+import React, { useState, useEffect } from "react"
+import { Box, Paper, Typography, Stack, Alert } from "@mui/material"
+import { Info as InfoIcon } from "@mui/icons-material"
 
 const Metadata = ({ item }) => {
     const [metadata, setMetadata] = useState({
-        created: '',
-        lastModified: ''
+        created: "",
+        lastModified: "",
     })
     const [loading, setLoading] = useState(false)
-    const [error, setError] = useState('')
+    const [error, setError] = useState("")
 
     useEffect(() => {
         if (item?.id) {
@@ -29,18 +23,14 @@ const Metadata = ({ item }) => {
             if (result.success) {
                 setMetadata(result.metadata)
             } else {
-                setError('Failed to load metadata')
+                setError("Failed to load metadata")
             }
         } catch (error) {
-            setError('Failed to load metadata: ' + error.message)
+            setError("Failed to load metadata: " + error.message)
         } finally {
             setLoading(false)
         }
     }
-
-
-
-
 
     if (!item) {
         return (
@@ -54,7 +44,7 @@ const Metadata = ({ item }) => {
 
     return (
         <Paper variant="outlined" sx={{ p: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
                 <InfoIcon color="primary" />
                 <Typography variant="h6">Item Metadata</Typography>
             </Box>
@@ -65,29 +55,40 @@ const Metadata = ({ item }) => {
                 </Alert>
             )}
 
-
-
             <Stack spacing={2}>
                 {/* Timestamps */}
                 <Box>
-                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    <Typography
+                        variant="subtitle2"
+                        color="text.secondary"
+                        gutterBottom>
                         Created
                     </Typography>
                     <Typography variant="body2">
-                        {metadata.created ? new Date(metadata.created).toLocaleString() : 'Unknown'}
+                        {metadata.created
+                            ? new Date(metadata.created).toLocaleString()
+                            : "Unknown"}
                     </Typography>
                 </Box>
 
                 <Box>
-                    <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    <Typography
+                        variant="subtitle2"
+                        color="text.secondary"
+                        gutterBottom>
                         Last Modified
                     </Typography>
                     <Typography variant="body2">
-                        {metadata.lastModified ? new Date(metadata.lastModified).toLocaleString() : 'Unknown'}
+                        {metadata.lastModified
+                            ? new Date(metadata.lastModified).toLocaleString()
+                            : "Unknown"}
                     </Typography>
                 </Box>
 
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+                <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 2 }}>
                     These timestamps are automatically managed by the system.
                 </Typography>
             </Stack>
@@ -95,4 +96,4 @@ const Metadata = ({ item }) => {
     )
 }
 
-export default Metadata 
+export default Metadata
