@@ -227,6 +227,114 @@ function reg_events(mainWindow) {
         },
     )
 
+    // Register icon browse handler
+    ipcMain.handle("browse-for-icon", async (event, { itemId }) => {
+        try {
+            // Find the item in any loaded package
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) {
+                throw new Error("Item not found")
+            }
+
+            // Show file dialog to select image file
+            const result = await dialog.showOpenDialog(mainWindow, {
+                title: "Select Icon File",
+                properties: ["openFile"],
+                filters: [
+                    {
+                        name: "Image Files",
+                        extensions: ["png", "jpg", "jpeg", "tga", "vtf"],
+                    },
+                    {
+                        name: "All Files",
+                        extensions: ["*"],
+                    },
+                ],
+            })
+
+            if (result.canceled || result.filePaths.length === 0) {
+                return { success: false, canceled: true }
+            }
+
+            const selectedFilePath = result.filePaths[0]
+            const fileName = path.basename(selectedFilePath)
+            const fileExt = path.extname(fileName).toLowerCase()
+
+            // Validate it's an image file
+            const validExtensions = [".png", ".jpg", ".jpeg", ".tga", ".vtf"]
+            if (!validExtensions.includes(fileExt)) {
+                throw new Error("Selected file must be an image file (PNG, JPG, TGA, or VTF)")
+            }
+
+            // Get the current icon path or create a new one
+            let targetIconPath
+            if (item.icon && fs.existsSync(item.icon)) {
+                // Replace existing icon - keep same path but update extension if needed
+                const currentDir = path.dirname(item.icon)
+                const currentBaseName = path.basename(item.icon, path.extname(item.icon))
+                targetIconPath = path.join(currentDir, currentBaseName + fileExt)
+                
+                // Delete the old icon file if it's different from the new target
+                if (item.icon !== targetIconPath && fs.existsSync(item.icon)) {
+                    fs.unlinkSync(item.icon)
+                }
+            } else {
+                // Create new icon path - use item name as filename in the BEE2/items structure
+                const iconDir = path.join(item.packagePath, "resources", "BEE2", "items", "beepkg")
+                if (!fs.existsSync(iconDir)) {
+                    fs.mkdirSync(iconDir, { recursive: true })
+                }
+                const safeItemName = item.name.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase()
+                targetIconPath = path.join(iconDir, safeItemName + fileExt)
+            }
+
+            // Copy the new icon file
+            fs.copyFileSync(selectedFilePath, targetIconPath)
+
+            // Update the item's icon path in the properties file (where Item class actually reads it)
+            const propertiesPath = path.join(item.fullItemPath, "properties.json")
+            if (fs.existsSync(propertiesPath)) {
+                const properties = JSON.parse(fs.readFileSync(propertiesPath, "utf-8"))
+                
+                // Make path relative to resources/BEE2/items/ (as expected by Item class line 84)
+                const bee2ItemsPath = path.join(item.packagePath, "resources", "BEE2", "items")
+                const relativePath = path.relative(bee2ItemsPath, targetIconPath)
+                
+                if (!properties.Properties) properties.Properties = {}
+                if (!properties.Properties.Icon) properties.Properties.Icon = {}
+                properties.Properties.Icon["0"] = relativePath.replace(/\\/g, '/')
+                
+                fs.writeFileSync(propertiesPath, JSON.stringify(properties, null, 2))
+            }
+
+            // Reload the item to get updated data
+            const updatedItemInstance = new Item({ 
+                packagePath: item.packagePath, 
+                itemJSON: loadOriginalItemJSON(item.packagePath, item.id) 
+            })
+            const updatedItem = updatedItemInstance.toJSON()
+
+            // Send updated item data to frontend
+            console.log('Sending updated item after icon change:', {
+                id: updatedItem.id,
+                icon: updatedItem.icon
+            })
+            mainWindow.webContents.send("item-updated", updatedItem)
+            sendItemUpdateToEditor(itemId, updatedItem)
+
+            return { success: true, iconPath: targetIconPath }
+        } catch (error) {
+            console.error("Failed to browse for icon:", error)
+            dialog.showErrorBox(
+                "Failed to Set Icon",
+                `Could not set icon: ${error.message}`
+            )
+            return { success: false, error: error.message }
+        }
+    })
+
     // IPC handler for Save Package
     ipcMain.on("save-package", async (event) => {
         try {

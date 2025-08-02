@@ -116,9 +116,19 @@ function BasicInfo({ item, formData, onUpdate }) {
                             <InputAdornment position="end">
                                 <IconButton
                                     size="small"
-                                    onClick={() => {
-                                        // TODO: Implement icon browse functionality
-                                        console.log("Browse for icon clicked")
+                                    onClick={async () => {
+                                        if (item?.id) {
+                                            try {
+                                                const result = await window.package.browseForIcon(item.id)
+                                                if (result.success) {
+                                                    console.log("Icon updated successfully")
+                                                } else if (!result.canceled) {
+                                                    console.error("Failed to update icon:", result.error)
+                                                }
+                                            } catch (error) {
+                                                console.error("Failed to browse for icon:", error)
+                                            }
+                                        }
                                     }}
                                     title="Browse for Icon"
                                     sx={{ mr: 0.5 }}>
