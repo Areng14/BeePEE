@@ -11,6 +11,7 @@ import {
     IconButton,
     DialogContentText,
     Tooltip,
+    Chip,
 } from "@mui/material"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
@@ -21,18 +22,64 @@ import SubjectIcon from "@mui/icons-material/Subject"
 import { useState, useEffect } from "react"
 import ViewInAr from "@mui/icons-material/ViewInAr"
 
-function Instances({ item, onInstancesChanged }) {
+function Instances({ item, deferredChanges, onInstanceChange }) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [instanceToDelete, setInstanceToDelete] = useState(null)
     const [isRemovingMissing, setIsRemovingMissing] = useState(false)
 
-    // Convert item instances to array format for rendering
-    const instances = item?.instances
-        ? Object.entries(item.instances).map(([index, instance]) => ({
-              ...instance,
-              index,
-          }))
-        : []
+    // Convert item instances to array format for rendering and apply pending changes for UI preview
+    const getInstancesWithPendingChanges = () => {
+        let instances = item?.instances
+            ? Object.entries(item.instances).map(([index, instance]) => ({
+                  ...instance,
+                  index,
+                  status: "existing" // default status
+              }))
+            : []
+
+        // Mark instances that are pending removal
+        if (deferredChanges?.instances?.removed) {
+            deferredChanges.instances.removed.forEach(removal => {
+                const instanceIndex = instances.findIndex(inst => inst.index === removal.index)
+                if (instanceIndex !== -1) {
+                    instances[instanceIndex] = {
+                        ...instances[instanceIndex],
+                        status: "pending-removal"
+                    }
+                }
+            })
+        }
+
+        // Mark instances that are pending replacement
+        if (deferredChanges?.instances?.replaced) {
+            deferredChanges.instances.replaced.forEach(replacement => {
+                const instanceIndex = instances.findIndex(inst => inst.index === replacement.index)
+                if (instanceIndex !== -1) {
+                    instances[instanceIndex] = {
+                        ...instances[instanceIndex],
+                        status: "pending-replacement"
+                    }
+                }
+            })
+        }
+
+        // Add pending additions as preview items
+        if (deferredChanges?.instances?.added) {
+            deferredChanges.instances.added.forEach((addition, addIndex) => {
+                instances.push({
+                    Name: `New Instance ${addIndex + 1} (pending)`,
+                    index: `pending-add-${addIndex}`,
+                    exists: true,
+                    status: "pending-addition",
+                    source: "pending"
+                })
+            })
+        }
+
+        return instances
+    }
+
+    const instances = getInstancesWithPendingChanges()
 
     // Debug effect to log when instances change
     useEffect(() => {
@@ -61,82 +108,50 @@ function Instances({ item, onInstancesChanged }) {
 
     const handleAddInstanceWithFileDialog = async () => {
         console.log(
-            "Instances: Adding instance with file dialog for item:",
+            "Instances: Queueing add instance operation for item:",
             item.id,
         )
-        try {
-            const result = await window.package.addInstanceFileDialog(item.id)
-            console.log("Instances: File dialog result:", result)
-            if (result.success) {
-                console.log(`Instances: Added instance: ${result.instanceName}`)
-                console.log(
-                    "Instances: Current item instances before callback:",
-                    item?.instances,
-                )
-                // Backend will automatically send item-updated event
-                if (onInstancesChanged) {
-                    console.log(
-                        "Instances: Calling onInstancesChanged callback",
-                    )
-                    onInstancesChanged()
-                }
-            } else if (!result.canceled) {
-                console.error(
-                    "Instances: Failed to add instance:",
-                    result.error,
-                )
-            }
-        } catch (error) {
-            console.error("Instances: Failed to add instance:", error)
-        }
+        // Queue the add operation for deferred execution
+        onInstanceChange("added", { 
+            itemId: item.id, 
+            timestamp: Date.now() 
+        })
+        console.log("Instances: Add instance operation queued")
     }
 
     const handleReplaceInstance = async (instanceIndex) => {
         console.log(
-            "Instances: Replacing instance at index:",
+            "Instances: Queueing replace instance operation at index:",
             instanceIndex,
             "for item:",
             item.id,
         )
-        try {
-            const result = await window.package.replaceInstanceFileDialog(
-                item.id,
-                instanceIndex,
-            )
-            if (result.success) {
-                console.log(
-                    `Instances: Replaced instance: ${result.instanceName}`,
-                )
-                // Backend will automatically send item-updated event
-                if (onInstancesChanged) onInstancesChanged()
-            } else if (!result.canceled) {
-                console.error(
-                    "Instances: Failed to replace instance:",
-                    result.error,
-                )
-            }
-        } catch (error) {
-            console.error("Instances: Failed to replace instance:", error)
-        }
+        // Queue the replace operation for deferred execution
+        onInstanceChange("replaced", { 
+            itemId: item.id, 
+            index: instanceIndex,
+            timestamp: Date.now() 
+        })
+        console.log("Instances: Replace instance operation queued")
     }
 
     const handleRemoveInstance = async () => {
         if (instanceToDelete === null) return
         console.log(
-            "Instances: Removing instance at index:",
+            "Instances: Queueing remove instance operation at index:",
             instanceToDelete,
             "for item:",
             item.id,
         )
-        try {
-            await window.package.removeInstance(item.id, instanceToDelete)
-            setDeleteDialogOpen(false)
-            setInstanceToDelete(null)
-            // Backend will automatically send item-updated event
-            if (onInstancesChanged) onInstancesChanged()
-        } catch (error) {
-            console.error("Instances: Failed to remove instance:", error)
-        }
+        // Queue the remove operation for deferred execution
+        onInstanceChange("removed", { 
+            itemId: item.id, 
+            index: instanceToDelete,
+            timestamp: Date.now() 
+        })
+        setDeleteDialogOpen(false)
+        setInstanceToDelete(null)
+        console.log("Instances: Remove instance operation queued")
     }
 
     const handleRemoveAllMissingInstances = async () => {
@@ -147,30 +162,23 @@ function Instances({ item, onInstancesChanged }) {
 
         setIsRemovingMissing(true)
         console.log(
-            "Instances: Removing all missing instances (excluding VBSP):",
+            "Instances: Queueing removal of all missing instances (excluding VBSP):",
             missingInstances.length,
             "for item:",
             item.id,
         )
-        try {
-            // Remove instances in reverse order to avoid index shifting issues
-            const sortedInstances = missingInstances.sort(
-                (a, b) => parseInt(b.index) - parseInt(a.index),
-            )
-
-            for (const instance of sortedInstances) {
-                await window.package.removeInstance(item.id, instance.index)
-            }
-
-            // Backend will automatically send item-updated event
-            if (onInstancesChanged) onInstancesChanged()
-        } catch (error) {
-            console.error(
-                "Instances: Failed to remove all missing instances:",
-                error,
-            )
-            setIsRemovingMissing(false) // Reset on error so user can try again
+        
+        // Queue removal of all missing instances
+        for (const instance of missingInstances) {
+            onInstanceChange("removed", { 
+                itemId: item.id, 
+                index: instance.index,
+                timestamp: Date.now() 
+            })
         }
+        
+        console.log("Instances: All missing instance removals queued")
+        setIsRemovingMissing(false)
     }
 
     return (
@@ -213,6 +221,8 @@ function Instances({ item, onInstancesChanged }) {
                 </Box>
             </Box>
 
+
+
             {instances.length > 0 ? (
                 <Stack spacing={2}>
                     {instances.map((instance, arrayIndex) => {
@@ -222,20 +232,51 @@ function Instances({ item, onInstancesChanged }) {
                         // Use the array index for sequential numbering instead of trying to parse from filename
                         const instanceNumber = arrayIndex
 
+                        // Get visual styling based on instance status
+                        const getInstanceStyling = (status, isDisabled) => {
+                            switch (status) {
+                                case "pending-removal":
+                                    return {
+                                        backgroundColor: "rgba(244, 67, 54, 0.1)",
+                                        borderColor: "error.main",
+                                        borderStyle: "dashed",
+                                        opacity: 0.7
+                                    }
+                                case "pending-replacement":
+                                    return {
+                                        backgroundColor: "rgba(255, 152, 0, 0.1)",
+                                        borderColor: "warning.main",
+                                        borderStyle: "dashed",
+                                        opacity: 0.9
+                                    }
+                                case "pending-addition":
+                                    return {
+                                        backgroundColor: "rgba(76, 175, 80, 0.1)",
+                                        borderColor: "success.main",
+                                        borderStyle: "dashed",
+                                        opacity: 0.9
+                                    }
+                                default:
+                                    return {
+                                        backgroundColor: isDisabled
+                                            ? "rgba(0, 0, 0, 0.3)"
+                                            : "background.paper",
+                                        borderColor: isDisabled
+                                            ? "error.main"
+                                            : "divider",
+                                        opacity: isDisabled ? 0.8 : 1,
+                                    }
+                            }
+                        }
+
                         return (
                             <Paper
-                                key={instance.Name || "unknown"}
+                                key={instance.Name || `instance-${arrayIndex}`}
                                 variant="outlined"
                                 sx={{
                                     p: 2,
-                                    backgroundColor: isDisabled
-                                        ? "rgba(0, 0, 0, 0.3)"
-                                        : "background.paper",
-                                    borderColor: isDisabled
-                                        ? "error.main"
-                                        : "divider",
-                                    borderWidth: isDisabled ? 1 : 1,
-                                    opacity: isDisabled ? 0.8 : 1,
+                                    ...getInstanceStyling(instance.status, isDisabled),
+                                    borderWidth: 1,
                                 }}>
                                 <Box
                                     sx={{
@@ -251,16 +292,25 @@ function Instances({ item, onInstancesChanged }) {
                                             display: "flex",
                                             alignItems: "center",
                                             gap: 1,
+                                            textDecoration: instance.status === "pending-removal" ? "line-through" : "none"
                                         }}>
                                         <Tooltip
                                             title={
-                                                isDisabled
+                                                instance.status === "pending-removal" 
+                                                    ? "Pending removal"
+                                                    : instance.status === "pending-replacement"
+                                                    ? "Pending replacement"
+                                                    : instance.status === "pending-addition"
+                                                    ? "Pending addition"
+                                                    : isDisabled
                                                     ? "Missing File"
                                                     : isVBSP
                                                       ? "VBSP Instance"
                                                       : "Editor Instance"
                                             }>
-                                            {isVBSP ? (
+                                            {instance.status === "pending-addition" ? (
+                                                <AddIcon fontSize="small" color="success" />
+                                            ) : isVBSP ? (
                                                 <CodeIcon fontSize="small" />
                                             ) : (
                                                 <SubjectIcon fontSize="small" />
@@ -284,69 +334,101 @@ function Instances({ item, onInstancesChanged }) {
                                     </Typography>
 
                                     <Box sx={{ display: "flex", gap: 1 }}>
-                                        <Tooltip
-                                            title={
-                                                isDisabled
-                                                    ? "Cannot edit - file is missing"
-                                                    : "Edit this instance file in Hammer"
-                                            }>
-                                            <span>
-                                                {" "}
-                                                {/* Wrapper needed for disabled IconButton */}
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={() =>
-                                                        handleEditInstance(
-                                                            item.packagePath,
-                                                            instance.Name,
-                                                        )
-                                                    }
-                                                    disabled={isDisabled}>
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
-                                            </span>
-                                        </Tooltip>
-
-                                        {!isVBSP && (
-                                            <Tooltip
-                                                title={
-                                                    isDisabled
-                                                        ? "Replace missing file with a VMF file"
-                                                        : "Replace this instance file with a different VMF file"
-                                                }>
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={() =>
-                                                        handleReplaceInstance(
-                                                            instance.index,
-                                                        )
-                                                    }
-                                                    color={
-                                                        isDisabled
-                                                            ? "primary"
-                                                            : "warning"
-                                                    }>
-                                                    <SwapHorizIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
-                                        )}
-
-                                        {!isVBSP && (
-                                            <Tooltip title="Delete this instance permanently">
+                                        {instance.status === "pending-addition" ? (
+                                            // For pending additions, show cancel button
+                                            <Tooltip title="Cancel addition">
                                                 <IconButton
                                                     size="small"
                                                     color="error"
                                                     onClick={() => {
-                                                        setInstanceToDelete(
-                                                            instance.index,
-                                                        )
-                                                        setDeleteDialogOpen(
-                                                            true,
-                                                        )
+                                                        // Remove this pending addition
+                                                        const addIndex = parseInt(instance.index.split('-')[2])
+                                                        // TODO: Implement cancel add functionality
+                                                        console.log("Cancel add for index:", addIndex)
                                                     }}>
                                                     <DeleteIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
+                                        ) : (
+                                            <>
+                                                <Tooltip
+                                                    title={
+                                                        instance.status === "pending-removal" 
+                                                            ? "Cannot edit - pending removal"
+                                                            : instance.status === "pending-replacement"
+                                                            ? "Cannot edit - pending replacement"
+                                                            : isDisabled
+                                                            ? "Cannot edit - file is missing"
+                                                            : "Edit in Hammer"
+                                                    }>
+                                                    <span>
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() =>
+                                                                handleEditInstance(
+                                                                    item.packagePath,
+                                                                    instance.Name,
+                                                                )
+                                                            }
+                                                            disabled={isDisabled || instance.status?.startsWith("pending")}>
+                                                            <EditIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </span>
+                                                </Tooltip>
+
+                                                {!isVBSP && instance.status !== "pending-removal" && (
+                                                    <Tooltip
+                                                        title={
+                                                            instance.status === "pending-replacement"
+                                                                ? "Already pending replacement"
+                                                                : isDisabled
+                                                                ? "Replace missing file"
+                                                                : "Replace with different VMF"
+                                                        }>
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() =>
+                                                                handleReplaceInstance(
+                                                                    instance.index,
+                                                                )
+                                                            }
+                                                            disabled={instance.status === "pending-replacement"}
+                                                            color={
+                                                                instance.status === "pending-replacement" 
+                                                                    ? "default"
+                                                                    : isDisabled
+                                                                    ? "primary"
+                                                                    : "warning"
+                                                            }>
+                                                            <SwapHorizIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+
+                                                {!isVBSP && (
+                                                    <Tooltip 
+                                                        title={
+                                                            instance.status === "pending-removal"
+                                                                ? "Already pending removal"
+                                                                : "Delete permanently"
+                                                        }>
+                                                        <IconButton
+                                                            size="small"
+                                                            color="error"
+                                                            disabled={instance.status === "pending-removal"}
+                                                            onClick={() => {
+                                                                setInstanceToDelete(
+                                                                    instance.index,
+                                                                )
+                                                                setDeleteDialogOpen(
+                                                                    true,
+                                                                )
+                                                            }}>
+                                                            <DeleteIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+                                            </>
                                         )}
                                     </Box>
                                 </Box>
