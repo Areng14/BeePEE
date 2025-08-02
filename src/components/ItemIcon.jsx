@@ -8,6 +8,8 @@ function ItemIcon({ item, onEdit }) {
     useEffect(() => {
         if (item.icon) {
             window.package.loadFile(item.icon).then(setImageSrc)
+        } else {
+            setImageSrc(null)
         }
     }, [item.icon])
 

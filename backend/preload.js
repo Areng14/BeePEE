@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld("package", {
     editorReady: () => ipcRenderer.send("editor-ready"),
     showIconPreview: (iconPath, itemName) =>
         ipcRenderer.invoke("show-icon-preview", { iconPath, itemName }),
+    browseForIcon: (itemId) =>
+        ipcRenderer.invoke("browse-for-icon", { itemId }),
     saveItem: (itemData) => ipcRenderer.invoke("save-item", itemData),
     onItemUpdated: (callback) =>
         ipcRenderer.on("item-updated", (event, item) => callback(event, item)),
