@@ -2359,7 +2359,7 @@ function InputOutputConfigDialog({
     )
 }
 
-function Inputs({ item, deferredChanges, onUpdate }) {
+function Inputs({ item }) {
     const [inputs, setInputs] = useState({})
     const [outputs, setOutputs] = useState({})
     const [tabValue, setTabValue] = useState(0)
