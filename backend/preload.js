@@ -33,8 +33,12 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.invoke("edit-instance", instancePath),
     addInstance: (itemId, instanceName) =>
         ipcRenderer.invoke("add-instance", { itemId, instanceName }),
+    addInstanceFromFile: (itemId, filePath, instanceName) =>
+        ipcRenderer.invoke("add-instance-from-file", { itemId, filePath, instanceName }),
     addInstanceFileDialog: (itemId) =>
         ipcRenderer.invoke("add-instance-file-dialog", { itemId }),
+    selectInstanceFile: (itemId) =>
+        ipcRenderer.invoke("select-instance-file", { itemId }),
     replaceInstanceFileDialog: (itemId, instanceIndex) =>
         ipcRenderer.invoke("replace-instance-file-dialog", {
             itemId,

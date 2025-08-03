@@ -379,6 +379,61 @@ function reg_events(mainWindow) {
         }
     })
 
+    // Add instance from file path (for buffered save)
+    ipcMain.handle("add-instance-from-file", async (event, { itemId, filePath, instanceName }) => {
+        try {
+            // Find the item in any loaded package
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) {
+                throw new Error("Item not found")
+            }
+
+            // Verify the file exists
+            if (!fs.existsSync(filePath)) {
+                throw new Error("Source file not found")
+            }
+
+            // Apply path fixing to remove BEE2/ prefix for actual file structure
+            const actualFilePath = fixInstancePath(instanceName)
+            const targetPath = path.join(
+                item.packagePath,
+                "resources",
+                actualFilePath,
+            )
+            const targetDir = path.dirname(targetPath)
+
+            // Ensure the instances directory exists
+            if (!fs.existsSync(targetDir)) {
+                fs.mkdirSync(targetDir, { recursive: true })
+            }
+
+            // Copy the file
+            fs.copyFileSync(filePath, targetPath)
+
+            // Add to editoritems
+            const newIndex = item.addInstance(instanceName)
+
+            // Send updated item data to frontend
+            const updatedItem = item.toJSON()
+            console.log("Sending updated item after add instance from file:", {
+                id: updatedItem.id,
+                instances: updatedItem.instances,
+            })
+            mainWindow.webContents.send("item-updated", updatedItem)
+            sendItemUpdateToEditor(itemId, updatedItem)
+
+            return { success: true, index: newIndex }
+        } catch (error) {
+            dialog.showErrorBox(
+                "Failed to Add Instance",
+                `Could not add instance: ${error.message}`,
+            )
+            return { success: false, error: error.message }
+        }
+    })
+
     // Add instance
     ipcMain.handle("add-instance", async (event, { itemId, instanceName }) => {
         try {
@@ -461,6 +516,119 @@ function reg_events(mainWindow) {
 
         return hasChanges
     }
+
+    // Select instance file (for buffered save)
+    ipcMain.handle("select-instance-file", async (event, { itemId }) => {
+        try {
+            // Find the item in any loaded package
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) {
+                throw new Error("Item not found")
+            }
+
+            // Show file dialog to select VMF file
+            const result = await dialog.showOpenDialog(mainWindow, {
+                title: "Select VMF Instance File",
+                properties: ["openFile"],
+                filters: [
+                    {
+                        name: "VMF Files",
+                        extensions: ["vmf"],
+                    },
+                    {
+                        name: "All Files",
+                        extensions: ["*"],
+                    },
+                ],
+            })
+
+            if (result.canceled || result.filePaths.length === 0) {
+                return { success: false, canceled: true }
+            }
+
+            const selectedFilePath = result.filePaths[0]
+            const fileName = path.basename(selectedFilePath)
+
+            // Check if it's a VMF file
+            if (!fileName.toLowerCase().endsWith(".vmf")) {
+                throw new Error("Selected file must be a VMF file")
+            }
+
+            // Calculate what the instance name would be (same logic as add-instance-file-dialog)
+            let instanceName
+
+            // Check if this item has existing instances to use as template
+            const existingInstances = Object.values(item.instances)
+            if (existingInstances.length > 0) {
+                // Use the first existing instance path as template
+                const templatePath = existingInstances[0].Name
+                const templateDir = path.dirname(templatePath)
+
+                // Create the new instance path using the template structure (keep BEE2/ for display)
+                instanceName = templateDir + "/" + fileName
+            } else {
+                // No existing instances - reconstruct path from source file
+                const selectedDir = path.dirname(selectedFilePath)
+                const pathParts = selectedDir.split(path.sep)
+
+                // Find the index of 'instances' in the source path
+                const instancesIndex = pathParts.findIndex(
+                    (part) => part.toLowerCase() === "instances",
+                )
+
+                if (
+                    instancesIndex !== -1 &&
+                    instancesIndex + 1 < pathParts.length
+                ) {
+                    // Get everything after 'instances' in the source path
+                    const pathAfterInstances = pathParts.slice(
+                        instancesIndex + 1,
+                    )
+
+                    // Skip 'bee' if it's the first part after instances
+                    let finalPathParts = pathAfterInstances
+                    if (
+                        pathAfterInstances.length > 0 &&
+                        pathAfterInstances[0].toLowerCase() === "bee"
+                    ) {
+                        finalPathParts = pathAfterInstances.slice(1)
+                    }
+
+                    if (finalPathParts.length > 0) {
+                        // Reconstruct the path: instances/rest/of/path/filename
+                        instanceName =
+                            "instances/" +
+                            finalPathParts.join("/") +
+                            "/" +
+                            fileName
+                    } else {
+                        // Fallback to simple instances/filename
+                        instanceName = "instances/" + fileName
+                    }
+                } else {
+                    // No instances found in path - create simple structure
+                    const itemId = item.id.toLowerCase()
+                    instanceName = `instances/${itemId}/${fileName}`
+                }
+            }
+
+            // Return file info without actually adding to backend
+            return {
+                success: true,
+                filePath: selectedFilePath,
+                instanceName: instanceName,
+                fileName: fileName,
+            }
+        } catch (error) {
+            dialog.showErrorBox(
+                "Failed to Select Instance File",
+                `Could not select instance file: ${error.message}`,
+            )
+            return { success: false, error: error.message }
+        }
+    })
 
     // Add instance with file dialog
     ipcMain.handle("add-instance-file-dialog", async (event, { itemId }) => {

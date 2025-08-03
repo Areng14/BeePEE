@@ -377,6 +377,39 @@ class Item {
             throw new Error("Cannot remove VBSP instances")
         }
 
+        // Delete the instance file from filesystem if it exists
+        try {
+            const fs = require('fs')
+            const path = require('path')
+            
+            // Apply path fixing to remove BEE2/ prefix for actual file structure
+            const actualFilePath = this.fixInstancePath(instance.Name)
+            const instanceFilePath = path.join(this.packagePath, "resources", actualFilePath)
+            
+            if (fs.existsSync(instanceFilePath)) {
+                fs.unlinkSync(instanceFilePath)
+                console.log(`Deleted instance file: ${instanceFilePath}`)
+                
+                // Also try to remove the directory if it's empty
+                const instanceDir = path.dirname(instanceFilePath)
+                try {
+                    const files = fs.readdirSync(instanceDir)
+                    if (files.length === 0) {
+                        fs.rmdirSync(instanceDir)
+                        console.log(`Removed empty directory: ${instanceDir}`)
+                    }
+                } catch (dirError) {
+                    // Directory not empty or other error, ignore
+                    console.log(`Could not remove directory ${instanceDir}: ${dirError.message}`)
+                }
+            } else {
+                console.log(`Instance file not found, skipping deletion: ${instanceFilePath}`)
+            }
+        } catch (fileError) {
+            console.error(`Error deleting instance file: ${fileError.message}`)
+            // Don't throw error, continue with removal from editoritems
+        }
+
         // Remove from memory
         delete this.instances[index]
         this._loadedInstances.delete(index)
