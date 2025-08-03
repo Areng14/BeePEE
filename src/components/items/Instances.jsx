@@ -28,7 +28,9 @@ function Instances({ item, formData, onUpdateInstances }) {
 
     // Convert formData instances to array format for rendering
     const instances = formData?.instances
-        ? Object.entries(formData.instances).map(([index, instance]) => ({
+        ? Object.entries(formData.instances)
+            .filter(([index, instance]) => !instance._toRemove) // Hide instances marked for removal
+            .map(([index, instance]) => ({
               ...instance,
               index,
           }))
@@ -61,43 +63,46 @@ function Instances({ item, formData, onUpdateInstances }) {
 
     const handleAddInstanceWithFileDialog = async () => {
         console.log(
-            "Instances: Adding instance with file dialog for item:",
+            "Instances: Selecting instance file for item:",
             item.id,
         )
         try {
-            const result = await window.package.addInstanceFileDialog(item.id)
+            const result = await window.package.selectInstanceFile(item.id)
             console.log("Instances: File dialog result:", result)
             if (result.success) {
-                // Backend automatically updates the files, but we need to mark as modified for UI purposes
-                // The backend will send an item-updated event, but we need to keep formData in sync
+                // Generate a unique index for the new instance (use pending prefix to avoid conflicts)
+                const existingIndices = Object.keys(formData.instances || {})
+                    .filter(key => !key.startsWith('pending_'))
+                    .map(Number)
+                const numericIndices = existingIndices.filter(num => !isNaN(num))
+                const maxIndex = numericIndices.length > 0 ? Math.max(...numericIndices) : -1
+                const newIndex = `pending_${Date.now()}` // Use timestamp to ensure uniqueness
                 
-                // Use the index returned by the backend
-                const newIndex = result.index
-                const instanceName = result.instanceName || `Instance${newIndex}`
-                
-                // Create new instance object matching backend structure
+                // Create new instance object with pending data
                 const newInstance = {
-                    Name: instanceName,
+                    Name: result.instanceName,
                     source: "editor",
                     exists: true,
+                    _pending: true,
+                    _filePath: result.filePath, // Store the source file path for when we actually save
                 }
                 
-                // Update formData with new instance
+                // Update formData with new pending instance
                 const updatedInstances = {
                     ...formData.instances,
                     [newIndex]: newInstance
                 }
                 
                 onUpdateInstances(updatedInstances)
-                console.log(`Instances: Added instance: ${newInstance.Name} at index ${newIndex}`)
+                console.log(`Instances: Added pending instance: ${newInstance.Name} (will be saved on Save button)`)
             } else if (!result.canceled) {
                 console.error(
-                    "Instances: Failed to add instance:",
+                    "Instances: Failed to select instance:",
                     result.error,
                 )
             }
         } catch (error) {
-            console.error("Instances: Failed to add instance:", error)
+            console.error("Instances: Failed to select instance:", error)
         }
     }
 
@@ -142,32 +147,40 @@ function Instances({ item, formData, onUpdateInstances }) {
         }
     }
 
-    const handleRemoveInstance = async () => {
+    const handleRemoveInstance = () => {
         if (instanceToDelete === null) return
         console.log(
-            "Instances: Removing instance at index:",
+            "Instances: Marking instance for removal at index:",
             instanceToDelete,
             "for item:",
             item.id,
         )
         try {
-            // Call backend to remove the instance
-            await window.package.removeInstance(item.id, instanceToDelete)
-            
-            // Update local formData to reflect the change
             const updatedInstances = { ...formData.instances }
-            delete updatedInstances[instanceToDelete]
+            const instanceData = updatedInstances[instanceToDelete]
+            
+            if (instanceData && instanceData._pending) {
+                // If it's a pending instance (not yet saved), just remove it completely
+                delete updatedInstances[instanceToDelete]
+                console.log("Instances: Removed pending instance (not saved yet)")
+            } else {
+                // Mark existing instance for removal
+                updatedInstances[instanceToDelete] = {
+                    ...instanceData,
+                    _toRemove: true
+                }
+                console.log("Instances: Marked instance for removal (will be deleted on Save)")
+            }
             
             onUpdateInstances(updatedInstances)
             setDeleteDialogOpen(false)
             setInstanceToDelete(null)
-            console.log("Instances: Instance removed successfully")
         } catch (error) {
-            console.error("Instances: Failed to remove instance:", error)
+            console.error("Instances: Failed to mark instance for removal:", error)
         }
     }
 
-    const handleRemoveAllMissingInstances = async () => {
+    const handleRemoveAllMissingInstances = () => {
         const missingInstances = instances.filter(
             (instance) => !instance.exists && instance.source !== "vbsp",
         )
@@ -175,37 +188,35 @@ function Instances({ item, formData, onUpdateInstances }) {
 
         setIsRemovingMissing(true)
         console.log(
-            "Instances: Removing all missing instances (excluding VBSP):",
+            "Instances: Marking all missing instances for removal (excluding VBSP):",
             missingInstances.length,
             "for item:",
             item.id,
         )
         
         try {
-            // Call backend to remove each missing instance
-            const removePromises = missingInstances.map(async (instance) => {
-                try {
-                    await window.package.removeInstance(item.id, instance.index)
-                    console.log(`Instances: Removed missing instance ${instance.index}`)
-                } catch (error) {
-                    console.error(`Instances: Failed to remove instance ${instance.index}:`, error)
-                    throw error
+            const updatedInstances = { ...formData.instances }
+            
+            missingInstances.forEach(instance => {
+                const instanceData = updatedInstances[instance.index]
+                if (instanceData && instanceData._pending) {
+                    // If it's a pending instance (not yet saved), just remove it completely
+                    delete updatedInstances[instance.index]
+                } else {
+                    // Mark existing instance for removal
+                    updatedInstances[instance.index] = {
+                        ...instanceData,
+                        _toRemove: true
+                    }
                 }
             })
             
-            await Promise.all(removePromises)
-            console.log("Instances: All missing instances removed successfully")
-            
-            // Update local formData to reflect the changes
-            const updatedInstances = { ...formData.instances }
-            missingInstances.forEach(instance => {
-                delete updatedInstances[instance.index]
-            })
             onUpdateInstances(updatedInstances)
+            console.log("Instances: All missing instances marked for removal (will be deleted on Save)")
             
         } catch (error) {
             console.error(
-                "Instances: Failed to remove all missing instances:",
+                "Instances: Failed to mark missing instances for removal:",
                 error,
             )
         } finally {
@@ -259,6 +270,7 @@ function Instances({ item, formData, onUpdateInstances }) {
                         const isVBSP = instance.source === "vbsp"
                         const instanceExists = instance.exists !== false // Default to true if not specified
                         const isDisabled = !instanceExists
+                        const isPending = instance._pending === true
                         // Use the array index for sequential numbering instead of trying to parse from filename
                         const instanceNumber = arrayIndex
 

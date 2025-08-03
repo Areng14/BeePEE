@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Box, Tabs, Tab, Button, Stack, Alert, Tooltip, Badge } from "@mui/material"
+import { Box, Tabs, Tab, Button, Stack, Alert, Tooltip, Badge, Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText } from "@mui/material"
 import {
     Info,
     Input,
@@ -24,6 +24,7 @@ function ItemEditor() {
     const [tabValue, setTabValue] = useState(0)
     const [saveError, setSaveError] = useState(null)
     const [showSaveSuccess, setShowSaveSuccess] = useState(false)
+    const [discardDialogOpen, setDiscardDialogOpen] = useState(false)
 
     // Form state for all tabs
     const [formData, setFormData] = useState({
@@ -333,10 +334,34 @@ function ItemEditor() {
                 }
             }
 
-            // Instances are handled immediately by individual operations (add/remove)
-            // The formData._modified.instances flag is used for UI indication only
-            // When instances are modified, the backend sends item-updated events
-            // which we handle by preserving local modifications
+            // Save instances if modified
+            if (formData._modified.instances) {
+                try {
+                    const currentInstances = formData.instances || {}
+                    const originalInstances = item.instances || {}
+                    
+                    // Process removals first
+                    for (const [index, instanceData] of Object.entries(currentInstances)) {
+                        if (instanceData._toRemove && originalInstances[index]) {
+                            console.log(`Removing instance at index ${index}`)
+                            await window.package.removeInstance(item.id, index)
+                        }
+                    }
+                    
+                    // Process additions
+                    for (const [index, instanceData] of Object.entries(currentInstances)) {
+                        if (instanceData._pending && instanceData._filePath) {
+                            console.log(`Adding pending instance: ${instanceData.Name}`)
+                            // Use a new backend function to add instance from file path
+                            await window.package.addInstanceFromFile(item.id, instanceData._filePath, instanceData.Name)
+                        }
+                    }
+                } catch (error) {
+                    console.error("Failed to save instances:", error)
+                    hasErrors = true
+                    throw new Error(`Instances: ${error.message}`)
+                }
+            }
 
             // Save VBSP data if modified
             if (formData._modified.vbsp) {
@@ -398,6 +423,25 @@ function ItemEditor() {
 
     const handleCloseError = () => {
         setSaveError(null)
+    }
+
+    const handleCloseOrDiscard = () => {
+        const hasUnsavedChanges = Object.values(formData._modified).some(modified => modified)
+        
+        if (hasUnsavedChanges) {
+            setDiscardDialogOpen(true)
+        } else {
+            window.close()
+        }
+    }
+
+    const handleConfirmDiscard = () => {
+        setDiscardDialogOpen(false)
+        window.close()
+    }
+
+    const handleCancelDiscard = () => {
+        setDiscardDialogOpen(false)
     }
 
     if (!item) return null
@@ -593,13 +637,19 @@ function ItemEditor() {
                             {showSaveSuccess ? "Saved!" : "Save"}
                         </Button>
                     </Tooltip>
-                    <Tooltip title="Close editor without saving">
+                    <Tooltip title={(() => {
+                        const hasUnsavedChanges = Object.values(formData._modified).some(modified => modified)
+                        return hasUnsavedChanges 
+                            ? "Discard unsaved changes and close editor" 
+                            : "Close editor"
+                    })()}>
                         <Button
                             variant="outlined"
                             startIcon={<Close />}
-                            onClick={() => window.close()}
+                            onClick={handleCloseOrDiscard}
+                            color={Object.values(formData._modified).some(modified => modified) ? "error" : "primary"}
                             sx={{ flex: 1 }}>
-                            Close
+                            {Object.values(formData._modified).some(modified => modified) ? "Discard" : "Close"}
                         </Button>
                     </Tooltip>
                 </Stack>
@@ -612,6 +662,30 @@ function ItemEditor() {
                     </Alert>
                 )}
             </Box>
+
+            {/* Discard Changes Confirmation Dialog */}
+            <Dialog
+                open={discardDialogOpen}
+                onClose={handleCancelDiscard}
+                aria-labelledby="discard-dialog-title"
+                aria-describedby="discard-dialog-description">
+                <DialogTitle id="discard-dialog-title">
+                    Discard Unsaved Changes?
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText id="discard-dialog-description">
+                        You have unsaved changes that will be lost if you close the editor. Are you sure you want to discard these changes?
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={handleCancelDiscard} color="primary">
+                        Cancel
+                    </Button>
+                    <Button onClick={handleConfirmDiscard} color="error" variant="contained">
+                        Discard Changes
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     )
 }
