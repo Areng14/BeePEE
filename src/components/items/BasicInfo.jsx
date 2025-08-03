@@ -11,41 +11,9 @@ import { Visibility, Edit, FolderOpen, Image } from "@mui/icons-material"
 import ReactMarkdown from "react-markdown"
 import { useState, useEffect } from "react"
 
-function BasicInfo({ item, deferredChanges, onUpdate }) {
+function BasicInfo({ item, formData, onUpdate }) {
     const [iconSrc, setIconSrc] = useState(null)
     const [isPreview, setIsPreview] = useState(false)
-
-    // Helper functions to get current values (deferred changes take precedence)
-    const getCurrentName = () => {
-        return deferredChanges.basicInfo.name !== undefined 
-            ? deferredChanges.basicInfo.name 
-            : item?.name || ""
-    }
-
-    const getCurrentAuthor = () => {
-        return deferredChanges.basicInfo.author !== undefined 
-            ? deferredChanges.basicInfo.author 
-            : item?.details?.Authors || ""
-    }
-
-    const getCurrentDescription = () => {
-        if (deferredChanges.basicInfo.description !== undefined) {
-            return deferredChanges.basicInfo.description
-        }
-        
-        const desc = item?.details?.Description
-        if (desc && typeof desc === "object") {
-            const descValues = Object.keys(desc)
-                .filter((key) => key.startsWith("desc_"))
-                .sort()
-                .map((key) => desc[key])
-                .filter((value) => value && value.trim() !== "")
-                .join("\n")
-                .trim()
-            return descValues
-        }
-        return desc || ""
-    }
 
     useEffect(() => {
         // Load the icon when item changes
@@ -120,37 +88,21 @@ function BasicInfo({ item, deferredChanges, onUpdate }) {
                 <Typography variant="h6">Basic Information</Typography>
             </Box>
 
-
-
             <Stack spacing={2} sx={{ height: "100%" }}>
                 <TextField
                     label="Name"
-                    value={getCurrentName()}
+                    value={formData.name}
                     onChange={(e) => onUpdate("name", e.target.value)}
                     fullWidth
                     variant="outlined"
-                    sx={{
-                        '& .MuiOutlinedInput-root': {
-                            backgroundColor: deferredChanges?.basicInfo?.name !== undefined 
-                                ? 'rgba(25, 118, 210, 0.05)' 
-                                : 'transparent',
-                        }
-                    }}
                 />
 
                 <TextField
                     label="Author"
-                    value={getCurrentAuthor()}
+                    value={formData.author}
                     onChange={(e) => onUpdate("author", e.target.value)}
                     fullWidth
                     variant="outlined"
-                    sx={{
-                        '& .MuiOutlinedInput-root': {
-                            backgroundColor: deferredChanges?.basicInfo?.author !== undefined 
-                                ? 'rgba(25, 118, 210, 0.05)' 
-                                : 'transparent',
-                        }
-                    }}
                 />
 
                 <TextField
@@ -158,13 +110,6 @@ function BasicInfo({ item, deferredChanges, onUpdate }) {
                     value={getRelativeIconPath()}
                     fullWidth
                     variant="outlined"
-                    sx={{
-                        '& .MuiOutlinedInput-root': {
-                            backgroundColor: deferredChanges?.basicInfo?.icon 
-                                ? 'rgba(25, 118, 210, 0.05)' 
-                                : 'transparent',
-                        }
-                    }}
                     InputProps={{
                         readOnly: true,
                         endAdornment: (
@@ -174,12 +119,14 @@ function BasicInfo({ item, deferredChanges, onUpdate }) {
                                     onClick={async () => {
                                         if (item?.id) {
                                             try {
-                                                // Store the icon change request for deferred processing
-                                                // This should update the icon field in the context
-                                                onUpdate("icon", { action: "browse", itemId: item.id })
-                                                console.log("Icon change queued for apply")
+                                                const result = await window.package.browseForIcon(item.id)
+                                                if (result.success) {
+                                                    console.log("Icon updated successfully")
+                                                } else if (!result.canceled) {
+                                                    console.error("Failed to update icon:", result.error)
+                                                }
                                             } catch (error) {
-                                                console.error("Failed to queue icon change:", error)
+                                                console.error("Failed to browse for icon:", error)
                                             }
                                         }
                                     }}
@@ -241,21 +188,19 @@ function BasicInfo({ item, deferredChanges, onUpdate }) {
                                 border: "1px solid #ccc",
                                 borderRadius: 1,
                                 p: 2,
-                                backgroundColor: deferredChanges?.basicInfo?.description !== undefined 
-                                    ? 'rgba(25, 118, 210, 0.05)' 
-                                    : "background.paper",
+                                backgroundColor: "background.paper",
                                 color: "text.primary",
                                 overflow: "auto",
                                 "& > *:first-of-type": { mt: 0 },
                                 "& > *:last-child": { mb: 0 },
                             }}>
                             <ReactMarkdown components={markdownComponents}>
-                                {processMarkdown(getCurrentDescription())}
+                                {processMarkdown(formData.description)}
                             </ReactMarkdown>
                         </Box>
                     ) : (
                         <TextField
-                            value={getCurrentDescription()}
+                            value={formData.description}
                             onChange={(e) =>
                                 onUpdate("description", e.target.value)
                             }
@@ -267,9 +212,6 @@ function BasicInfo({ item, deferredChanges, onUpdate }) {
                                 "& .MuiInputBase-root": {
                                     height: "100%",
                                     alignItems: "flex-start",
-                                    backgroundColor: deferredChanges?.basicInfo?.description !== undefined 
-                                        ? 'rgba(25, 118, 210, 0.05)' 
-                                        : 'transparent',
                                 },
                             }}
                         />

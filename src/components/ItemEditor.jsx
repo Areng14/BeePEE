@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { Box, Tabs, Tab, Button, Stack, Alert, Tooltip, Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Paper, Chip, Typography } from "@mui/material"
+import { Box, Tabs, Tab, Button, Stack, Alert, Tooltip } from "@mui/material"
 import {
     Info,
     Input,
@@ -10,7 +10,6 @@ import {
     Construction,
     CheckCircle,
     Description,
-    Assignment,
 } from "@mui/icons-material"
 import BasicInfo from "./items/BasicInfo"
 import Inputs from "./items/Inputs"
@@ -18,38 +17,55 @@ import Instances from "./items/Instances"
 import Vbsp from "./items/Vbsp"
 import Other from "./items/Other"
 import Metadata from "./items/Metadata"
-import PendingChanges from "./items/PendingChanges"
 import { useItemContext } from "../contexts/ItemContext"
 
 function ItemEditor() {
-    const { 
-        item, 
-        reloadItem, 
-        deferredChanges, 
-        updateDeferredChanges, 
-        addDeferredInstanceChange, 
-        undoDeferredChange,
-        hasUnsavedChanges, 
-        applyDeferredChanges, 
-        clearDeferredChanges 
-    } = useItemContext()
+    const { item, reloadItem } = useItemContext()
     const [tabValue, setTabValue] = useState(0)
     const [saveError, setSaveError] = useState(null)
     const [showSaveSuccess, setShowSaveSuccess] = useState(false)
-    const [showCloseConfirmation, setShowCloseConfirmation] = useState(false)
+
+    // Form state for all tabs
+    const [formData, setFormData] = useState({
+        name: "",
+        author: "",
+        description: "",
+        // Add other fields as needed for other tabs
+    })
 
     useEffect(() => {
-        // Initialize when item changes
+        // Initialize form data when item changes
         if (item) {
             document.title = `Edit ${item.name}`
 
-            // Clear deferred changes when loading a new item
-            clearDeferredChanges()
+            // Initialize form data with loaded item
+            const desc = item.details?.Description
+            let description = ""
+
+            if (desc && typeof desc === "object") {
+                const descValues = Object.keys(desc)
+                    .filter((key) => key.startsWith("desc_"))
+                    .sort()
+                    .map((key) => desc[key])
+                    .filter((value) => value && value.trim() !== "")
+                    .join("\n")
+                    .trim()
+                description = descValues
+            } else {
+                description = desc || ""
+            }
+
+            setFormData({
+                name: item.name || "",
+                author: item.details?.Authors || "",
+                description: description,
+                // Add other fields here
+            })
 
             // Clear unsaved changes indicator when loading a new item
             window.package?.setUnsavedChanges?.(false)
         }
-    }, [item, clearDeferredChanges])
+    }, [item])
 
     useEffect(() => {
         // Notify backend that editor is ready
@@ -68,55 +84,78 @@ function ItemEditor() {
         setTabValue(newValue)
     }
 
-    // Update unsaved changes indicator whenever deferred changes change
-    useEffect(() => {
-        window.package?.setUnsavedChanges?.(hasUnsavedChanges())
-    }, [hasUnsavedChanges])
+    const updateFormData = (field, value) => {
+        setFormData((prev) => {
+            const newData = {
+                ...prev,
+                [field]: value,
+            }
 
-    const handleApply = async () => {
+            // Check if data has changed from original item
+            const hasChanges =
+                newData.name !== (item?.name || "") ||
+                newData.author !== (item?.details?.Authors || "") ||
+                newData.description !==
+                    (() => {
+                        const desc = item?.details?.Description
+                        if (desc && typeof desc === "object") {
+                            const descValues = Object.keys(desc)
+                                .filter((key) => key.startsWith("desc_"))
+                                .sort()
+                                .map((key) => desc[key])
+                                .filter((value) => value && value.trim() !== "")
+                                .join("\n")
+                                .trim()
+                            return descValues
+                        }
+                        return desc || ""
+                    })()
+
+            // Update window title with unsaved changes indicator
+            window.package?.setUnsavedChanges?.(hasChanges)
+
+            return newData
+        })
+    }
+
+    const handleSave = async () => {
         try {
-            const currentName = deferredChanges.basicInfo.name !== undefined 
-                ? deferredChanges.basicInfo.name 
-                : item?.name
-            
             // Validate required fields
-            if (!currentName?.trim()) {
+            if (!formData.name?.trim()) {
                 throw new Error("Item name cannot be empty")
             }
 
-            // Apply all deferred changes
-            const result = await applyDeferredChanges()
+            // Prepare the save data
+            const saveData = {
+                id: item.id,
+                name: formData.name,
+                fullItemPath: item.fullItemPath,
+                details: {
+                    ...item.details,
+                    Authors: formData.author,
+                    Description: formData.description,
+                },
+                // Add other fields from formData as needed
+            }
+
+            // Send save data via IPC
+            const result = await window.package?.saveItem?.(saveData)
 
             if (result?.success) {
                 // Show checkmark icon temporarily
                 setShowSaveSuccess(true)
                 setSaveError(null)
                 setTimeout(() => setShowSaveSuccess(false), 2000)
+
+                // Clear unsaved changes indicator
+                window.package?.setUnsavedChanges?.(false)
             } else {
-                throw new Error(result?.error || "Failed to apply changes")
+                throw new Error("Failed to save item")
             }
         } catch (error) {
-            console.error("Failed to apply changes:", error)
+            console.error("Failed to save:", error)
             setSaveError(error.message)
         }
-    }
-
-    const handleClose = () => {
-        if (hasUnsavedChanges()) {
-            setShowCloseConfirmation(true)
-        } else {
-            window.close()
-        }
-    }
-
-    const handleConfirmClose = () => {
-        setShowCloseConfirmation(false)
-        clearDeferredChanges()
-        window.close()
-    }
-
-    const handleCancelClose = () => {
-        setShowCloseConfirmation(false)
     }
 
     const handleCloseError = () => {
@@ -190,18 +229,6 @@ function ItemEditor() {
                         placement="right">
                         <Tab icon={<Description />} />
                     </Tooltip>
-                    <Tooltip
-                        title="Pending Changes - Review changes before applying"
-                        placement="right">
-                        <Tab 
-                            icon={<Assignment />} 
-                            sx={{
-                                '& .MuiSvgIcon-root': {
-                                    color: hasUnsavedChanges() ? 'warning.main' : 'inherit'
-                                }
-                            }}
-                        />
-                    </Tooltip>
                 </Tabs>
 
                 {/* Tab Content */}
@@ -209,74 +236,65 @@ function ItemEditor() {
                     <Box sx={{ display: tabValue === 0 ? "block" : "none" }}>
                         <BasicInfo
                             item={item}
-                            deferredChanges={deferredChanges}
-                            onUpdate={(field, value) => updateDeferredChanges('basicInfo', { [field]: value })}
+                            formData={formData}
+                            onUpdate={updateFormData}
                         />
                     </Box>
                     <Box sx={{ display: tabValue === 1 ? "block" : "none" }}>
                         <Inputs
                             item={item}
-                            deferredChanges={deferredChanges}
-                            onUpdate={(field, value) => updateDeferredChanges('inputs', { [field]: value })}
+                            formData={formData}
+                            onUpdate={updateFormData}
                         />
                     </Box>
                     <Box sx={{ display: tabValue === 2 ? "block" : "none" }}>
                         <Instances
                             item={item}
-                            deferredChanges={deferredChanges}
-                            onInstanceChange={addDeferredInstanceChange}
+                            formData={formData}
+                            onUpdate={updateFormData}
+                            onInstancesChanged={() => reloadItem(item.id)}
                         />
                     </Box>
                     <Box sx={{ display: tabValue === 3 ? "block" : "none" }}>
                         <Vbsp
                             item={item}
-                            deferredChanges={deferredChanges}
-                            onUpdate={(field, value) => updateDeferredChanges('vbsp', { [field]: value })}
+                            formData={formData}
+                            onUpdate={updateFormData}
                         />
                     </Box>
                     <Box sx={{ display: tabValue === 4 ? "block" : "none" }}>
                         <Other
                             item={item}
-                            deferredChanges={deferredChanges}
-                            onUpdate={(field, value) => updateDeferredChanges('other', { [field]: value })}
+                            formData={formData}
+                            onUpdate={updateFormData}
                         />
                     </Box>
                     <Box sx={{ display: tabValue === 5 ? "block" : "none" }}>
                         <Metadata item={item} />
                     </Box>
-                    <Box sx={{ display: tabValue === 6 ? "block" : "none" }}>
-                        <PendingChanges 
-                            item={item}
-                            deferredChanges={deferredChanges}
-                            onUndo={undoDeferredChange}
-                        />
-                    </Box>
                 </Box>
             </Box>
 
-
-
-            {/* Apply/Close Buttons */}
+            {/* Save/Close Buttons */}
             <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
                 <Stack direction="row" spacing={1}>
-                    <Tooltip title="Apply all changes to this item">
+                    <Tooltip title="Save changes to this item">
                         <Button
                             variant="contained"
                             startIcon={
                                 showSaveSuccess ? <CheckCircle /> : <Save />
                             }
-                            onClick={handleApply}
+                            onClick={handleSave}
                             color={showSaveSuccess ? "success" : "primary"}
-                            disabled={!hasUnsavedChanges()}
                             sx={{ flex: 1 }}>
-                            Apply
+                            Save
                         </Button>
                     </Tooltip>
-                    <Tooltip title="Close editor">
+                    <Tooltip title="Close editor without saving">
                         <Button
                             variant="outlined"
                             startIcon={<Close />}
-                            onClick={handleClose}
+                            onClick={() => window.close()}
                             sx={{ flex: 1 }}>
                             Close
                         </Button>
@@ -291,39 +309,6 @@ function ItemEditor() {
                     </Alert>
                 )}
             </Box>
-
-            {/* Unsaved Changes Confirmation Dialog */}
-            <Dialog
-                open={showCloseConfirmation}
-                onClose={handleCancelClose}
-                PaperProps={{
-                    sx: {
-                        bgcolor: "#1e1e1e",
-                        color: "white",
-                        minWidth: "400px",
-                    },
-                }}>
-                <DialogTitle>Unsaved Changes</DialogTitle>
-                <DialogContent>
-                    <DialogContentText sx={{ color: "rgba(255,255,255,0.8)" }}>
-                        You have unsaved changes that will be lost if you close now.
-                        Do you want to close without applying your changes?
-                    </DialogContentText>
-                </DialogContent>
-                <DialogActions>
-                    <Button
-                        onClick={handleCancelClose}
-                        sx={{ color: "rgba(255,255,255,0.6)" }}>
-                        Cancel
-                    </Button>
-                    <Button
-                        onClick={handleConfirmClose}
-                        color="error"
-                        variant="contained">
-                        Close Without Applying
-                    </Button>
-                </DialogActions>
-            </Dialog>
         </Box>
     )
 }
