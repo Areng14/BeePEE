@@ -2359,7 +2359,7 @@ function InputOutputConfigDialog({
     )
 }
 
-function Inputs({ item }) {
+function Inputs({ item, formData, onUpdateInputs, onUpdateOutputs }) {
     const [inputs, setInputs] = useState({})
     const [outputs, setOutputs] = useState({})
     const [tabValue, setTabValue] = useState(0)
@@ -2373,97 +2373,92 @@ function Inputs({ item }) {
     const [deleteItem, setDeleteItem] = useState({ name: "", type: "" })
     const [error, setError] = useState("")
 
-    // Load inputs and outputs when component mounts or item changes
+    // Use formData instead of loading from backend
     useEffect(() => {
-        if (item) {
-            loadInputsAndOutputs()
+        if (formData) {
+            setInputs(formData.inputs || {})
+            setOutputs(formData.outputs || {})
         }
-    }, [item])
+    }, [formData])
 
-    const loadInputsAndOutputs = async () => {
-        try {
-            const [inputResult, outputResult] = await Promise.all([
-                window.package.getInputs(item.id),
-                window.package.getOutputs(item.id),
-            ])
-
-            if (inputResult.success) {
-                setInputs(inputResult.inputs)
-            }
-            if (outputResult.success) {
-                setOutputs(outputResult.outputs)
-            }
-        } catch (error) {
-            console.error("Failed to load inputs/outputs:", error)
-        }
-    }
-
-    const handleAddConfig = async (configData) => {
+    const handleAddConfig = (configData) => {
         try {
             const isInput = tabValue === 0
-            const defaultName = isInput ? "Input" : "Output" // Use descriptive names
-            const result = isInput
-                ? await window.package.addInput(
-                      item.id,
-                      defaultName,
-                      configData,
-                  )
-                : await window.package.addOutput(
-                      item.id,
-                      defaultName,
-                      configData,
-                  )
-
-            if (result.success) {
-                await loadInputsAndOutputs()
-                setEditDialogOpen(false)
-                setError("")
+            const defaultName = isInput ? "Input" : "Output"
+            
+            // Generate a unique name if default already exists
+            let uniqueName = defaultName
+            let counter = 1
+            const existingData = isInput ? inputs : outputs
+            while (existingData[uniqueName]) {
+                uniqueName = `${defaultName}${counter}`
+                counter++
             }
+
+            if (isInput) {
+                const updatedInputs = {
+                    ...inputs,
+                    [uniqueName]: configData
+                }
+                setInputs(updatedInputs)
+                onUpdateInputs(updatedInputs)
+            } else {
+                const updatedOutputs = {
+                    ...outputs,
+                    [uniqueName]: configData
+                }
+                setOutputs(updatedOutputs)
+                onUpdateOutputs(updatedOutputs)
+            }
+
+            setEditDialogOpen(false)
+            setError("")
         } catch (error) {
             setError(error.message)
         }
     }
 
-    const handleEditConfig = async (configData) => {
+    const handleEditConfig = (configData) => {
         try {
-            const result =
-                editingConfig.type === "input"
-                    ? await window.package.updateInput(
-                          item.id,
-                          editingConfig.name,
-                          configData,
-                      )
-                    : await window.package.updateOutput(
-                          item.id,
-                          editingConfig.name,
-                          configData,
-                      )
-
-            if (result.success) {
-                await loadInputsAndOutputs()
-                setEditDialogOpen(false)
-                setEditingConfig({ name: "", config: {}, type: "" })
+            if (editingConfig.type === "input") {
+                const updatedInputs = {
+                    ...inputs,
+                    [editingConfig.name]: configData
+                }
+                setInputs(updatedInputs)
+                onUpdateInputs(updatedInputs)
+            } else {
+                const updatedOutputs = {
+                    ...outputs,
+                    [editingConfig.name]: configData
+                }
+                setOutputs(updatedOutputs)
+                onUpdateOutputs(updatedOutputs)
             }
+
+            setEditDialogOpen(false)
+            setEditingConfig({ name: "", config: {}, type: "" })
         } catch (error) {
             console.error("Failed to edit config:", error)
         }
     }
 
-    const handleDeleteConfig = async () => {
+    const handleDeleteConfig = () => {
         try {
-            const result =
-                deleteItem.type === "input"
-                    ? await window.package.removeInput(item.id, deleteItem.name)
-                    : await window.package.removeOutput(
-                          item.id,
-                          deleteItem.name,
-                      )
-
-            if (result.success) {
-                await loadInputsAndOutputs()
-                setDeleteDialogOpen(false)
-                setDeleteItem({ name: "", type: "" })
+            if (deleteItem.type === "input") {
+                const updatedInputs = { ...inputs }
+                delete updatedInputs[deleteItem.name]
+                setInputs(updatedInputs)
+                onUpdateInputs(updatedInputs)
+            } else {
+                const updatedOutputs = { ...outputs }
+                delete updatedOutputs[deleteItem.name]
+                setOutputs(updatedOutputs)
+                onUpdateOutputs(updatedOutputs)
             }
+
+            setDeleteDialogOpen(false)
+            setDeleteItem({ name: "", type: "" })
         } catch (error) {
             console.error("Failed to delete config:", error)
         }
