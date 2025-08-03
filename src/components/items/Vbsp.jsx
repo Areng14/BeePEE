@@ -1,6 +1,6 @@
 import { Box, Typography } from "@mui/material"
 
-function Vbsp({ item }) {
+function Vbsp({ item, formData, onUpdateVbsp }) {
     return (
         <Box>
             <Typography variant="h6" gutterBottom>

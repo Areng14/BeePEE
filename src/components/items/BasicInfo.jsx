@@ -122,6 +122,8 @@ function BasicInfo({ item, formData, onUpdate }) {
                                                 const result = await window.package.browseForIcon(item.id)
                                                 if (result.success) {
                                                     console.log("Icon updated successfully")
+                                                    // Mark icon as modified to trigger save button
+                                                    onUpdate('iconPath', result.iconPath || item.icon, 'basicInfo')
                                                 } else if (!result.canceled) {
                                                     console.error("Failed to update icon:", result.error)
                                                 }

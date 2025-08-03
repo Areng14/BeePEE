@@ -1,6 +1,6 @@
 import { Box, Typography } from "@mui/material"
 
-function Other({ item }) {
+function Other({ item, formData, onUpdateOther }) {
     return (
         <Box>
             <Typography variant="h6" gutterBottom>

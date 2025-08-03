@@ -21,14 +21,14 @@ import SubjectIcon from "@mui/icons-material/Subject"
 import { useState, useEffect } from "react"
 import ViewInAr from "@mui/icons-material/ViewInAr"
 
-function Instances({ item, onInstancesChanged }) {
+function Instances({ item, formData, onUpdateInstances }) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [instanceToDelete, setInstanceToDelete] = useState(null)
     const [isRemovingMissing, setIsRemovingMissing] = useState(false)
 
-    // Convert item instances to array format for rendering
-    const instances = item?.instances
-        ? Object.entries(item.instances).map(([index, instance]) => ({
+    // Convert formData instances to array format for rendering
+    const instances = formData?.instances
+        ? Object.entries(formData.instances).map(([index, instance]) => ({
               ...instance,
               index,
           }))
@@ -68,18 +68,28 @@ function Instances({ item, onInstancesChanged }) {
             const result = await window.package.addInstanceFileDialog(item.id)
             console.log("Instances: File dialog result:", result)
             if (result.success) {
-                console.log(`Instances: Added instance: ${result.instanceName}`)
-                console.log(
-                    "Instances: Current item instances before callback:",
-                    item?.instances,
-                )
-                // Backend will automatically send item-updated event
-                if (onInstancesChanged) {
-                    console.log(
-                        "Instances: Calling onInstancesChanged callback",
-                    )
-                    onInstancesChanged()
+                // Backend automatically updates the files, but we need to mark as modified for UI purposes
+                // The backend will send an item-updated event, but we need to keep formData in sync
+                
+                // Use the index returned by the backend
+                const newIndex = result.index
+                const instanceName = result.instanceName || `Instance${newIndex}`
+                
+                // Create new instance object matching backend structure
+                const newInstance = {
+                    Name: instanceName,
+                    source: "editor",
+                    exists: true,
                 }
+                
+                // Update formData with new instance
+                const updatedInstances = {
+                    ...formData.instances,
+                    [newIndex]: newInstance
+                }
+                
+                onUpdateInstances(updatedInstances)
+                console.log(`Instances: Added instance: ${newInstance.Name} at index ${newIndex}`)
             } else if (!result.canceled) {
                 console.error(
                     "Instances: Failed to add instance:",
@@ -104,11 +114,23 @@ function Instances({ item, onInstancesChanged }) {
                 instanceIndex,
             )
             if (result.success) {
+                // Update the local formData to match the backend change
+                const existingInstance = formData.instances[instanceIndex]
+                const updatedInstance = {
+                    ...existingInstance,
+                    Name: result.instanceName || existingInstance.Name,
+                    exists: true,
+                }
+                
+                const updatedInstances = {
+                    ...formData.instances,
+                    [instanceIndex]: updatedInstance
+                }
+                
+                onUpdateInstances(updatedInstances)
                 console.log(
-                    `Instances: Replaced instance: ${result.instanceName}`,
+                    `Instances: Replaced instance: ${updatedInstance.Name}`,
                 )
-                // Backend will automatically send item-updated event
-                if (onInstancesChanged) onInstancesChanged()
             } else if (!result.canceled) {
                 console.error(
                     "Instances: Failed to replace instance:",
@@ -129,11 +151,17 @@ function Instances({ item, onInstancesChanged }) {
             item.id,
         )
         try {
+            // Call backend to remove the instance
             await window.package.removeInstance(item.id, instanceToDelete)
+            
+            // Update local formData to reflect the change
+            const updatedInstances = { ...formData.instances }
+            delete updatedInstances[instanceToDelete]
+            
+            onUpdateInstances(updatedInstances)
             setDeleteDialogOpen(false)
             setInstanceToDelete(null)
-            // Backend will automatically send item-updated event
-            if (onInstancesChanged) onInstancesChanged()
+            console.log("Instances: Instance removed successfully")
         } catch (error) {
             console.error("Instances: Failed to remove instance:", error)
         }
@@ -152,24 +180,36 @@ function Instances({ item, onInstancesChanged }) {
             "for item:",
             item.id,
         )
+        
         try {
-            // Remove instances in reverse order to avoid index shifting issues
-            const sortedInstances = missingInstances.sort(
-                (a, b) => parseInt(b.index) - parseInt(a.index),
-            )
-
-            for (const instance of sortedInstances) {
-                await window.package.removeInstance(item.id, instance.index)
-            }
-
-            // Backend will automatically send item-updated event
-            if (onInstancesChanged) onInstancesChanged()
+            // Call backend to remove each missing instance
+            const removePromises = missingInstances.map(async (instance) => {
+                try {
+                    await window.package.removeInstance(item.id, instance.index)
+                    console.log(`Instances: Removed missing instance ${instance.index}`)
+                } catch (error) {
+                    console.error(`Instances: Failed to remove instance ${instance.index}:`, error)
+                    throw error
+                }
+            })
+            
+            await Promise.all(removePromises)
+            console.log("Instances: All missing instances removed successfully")
+            
+            // Update local formData to reflect the changes
+            const updatedInstances = { ...formData.instances }
+            missingInstances.forEach(instance => {
+                delete updatedInstances[instance.index]
+            })
+            onUpdateInstances(updatedInstances)
+            
         } catch (error) {
             console.error(
                 "Instances: Failed to remove all missing instances:",
                 error,
             )
-            setIsRemovingMissing(false) // Reset on error so user can try again
+        } finally {
+            setIsRemovingMissing(false)
         }
     }
 
