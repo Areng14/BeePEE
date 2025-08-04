@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.invoke("show-icon-preview", { iconPath, itemName }),
     browseForIcon: (itemId) =>
         ipcRenderer.invoke("browse-for-icon", { itemId }),
+    browseForIconFile: () =>
+        ipcRenderer.invoke("browse-for-icon-file"),
     saveItem: (itemData) => ipcRenderer.invoke("save-item", itemData),
     onItemUpdated: (callback) => {
         if (callback) {

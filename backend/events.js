@@ -228,6 +228,50 @@ function reg_events(mainWindow) {
         },
     )
 
+    // Register icon file browse handler (for staging)
+    ipcMain.handle("browse-for-icon-file", async (event) => {
+        try {
+            // Show file dialog to select image file
+            const result = await dialog.showOpenDialog(mainWindow, {
+                title: "Select Icon File",
+                properties: ["openFile"],
+                filters: [
+                    {
+                        name: "Image Files",
+                        extensions: ["png", "jpg", "jpeg", "tga", "vtf"],
+                    },
+                    {
+                        name: "All Files",
+                        extensions: ["*"],
+                    },
+                ],
+            })
+
+            if (result.canceled || result.filePaths.length === 0) {
+                return { success: false, canceled: true }
+            }
+
+            const selectedFilePath = result.filePaths[0]
+            const fileName = path.basename(selectedFilePath)
+            const fileExt = path.extname(fileName).toLowerCase()
+
+            // Validate it's an image file
+            const validExtensions = [".png", ".jpg", ".jpeg", ".tga", ".vtf"]
+            if (!validExtensions.includes(fileExt)) {
+                throw new Error("Selected file must be an image file (PNG, JPG, TGA, or VTF)")
+            }
+
+            return { 
+                success: true, 
+                filePath: selectedFilePath,
+                fileName: fileName
+            }
+        } catch (error) {
+            console.error("Failed to browse for icon file:", error)
+            return { success: false, error: error.message }
+        }
+    })
+
     // Register icon browse handler
     ipcMain.handle("browse-for-icon", async (event, { itemId }) => {
         try {

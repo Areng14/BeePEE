@@ -16,18 +16,28 @@ function BasicInfo({ item, formData, onUpdate }) {
     const [isPreview, setIsPreview] = useState(false)
 
     useEffect(() => {
-        // Load the icon when item changes
-        if (item?.icon) {
-            window.package.loadFile(item.icon).then(setIconSrc)
+        // Load the icon when item changes or when staged icon changes
+        const iconToLoad = formData.stagedIconPath || item?.icon
+        if (iconToLoad) {
+            window.package.loadFile(iconToLoad).then(setIconSrc)
+        } else {
+            setIconSrc(null)
         }
-    }, [item])
+    }, [item, formData.stagedIconPath])
 
-    // Get relative path from package root
+    // Get relative path from package root (show staged path if available)
     const getRelativeIconPath = () => {
-        if (!item?.icon || !item?.packagePath) return ""
+        const iconPath = formData.stagedIconPath || item?.icon
+        if (!iconPath || !item?.packagePath) return ""
+
+        // If it's a staged icon, show just the filename
+        if (formData.stagedIconPath) {
+            const filename = formData.stagedIconPath.split(/[\\\/]/).pop()
+            return `${filename} (staged)`
+        }
 
         // Remove the package path from the full icon path to get relative path
-        const fullIconPath = item.icon
+        const fullIconPath = iconPath
         const packagePath = item.packagePath
 
         if (fullIconPath.startsWith(packagePath)) {
@@ -36,7 +46,7 @@ function BasicInfo({ item, formData, onUpdate }) {
                 .replace(/^[\\\/]/, "")
         }
 
-        return item.icon // fallback to full path if something goes wrong
+        return iconPath // fallback to full path if something goes wrong
     }
 
     // Process markdown to handle single line breaks properly
@@ -117,19 +127,19 @@ function BasicInfo({ item, formData, onUpdate }) {
                                 <IconButton
                                     size="small"
                                     onClick={async () => {
-                                        if (item?.id) {
-                                            try {
-                                                const result = await window.package.browseForIcon(item.id)
-                                                if (result.success) {
-                                                    console.log("Icon updated successfully")
-                                                    // Mark icon as modified to trigger save button
-                                                    onUpdate('iconPath', result.iconPath || item.icon, 'basicInfo')
-                                                } else if (!result.canceled) {
-                                                    console.error("Failed to update icon:", result.error)
-                                                }
-                                            } catch (error) {
-                                                console.error("Failed to browse for icon:", error)
+                                        try {
+                                            const result = await window.package.browseForIconFile()
+                                            if (result.success) {
+                                                console.log("Icon staged successfully")
+                                                // Stage the icon change
+                                                onUpdate('stagedIconPath', result.filePath)
+                                                onUpdate('stagedIconName', result.fileName)
+                                                onUpdate('iconChanged', true, 'basicInfo')
+                                            } else if (!result.canceled) {
+                                                console.error("Failed to browse for icon:", result.error)
                                             }
+                                        } catch (error) {
+                                            console.error("Failed to browse for icon:", error)
                                         }
                                     }}
                                     title="Browse for Icon"
@@ -139,10 +149,11 @@ function BasicInfo({ item, formData, onUpdate }) {
                                 <IconButton
                                     size="small"
                                     onClick={async () => {
-                                        if (item?.icon) {
+                                        const iconToShow = formData.stagedIconPath || item?.icon
+                                        if (iconToShow) {
                                             try {
                                                 await window.package.showIconPreview(
-                                                    item.icon,
+                                                    iconToShow,
                                                     item.name,
                                                 )
                                             } catch (error) {
@@ -154,7 +165,7 @@ function BasicInfo({ item, formData, onUpdate }) {
                                         }
                                     }}
                                     title="View Icon"
-                                    disabled={!item?.icon}>
+                                    disabled={!formData.stagedIconPath && !item?.icon}>
                                     <Image />
                                 </IconButton>
                             </InputAdornment>
