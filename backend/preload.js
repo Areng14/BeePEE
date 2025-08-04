@@ -67,6 +67,18 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.invoke("get-instance-metadata", { itemId, instanceIndex }),
 
     // ========================================
+    // INSTANCE NAMING FUNCTIONS
+    // ========================================
+    getInstanceName: (itemId, instanceIndex) =>
+        ipcRenderer.invoke("get-instance-name", { itemId, instanceIndex }),
+    setInstanceName: (itemId, instanceIndex, name) =>
+        ipcRenderer.invoke("set-instance-name", { itemId, instanceIndex, name }),
+    getInstanceNames: (itemId) =>
+        ipcRenderer.invoke("get-instance-names", { itemId }),
+    removeInstanceName: (itemId, instanceIndex) =>
+        ipcRenderer.invoke("remove-instance-name", { itemId, instanceIndex }),
+
+    // ========================================
     // INPUT MANAGEMENT FUNCTIONS
     // ========================================
     getInputs: (itemId) => ipcRenderer.invoke("get-inputs", { itemId }),

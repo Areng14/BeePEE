@@ -14,6 +14,7 @@ import {
     Collapse,
     Chip,
     Divider,
+    TextField,
 } from "@mui/material"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
@@ -24,10 +25,11 @@ import SubjectIcon from "@mui/icons-material/Subject"
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
 import ExpandLessIcon from "@mui/icons-material/ExpandLess"
 import InfoIcon from "@mui/icons-material/Info"
+import LabelIcon from "@mui/icons-material/Label"
 import { useState, useEffect } from "react"
 import ViewInAr from "@mui/icons-material/ViewInAr"
 
-function Instances({ item, formData, onUpdateInstances }) {
+function Instances({ item, formData, onUpdateInstances, editingNames, setEditingNames }) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [instanceToDelete, setInstanceToDelete] = useState(null)
     const [isRemovingMissing, setIsRemovingMissing] = useState(false)
@@ -254,6 +256,8 @@ function Instances({ item, formData, onUpdateInstances }) {
         }
     }
 
+
+
     return (
         <Box>
             <Box
@@ -343,31 +347,60 @@ function Instances({ item, formData, onUpdateInstances }) {
                                             alignItems: "center",
                                             gap: 1,
                                         }}>
-                                        <Typography
-                                            variant="subtitle1"
-                                            sx={{
-                                                mr: 1,
-                                                minWidth: "auto",
-                                                display: "flex",
-                                                alignItems: "center",
-                                                gap: 1,
-                                            }}>
-                                            <Tooltip
-                                                title={
-                                                    isDisabled
-                                                        ? "Missing File"
-                                                        : isVBSP
-                                                          ? "VBSP Instance"
-                                                          : "Editor Instance"
-                                                }>
-                                                {isVBSP ? (
-                                                    <CodeIcon fontSize="small" />
-                                                ) : (
-                                                    <SubjectIcon fontSize="small" />
-                                                )}
-                                            </Tooltip>
-                                            Instance {instanceNumber}:
-                                        </Typography>
+                                        {/* Instance Type Icon */}
+                                        <Tooltip
+                                            title={
+                                                isDisabled
+                                                    ? "Missing File"
+                                                    : isVBSP
+                                                      ? "VBSP Instance"
+                                                      : "Editor Instance"
+                                            }>
+                                            {isVBSP ? (
+                                                <CodeIcon fontSize="small" />
+                                            ) : (
+                                                <SubjectIcon fontSize="small" />
+                                            )}
+                                        </Tooltip>
+
+                                        {/* Instance Name - Always Editable */}
+                                        <Box sx={{ minWidth: "80px", maxWidth: "120px", display: "flex", alignItems: "center", gap: 0.5 }}>
+                                            <TextField
+                                                size="small"
+                                                value={editingNames[instance.index] !== undefined ? editingNames[instance.index] : (instance.displayName || `Instance ${instanceNumber}`)}
+                                                onChange={(e) => {
+                                                    // Just update the local state, don't save to meta.json yet
+                                                    const newName = e.target.value
+                                                    setEditingNames(prev => ({
+                                                        ...prev,
+                                                        [instance.index]: newName
+                                                    }))
+                                                }}
+                                                placeholder={`Instance ${instanceNumber}`}
+                                                sx={{
+                                                    minWidth: "60px",
+                                                    maxWidth: "100px",
+                                                    "& .MuiInputBase-input": {
+                                                        fontSize: "0.875rem",
+                                                        fontWeight: "medium",
+                                                        color: "text.primary",
+                                                    },
+                                                    "& .MuiOutlinedInput-root": {
+                                                        "& fieldset": {
+                                                            borderColor: "transparent",
+                                                        },
+                                                        "&:hover fieldset": {
+                                                            borderColor: "divider",
+                                                        },
+                                                        "&.Mui-focused fieldset": {
+                                                            borderColor: "primary.main",
+                                                        },
+                                                    },
+                                                }}
+                                            />
+                                        </Box>
+
+                                        {/* Instance Path */}
                                         <Typography
                                             variant="body2"
                                             color="text.secondary"
@@ -377,11 +410,11 @@ function Instances({ item, formData, onUpdateInstances }) {
                                                 textOverflow: "ellipsis",
                                                 whiteSpace: "nowrap",
                                                 flex: 1,
-                                                direction: "rtl", // Make text overflow from the left
-                                                textAlign: "left", // Keep text aligned normally
+                                                direction: "rtl",
+                                                textAlign: "left",
+                                                fontSize: "0.75rem",
                                             }}>
-                                            {instance.Name ||
-                                                "(unnamed instance)"}
+                                            {instance.Name || "(unnamed instance)"}
                                         </Typography>
 
                                         <Box sx={{ display: "flex", gap: 1 }}>

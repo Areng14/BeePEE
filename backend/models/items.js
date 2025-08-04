@@ -135,10 +135,10 @@ class Item {
 
                 for (const match of matches) {
                     const instancePath = match[1]
-                    // Only add if not already present
+                    // Only add if not already present (case-insensitive comparison)
                     if (
                         !Object.values(this.instances).some(
-                            (inst) => inst.Name === instancePath,
+                            (inst) => inst.Name.toLowerCase() === instancePath.toLowerCase(),
                         )
                     ) {
                         this.instances[nextIndex.toString()] = {
@@ -148,6 +148,9 @@ class Item {
                         nextIndex++
                     }
                 }
+                
+                // Auto-register VBSP instances in editoritems.json
+                this.autoRegisterVbspInstances(matches)
             } catch (error) {
                 console.error(
                     `Failed to parse VBSP config for ${this.name}:`,
@@ -157,6 +160,88 @@ class Item {
         }
 
         console.log(`Added item: ${this.name} (id: ${this.id})`)
+    }
+
+    autoRegisterVbspInstances(vbspMatches) {
+        try {
+            // Get current editoritems.json
+            const editoritems = this.getEditorItems()
+            
+            // Ensure Exporting.Instances structure exists
+            if (!editoritems.Item.Exporting) {
+                editoritems.Item.Exporting = {}
+            }
+            if (!editoritems.Item.Exporting.Instances) {
+                editoritems.Item.Exporting.Instances = {}
+            }
+
+            const existingInstances = editoritems.Item.Exporting.Instances
+            const existingInstanceNames = Object.values(existingInstances).map(inst => inst.Name)
+            const existingInstanceNamesLower = existingInstanceNames.map(name => name.toLowerCase())
+            
+            let addedCount = 0
+            let skippedCount = 0
+
+            // Process each VBSP instance
+            for (const match of vbspMatches) {
+                const instancePath = match[1]
+                
+                // Skip if already registered in editoritems.json (case-insensitive comparison)
+                if (existingInstanceNamesLower.includes(instancePath.toLowerCase())) {
+                    skippedCount++
+                    continue
+                }
+
+                // Find next available index
+                const keys = Object.keys(existingInstances)
+                const nextIndex = keys.length > 0 ? Math.max(...keys.map(k => parseInt(k))) + 1 : 0
+
+                // Get VMF stats for the instance
+                let vmfStats = {
+                    EntityCount: 0,
+                    BrushCount: 0,
+                    BrushSideCount: 0,
+                }
+
+                try {
+                    // Apply path fixing to remove BEE2/ prefix for actual file structure
+                    const actualInstancePath = this.fixInstancePath(instancePath)
+                    const fullInstancePath = Instance.getCleanPath(
+                        this.packagePath,
+                        actualInstancePath,
+                    )
+
+                    // Get VMF stats using the cache
+                    vmfStats = vmfStatsCache.getStats(fullInstancePath)
+                } catch (error) {
+                    console.warn(
+                        `Could not get VMF stats for VBSP instance ${instancePath}: ${error.message}`
+                    )
+                }
+
+                // Add to editoritems.json
+                editoritems.Item.Exporting.Instances[nextIndex.toString()] = {
+                    Name: instancePath,
+                    ...vmfStats,
+                }
+                
+                addedCount++
+            }
+
+            // Save the updated editoritems.json if any instances were added
+            if (addedCount > 0) {
+                this.saveEditorItems(editoritems)
+                console.log(`Auto-registered ${addedCount} VBSP instances in editoritems.json for ${this.name}`)
+                if (skippedCount > 0) {
+                    console.log(`Skipped ${skippedCount} already registered VBSP instances`)
+                }
+            }
+        } catch (error) {
+            console.error(
+                `Failed to auto-register VBSP instances for ${this.name}:`,
+                error.message
+            )
+        }
     }
 
     reloadInstances() {
@@ -204,10 +289,10 @@ class Item {
 
                 for (const match of matches) {
                     const instancePath = match[1]
-                    // Only add if not already present
+                    // Only add if not already present (case-insensitive comparison)
                     if (
                         !Object.values(this.instances).some(
-                            (inst) => inst.Name === instancePath,
+                            (inst) => inst.Name.toLowerCase() === instancePath.toLowerCase(),
                         )
                     ) {
                         this.instances[nextIndex.toString()] = {
@@ -217,6 +302,9 @@ class Item {
                         nextIndex++
                     }
                 }
+                
+                // Auto-register VBSP instances in editoritems.json
+                this.autoRegisterVbspInstances(matches)
             } catch (error) {
                 console.error(
                     `Failed to parse VBSP config for ${this.name}:`,
@@ -367,6 +455,8 @@ class Item {
                 ...vmfStats,
                 // Add metadata for frontend use
                 _metadata: metadata,
+                // Add custom name
+                displayName: this.getInstanceName(index),
             }
         }
 
@@ -889,6 +979,31 @@ class Item {
 
     getMetadata() {
         return this.metadata
+    }
+
+    // Instance naming methods
+    getInstanceName(index) {
+        const instanceNames = this.metadata.instanceNames || {}
+        return instanceNames[index] || `Instance ${index}`
+    }
+
+    setInstanceName(index, name) {
+        if (!this.metadata.instanceNames) {
+            this.metadata.instanceNames = {}
+        }
+        this.metadata.instanceNames[index] = name
+        this.saveMetadata()
+    }
+
+    getInstanceNames() {
+        return this.metadata.instanceNames || {}
+    }
+
+    removeInstanceName(index) {
+        if (this.metadata.instanceNames && this.metadata.instanceNames[index]) {
+            delete this.metadata.instanceNames[index]
+            this.saveMetadata()
+        }
     }
 
     toJSON() {
