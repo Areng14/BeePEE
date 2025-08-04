@@ -13,6 +13,7 @@ import {
     DialogContent,
     DialogActions,
     DialogContentText,
+    CircularProgress,
 } from "@mui/material"
 import {
     Info,
@@ -38,6 +39,7 @@ function ItemEditor() {
     const [tabValue, setTabValue] = useState(0)
     const [saveError, setSaveError] = useState(null)
     const [showSaveSuccess, setShowSaveSuccess] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
     const [discardDialogOpen, setDiscardDialogOpen] = useState(false)
 
     // Form state for all tabs
@@ -262,6 +264,9 @@ function ItemEditor() {
 
     const handleSave = async () => {
         try {
+            setIsSaving(true)
+            setSaveError(null)
+
             // Validate required fields
             if (!formData.name?.trim()) {
                 throw new Error("Item name cannot be empty")
@@ -498,6 +503,8 @@ function ItemEditor() {
         } catch (error) {
             console.error("Failed to save:", error)
             setSaveError(error.message)
+        } finally {
+            setIsSaving(false)
         }
     }
 
@@ -728,17 +735,30 @@ function ItemEditor() {
                         <Button
                             variant="contained"
                             startIcon={
-                                showSaveSuccess ? <CheckCircle /> : <Save />
+                                isSaving ? (
+                                    <CircularProgress
+                                        size={20}
+                                        color="inherit"
+                                    />
+                                ) : showSaveSuccess ? (
+                                    <CheckCircle />
+                                ) : (
+                                    <Save />
+                                )
                             }
                             onClick={handleSave}
                             color={showSaveSuccess ? "success" : "primary"}
                             disabled={
                                 !Object.values(formData._modified).some(
                                     (modified) => modified,
-                                )
+                                ) || isSaving
                             }
                             sx={{ flex: 1 }}>
-                            {showSaveSuccess ? "Saved!" : "Save"}
+                            {isSaving
+                                ? "Saving..."
+                                : showSaveSuccess
+                                  ? "Saved!"
+                                  : "Save"}
                         </Button>
                     </Tooltip>
                     <Tooltip
