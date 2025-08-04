@@ -88,7 +88,7 @@ function ItemEditor() {
                         description: description,
                         inputs: inputResult.success ? inputResult.inputs : {},
                         outputs: outputResult.success ? outputResult.outputs : {},
-                        // Only update instances if we don't have local modifications
+                        // Update instances from item data, but preserve local modifications
                         instances: prev._modified.instances ? prev.instances : (item.instances || {}),
                         vbsp: item.vbsp || {},
                         other: item.other || {},
@@ -111,7 +111,7 @@ function ItemEditor() {
                         description: description,
                         inputs: {},
                         outputs: {},
-                        // Only update instances if we don't have local modifications
+                        // Update instances from item data, but preserve local modifications
                         instances: prev._modified.instances ? prev.instances : (item.instances || {}),
                         vbsp: item.vbsp || {},
                         other: item.other || {},

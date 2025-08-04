@@ -7,6 +7,7 @@ const path7za = require("7zip-bin").path7za
 const { extractFull } = require("node-7z")
 const { add } = require("node-7z")
 const { timeOperation } = require("./utils/timing")
+const { vmfStatsCache } = require("./utils/vmfParser")
 
 var packages = []
 
@@ -71,6 +72,90 @@ function processVdfFiles(directory) {
     }
 }
 
+// Helper function to update VMF stats for all instances in a package
+const updateVMFStatsForPackage = async (packageDir) => {
+    return timeOperation("Update VMF stats", async () => {
+        try {
+            // Find all editoritems.json files in the package
+            const findEditorItemsFiles = (dir) => {
+                const files = []
+                const items = fs.readdirSync(dir)
+                
+                for (const item of items) {
+                    const fullPath = path.join(dir, item)
+                    const stat = fs.statSync(fullPath)
+                    
+                    if (stat.isDirectory()) {
+                        files.push(...findEditorItemsFiles(fullPath))
+                    } else if (item === "editoritems.json") {
+                        files.push(fullPath)
+                    }
+                }
+                
+                return files
+            }
+            
+            const editorItemsFiles = findEditorItemsFiles(packageDir)
+            let updatedFiles = 0
+            
+            for (const editorItemsPath of editorItemsFiles) {
+                try {
+                    const editorItems = JSON.parse(fs.readFileSync(editorItemsPath, "utf-8"))
+                    let hasChanges = false
+                    
+                    if (editorItems.Item?.Exporting?.Instances) {
+                        for (const [index, instance] of Object.entries(editorItems.Item.Exporting.Instances)) {
+                            if (instance.Name) {
+                                // Check if this is a VMF file (not VBSP)
+                                const isVbspInstance = instance.Name.includes('instances/bee2_dev')
+                                if (!isVbspInstance) {
+                                    // Build the full path to the VMF file
+                                    const instancePath = instance.Name.replace(/^instances\/BEE2\//, 'instances/')
+                                    const fullInstancePath = path.join(packageDir, "resources", instancePath)
+                                    
+                                    if (fs.existsSync(fullInstancePath)) {
+                                        // Always get VMF stats on import (don't check if they already exist)
+                                        const vmfStats = vmfStatsCache.getStats(fullInstancePath)
+                                        console.log(`Raw VMF stats for ${instance.Name}:`, vmfStats)
+                                        
+                                        // Always update the instance data with current stats
+                                        const updatedInstance = {
+                                            ...instance,
+                                            EntityCount: vmfStats.EntityCount || 0,
+                                            BrushCount: vmfStats.BrushCount || 0,
+                                            BrushSideCount: vmfStats.BrushSideCount || 0
+                                        }
+                                        editorItems.Item.Exporting.Instances[index] = updatedInstance
+                                        hasChanges = true
+                                        console.log(`Updated VMF stats for ${instance.Name}: ${updatedInstance.EntityCount} entities, ${updatedInstance.BrushCount} brushes, ${updatedInstance.BrushSideCount} brush sides`)
+                                        console.log(`Saved instance data:`, updatedInstance)
+                                    } else {
+                                        console.warn(`VMF file not found: ${fullInstancePath}`)
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (hasChanges) {
+                            fs.writeFileSync(editorItemsPath, JSON.stringify(editorItems, null, 4))
+                            updatedFiles++
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`Failed to update VMF stats in ${editorItemsPath}:`, error.message)
+                }
+            }
+            
+            if (updatedFiles > 0) {
+                console.log(`Updated VMF stats in ${updatedFiles} editoritems.json files`)
+            }
+            
+        } catch (error) {
+            console.error("Failed to update VMF stats for package:", error.message)
+        }
+    })
+}
+
 const unloadPackage = async (packageName, remove = false) => {
     const index = packages.findIndex((pkg) => pkg.name === packageName)
     if (index !== -1) {
@@ -120,6 +205,9 @@ const importPackage = async (pathToPackage) => {
                 processVdfFiles(tempPkg.packageDir)
                 return Promise.resolve()
             })
+
+            // Update VMF stats for all instances in the package
+            await updateVMFStatsForPackage(tempPkg.packageDir)
 
             return true
         } catch (error) {

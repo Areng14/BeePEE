@@ -15,16 +15,26 @@ contextBridge.exposeInMainWorld("package", {
     // ITEM EDITING FUNCTIONS
     // ========================================
     openItemEditor: (item) => ipcRenderer.invoke("open-item-editor", item),
-    onItemLoaded: (callback) =>
-        ipcRenderer.on("load-item", (event, item) => callback(event, item)),
+    onItemLoaded: (callback) => {
+        if (callback) {
+            ipcRenderer.on("load-item", (event, item) => callback(event, item))
+        } else {
+            ipcRenderer.removeAllListeners("load-item")
+        }
+    },
     editorReady: () => ipcRenderer.send("editor-ready"),
     showIconPreview: (iconPath, itemName) =>
         ipcRenderer.invoke("show-icon-preview", { iconPath, itemName }),
     browseForIcon: (itemId) =>
         ipcRenderer.invoke("browse-for-icon", { itemId }),
     saveItem: (itemData) => ipcRenderer.invoke("save-item", itemData),
-    onItemUpdated: (callback) =>
-        ipcRenderer.on("item-updated", (event, item) => callback(event, item)),
+    onItemUpdated: (callback) => {
+        if (callback) {
+            ipcRenderer.on("item-updated", (event, item) => callback(event, item))
+        } else {
+            ipcRenderer.removeAllListeners("item-updated")
+        }
+    },
 
     // ========================================
     // INSTANCE MANAGEMENT FUNCTIONS
@@ -46,6 +56,8 @@ contextBridge.exposeInMainWorld("package", {
         }),
     removeInstance: (itemId, instanceIndex) =>
         ipcRenderer.invoke("remove-instance", { itemId, instanceIndex }),
+    getInstanceMetadata: (itemId, instanceIndex) =>
+        ipcRenderer.invoke("get-instance-metadata", { itemId, instanceIndex }),
 
     // ========================================
     // INPUT MANAGEMENT FUNCTIONS

@@ -11,6 +11,9 @@ import {
     IconButton,
     DialogContentText,
     Tooltip,
+    Collapse,
+    Chip,
+    Divider,
 } from "@mui/material"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
@@ -18,6 +21,9 @@ import AddIcon from "@mui/icons-material/Add"
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz"
 import CodeIcon from "@mui/icons-material/Code"
 import SubjectIcon from "@mui/icons-material/Subject"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import ExpandLessIcon from "@mui/icons-material/ExpandLess"
+import InfoIcon from "@mui/icons-material/Info"
 import { useState, useEffect } from "react"
 import ViewInAr from "@mui/icons-material/ViewInAr"
 
@@ -25,6 +31,7 @@ function Instances({ item, formData, onUpdateInstances }) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [instanceToDelete, setInstanceToDelete] = useState(null)
     const [isRemovingMissing, setIsRemovingMissing] = useState(false)
+    const [expandedStats, setExpandedStats] = useState(new Set())
 
     // Convert formData instances to array format for rendering
     const instances = formData?.instances
@@ -44,10 +51,22 @@ function Instances({ item, formData, onUpdateInstances }) {
             instanceNames: instances.map((i) => i.Name),
             instanceExists: instances.map((i) => ({
                 name: i.Name,
-                exists: i.exists,
+                exists: i._metadata?.exists ?? true,
             })),
         })
     }, [item, instances])
+
+    const toggleStatsExpansion = (instanceIndex) => {
+        setExpandedStats(prev => {
+            const newSet = new Set(prev)
+            if (newSet.has(instanceIndex)) {
+                newSet.delete(instanceIndex)
+            } else {
+                newSet.add(instanceIndex)
+            }
+            return newSet
+        })
+    }
 
     const handleEditInstance = async (packagePath, instancePath) => {
         try {
@@ -81,8 +100,6 @@ function Instances({ item, formData, onUpdateInstances }) {
                 // Create new instance object with pending data
                 const newInstance = {
                     Name: result.instanceName,
-                    source: "editor",
-                    exists: true,
                     _pending: true,
                     _filePath: result.filePath, // Store the source file path for when we actually save
                 }
@@ -124,7 +141,6 @@ function Instances({ item, formData, onUpdateInstances }) {
                 const updatedInstance = {
                     ...existingInstance,
                     Name: result.instanceName || existingInstance.Name,
-                    exists: true,
                 }
                 
                 const updatedInstances = {
@@ -181,9 +197,10 @@ function Instances({ item, formData, onUpdateInstances }) {
     }
 
     const handleRemoveAllMissingInstances = () => {
-        const missingInstances = instances.filter(
-            (instance) => !instance.exists && instance.source !== "vbsp",
-        )
+        const missingInstances = instances.filter((instance) => {
+            const metadata = instance._metadata || { exists: true, source: 'editor' }
+            return !metadata.exists && metadata.source !== "vbsp"
+        })
         if (missingInstances.length === 0) return
 
         setIsRemovingMissing(true)
@@ -245,10 +262,10 @@ function Instances({ item, formData, onUpdateInstances }) {
                             Add VMF Instance
                         </Button>
                     </Tooltip>
-                    {instances.some(
-                        (instance) =>
-                            !instance.exists && instance.source !== "vbsp",
-                    ) &&
+                    {instances.some((instance) => {
+                        const metadata = instance._metadata || { exists: true, source: 'editor' }
+                        return !metadata.exists && metadata.source !== "vbsp"
+                    }) &&
                         !isRemovingMissing && (
                             <Tooltip title="Remove all instances with missing files (excluding VBSP instances)">
                                 <Button
@@ -267,19 +284,27 @@ function Instances({ item, formData, onUpdateInstances }) {
             {instances.length > 0 ? (
                 <Stack spacing={2}>
                     {instances.map((instance, arrayIndex) => {
-                        const isVBSP = instance.source === "vbsp"
-                        const instanceExists = instance.exists !== false // Default to true if not specified
+                        // Get metadata from the instance or fallback to defaults
+                        const metadata = instance._metadata || { exists: true, source: 'editor' }
+                        const isVBSP = metadata.source === "vbsp"
+                        const instanceExists = metadata.exists
                         const isDisabled = !instanceExists
                         const isPending = instance._pending === true
                         // Use the array index for sequential numbering instead of trying to parse from filename
                         const instanceNumber = arrayIndex
+
+                        const hasStats = instanceExists && !isVBSP && (
+                            instance.EntityCount > 0 || 
+                            instance.BrushCount > 0 || 
+                            instance.BrushSideCount > 0
+                        )
+                        const isStatsExpanded = expandedStats.has(instance.index)
 
                         return (
                             <Paper
                                 key={instance.Name || "unknown"}
                                 variant="outlined"
                                 sx={{
-                                    p: 2,
                                     backgroundColor: isDisabled
                                         ? "rgba(0, 0, 0, 0.3)"
                                         : "background.paper",
@@ -289,119 +314,169 @@ function Instances({ item, formData, onUpdateInstances }) {
                                     borderWidth: isDisabled ? 1 : 1,
                                     opacity: isDisabled ? 0.8 : 1,
                                 }}>
-                                <Box
-                                    sx={{
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: 1,
-                                    }}>
-                                    <Typography
-                                        variant="subtitle1"
+                                <Box sx={{ p: 2 }}>
+                                    <Box
                                         sx={{
-                                            mr: 1,
-                                            minWidth: "auto",
                                             display: "flex",
                                             alignItems: "center",
                                             gap: 1,
                                         }}>
-                                        <Tooltip
-                                            title={
-                                                isDisabled
-                                                    ? "Missing File"
-                                                    : isVBSP
-                                                      ? "VBSP Instance"
-                                                      : "Editor Instance"
-                                            }>
-                                            {isVBSP ? (
-                                                <CodeIcon fontSize="small" />
-                                            ) : (
-                                                <SubjectIcon fontSize="small" />
-                                            )}
-                                        </Tooltip>
-                                        Instance {instanceNumber}:
-                                    </Typography>
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary"
-                                        sx={{
-                                            fontFamily: "monospace",
-                                            overflow: "hidden",
-                                            textOverflow: "ellipsis",
-                                            whiteSpace: "nowrap",
-                                            flex: 1,
-                                            direction: "rtl", // Make text overflow from the left
-                                            textAlign: "left", // Keep text aligned normally
-                                        }}>
-                                        {instance.Name || "(unnamed instance)"}
-                                    </Typography>
-
-                                    <Box sx={{ display: "flex", gap: 1 }}>
-                                        <Tooltip
-                                            title={
-                                                isDisabled
-                                                    ? "Cannot edit - file is missing"
-                                                    : "Edit this instance file in Hammer"
-                                            }>
-                                            <span>
-                                                {" "}
-                                                {/* Wrapper needed for disabled IconButton */}
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={() =>
-                                                        handleEditInstance(
-                                                            item.packagePath,
-                                                            instance.Name,
-                                                        )
-                                                    }
-                                                    disabled={isDisabled}>
-                                                    <EditIcon fontSize="small" />
-                                                </IconButton>
-                                            </span>
-                                        </Tooltip>
-
-                                        {!isVBSP && (
+                                        <Typography
+                                            variant="subtitle1"
+                                            sx={{
+                                                mr: 1,
+                                                minWidth: "auto",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 1,
+                                            }}>
                                             <Tooltip
                                                 title={
                                                     isDisabled
-                                                        ? "Replace missing file with a VMF file"
-                                                        : "Replace this instance file with a different VMF file"
+                                                        ? "Missing File"
+                                                        : isVBSP
+                                                          ? "VBSP Instance"
+                                                          : "Editor Instance"
                                                 }>
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={() =>
-                                                        handleReplaceInstance(
-                                                            instance.index,
-                                                        )
-                                                    }
-                                                    color={
-                                                        isDisabled
-                                                            ? "primary"
-                                                            : "warning"
-                                                    }>
-                                                    <SwapHorizIcon fontSize="small" />
-                                                </IconButton>
+                                                {isVBSP ? (
+                                                    <CodeIcon fontSize="small" />
+                                                ) : (
+                                                    <SubjectIcon fontSize="small" />
+                                                )}
                                             </Tooltip>
-                                        )}
+                                            Instance {instanceNumber}:
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                            sx={{
+                                                fontFamily: "monospace",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                                flex: 1,
+                                                direction: "rtl", // Make text overflow from the left
+                                                textAlign: "left", // Keep text aligned normally
+                                            }}>
+                                            {instance.Name || "(unnamed instance)"}
+                                        </Typography>
 
-                                        {!isVBSP && (
-                                            <Tooltip title="Delete this instance permanently">
-                                                <IconButton
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => {
-                                                        setInstanceToDelete(
-                                                            instance.index,
-                                                        )
-                                                        setDeleteDialogOpen(
-                                                            true,
-                                                        )
-                                                    }}>
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
+                                        <Box sx={{ display: "flex", gap: 1 }}>
+                                            {hasStats && (
+                                                <Tooltip title={isStatsExpanded ? "Hide VMF stats" : "Show VMF stats"}>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() => toggleStatsExpansion(instance.index)}
+                                                        color="info">
+                                                        {isStatsExpanded ? (
+                                                            <ExpandLessIcon fontSize="small" />
+                                                        ) : (
+                                                            <ExpandMoreIcon fontSize="small" />
+                                                        )}
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+
+                                            <Tooltip
+                                                title={
+                                                    isDisabled
+                                                        ? "Cannot edit - file is missing"
+                                                        : "Edit this instance file in Hammer"
+                                                }>
+                                                <span>
+                                                    {" "}
+                                                    {/* Wrapper needed for disabled IconButton */}
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() =>
+                                                            handleEditInstance(
+                                                                item.packagePath,
+                                                                instance.Name,
+                                                            )
+                                                        }
+                                                        disabled={isDisabled}>
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                </span>
                                             </Tooltip>
-                                        )}
+
+                                            {!isVBSP && (
+                                                <Tooltip
+                                                    title={
+                                                        isDisabled
+                                                            ? "Replace missing file with a VMF file"
+                                                            : "Replace this instance file with a different VMF file"
+                                                    }>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() =>
+                                                            handleReplaceInstance(
+                                                                instance.index,
+                                                            )
+                                                        }
+                                                        color={
+                                                            isDisabled
+                                                                ? "primary"
+                                                                : "warning"
+                                                        }>
+                                                        <SwapHorizIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+
+                                            {!isVBSP && (
+                                                <Tooltip title="Delete this instance permanently">
+                                                    <IconButton
+                                                        size="small"
+                                                        color="error"
+                                                        onClick={() => {
+                                                            setInstanceToDelete(
+                                                                instance.index,
+                                                            )
+                                                            setDeleteDialogOpen(
+                                                                true,
+                                                            )
+                                                        }}>
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+                                        </Box>
                                     </Box>
                                 </Box>
+
+                                {/* Expandable Stats Section */}
+                                {hasStats && (
+                                    <Collapse in={isStatsExpanded}>
+                                        <Divider />
+                                        <Box sx={{ p: 2, pt: 1.5 }}>
+                                            <Typography variant="subtitle2" sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                                                <InfoIcon fontSize="small" />
+                                                VMF Statistics
+                                            </Typography>
+                                            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                                                <Chip
+                                                    label={`${instance.EntityCount || 0} Entities`}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color="primary"
+                                                />
+                                                <Chip
+                                                    label={`${instance.BrushCount || 0} Brushes`}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color="secondary"
+                                                />
+                                                <Chip
+                                                    label={`${instance.BrushSideCount || 0} Brush Sides`}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    color="success"
+                                                />
+                                            </Box>
+                                        </Box>
+                                    </Collapse>
+                                )}
                             </Paper>
                         )
                     })}
