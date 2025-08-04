@@ -1406,6 +1406,117 @@ function reg_events(mainWindow) {
             }
         },
     )
+
+    // Instance naming handlers
+    ipcMain.handle(
+        "get-instance-name",
+        async (event, { itemId, instanceIndex }) => {
+            try {
+                const item = packages
+                    .flatMap((p) => p.items)
+                    .find((i) => i.id === itemId)
+
+                if (!item) {
+                    throw new Error(`Item ${itemId} not found`)
+                }
+
+                const name = item.getInstanceName(instanceIndex)
+                return { success: true, name }
+            } catch (error) {
+                console.error("Error getting instance name:", error)
+                return { success: false, error: error.message }
+            }
+        },
+    )
+
+    ipcMain.handle(
+        "set-instance-name",
+        async (event, { itemId, instanceIndex, name }) => {
+            try {
+                const item = packages
+                    .flatMap((p) => p.items)
+                    .find((i) => i.id === itemId)
+
+                if (!item) {
+                    throw new Error(`Item ${itemId} not found`)
+                }
+
+                item.setInstanceName(instanceIndex, name)
+
+                // Send updated item data to both windows
+                const updatedItem = item.toJSONWithExistence()
+                event.sender.send("item-updated", updatedItem)
+                
+                // Find main window and send update
+                const mainWindow = BrowserWindow.getAllWindows().find(
+                    (w) => w.getTitle().includes("BeePEE")
+                )
+                if (mainWindow) {
+                    mainWindow.webContents.send("item-updated", updatedItem)
+                }
+
+                return { success: true }
+            } catch (error) {
+                console.error("Error setting instance name:", error)
+                return { success: false, error: error.message }
+            }
+        },
+    )
+
+    ipcMain.handle(
+        "get-instance-names",
+        async (event, { itemId }) => {
+            try {
+                const item = packages
+                    .flatMap((p) => p.items)
+                    .find((i) => i.id === itemId)
+
+                if (!item) {
+                    throw new Error(`Item ${itemId} not found`)
+                }
+
+                const names = item.getInstanceNames()
+                return { success: true, names }
+            } catch (error) {
+                console.error("Error getting instance names:", error)
+                return { success: false, error: error.message }
+            }
+        },
+    )
+
+    ipcMain.handle(
+        "remove-instance-name",
+        async (event, { itemId, instanceIndex }) => {
+            try {
+                const item = packages
+                    .flatMap((p) => p.items)
+                    .find((i) => i.id === itemId)
+
+                if (!item) {
+                    throw new Error(`Item ${itemId} not found`)
+                }
+
+                item.removeInstanceName(instanceIndex)
+
+                // Send updated item data to both windows
+                const updatedItem = item.toJSONWithExistence()
+                event.sender.send("item-updated", updatedItem)
+                
+                // Find main window and send update
+                const mainWindow = BrowserWindow.getAllWindows().find(
+                    (w) => w.getTitle().includes("BeePEE")
+                )
+                if (mainWindow) {
+                    mainWindow.webContents.send("item-updated", updatedItem)
+                }
+
+                return { success: true }
+            } catch (error) {
+                console.error("Error removing instance name:", error)
+                return { success: false, error: error.message }
+            }
+        },
+    )
 }
 
 module.exports = { reg_events }
