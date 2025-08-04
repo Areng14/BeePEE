@@ -1,5 +1,65 @@
 const fs = require("fs")
 const path = require("path")
+const { convertImageToVTF, getVTFPathFromImagePath, updateEditorItemsWithVTF } = require("./utils/vtfConverter")
+
+/**
+ * Handles VTF conversion for palette images referenced in editoritems.json
+ * @param {Object} editorItems - The editoritems JSON object
+ * @param {string} iconPath - Path to the icon file that was just saved
+ * @param {string} packagePath - Path to the package directory
+ * @param {string} editorItemsPath - Path to the editoritems.json file
+ */
+async function handleVTFConversion(editorItems, iconPath, packagePath, editorItemsPath) {
+    const editor = editorItems.Item?.Editor
+    if (!editor?.SubType) return
+
+    const subType = Array.isArray(editor.SubType) ? editor.SubType[0] : editor.SubType
+    const paletteImage = subType?.Palette?.Image
+
+    if (!paletteImage) return
+
+    console.log(`Found palette image reference: ${paletteImage}`)
+
+    // Check if this is a palette image path that needs VTF conversion
+    if (paletteImage.startsWith('palette/')) {
+        try {
+            // Get the VTF output path
+            const vtfPath = getVTFPathFromImagePath(packagePath, paletteImage)
+            
+            // Convert the icon to VTF format
+            await convertImageToVTF(iconPath, vtfPath, {
+                format: 'DXT5',
+                generateMipmaps: true
+            })
+
+            // Update the editoritems.json to reference the VTF path instead of the palette image
+            const updatedEditorItems = updateEditorItemsWithVTF(
+                editorItemsPath,
+                paletteImage,
+                vtfPath,
+                packagePath
+            )
+
+            // Update the editorItems object that will be saved
+            if (updatedEditorItems.Item?.Editor?.SubType) {
+                const updatedSubType = Array.isArray(updatedEditorItems.Item.Editor.SubType) 
+                    ? updatedEditorItems.Item.Editor.SubType[0] 
+                    : updatedEditorItems.Item.Editor.SubType
+                
+                if (Array.isArray(editor.SubType)) {
+                    editor.SubType[0].Palette = updatedSubType.Palette
+                } else {
+                    editor.SubType.Palette = updatedSubType.Palette
+                }
+            }
+
+            console.log(`Successfully converted and updated VTF reference: ${vtfPath}`)
+        } catch (error) {
+            console.error(`Failed to handle VTF conversion for ${paletteImage}:`, error)
+            throw error
+        }
+    }
+}
 
 async function saveItem(item) {
     // Get the item's editor items and properties files
@@ -97,6 +157,14 @@ async function saveItem(item) {
                 properties.Properties.Icon["0"] = relativePath.replace(/\\/g, '/')
                 
                 console.log(`Icon updated: ${stagedIconPath} -> ${targetIconPath}`)
+                
+                // Also convert to VTF and update editoritems.json if the item uses palette images
+                try {
+                    await handleVTFConversion(editorItems, targetIconPath, packagePath, editorItemsPath)
+                } catch (error) {
+                    console.error("Failed to convert icon to VTF:", error)
+                    // Don't throw here - let the save continue even if VTF conversion fails
+                }
             } else {
                 console.warn(`Staged icon file not found: ${stagedIconPath}`)
             }
