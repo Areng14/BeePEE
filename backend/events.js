@@ -137,23 +137,50 @@ async function handleItemSave(item, event, mainWindow) {
         // Use the new saveItem function to handle file operations
         const { editorItems, properties } = await saveItem(item)
 
-        // Reconstruct the item from disk to ensure all fields are up to date
+        // Find the current item instance in memory to get the most up-to-date data
         const packagePath =
             item.packagePath || path.dirname(path.dirname(item.fullItemPath))
-        let itemJSON
-        try {
-            itemJSON = loadOriginalItemJSON(packagePath, item.id)
-        } catch (e) {
-            // fallback to minimal itemJSON if info.json is missing or item not found
-            const itemFolder =
-                item.itemFolder || path.basename(item.fullItemPath)
-            itemJSON = {
-                ID: item.id,
-                Version: { Styles: { BEE2_CLEAN: itemFolder } },
+        
+        // Try to find the existing item instance first
+        let updatedItemInstance = packages
+            .flatMap((p) => p.items)
+            .find((i) => i.id === item.id)
+        
+        if (updatedItemInstance) {
+            // Reload the item's data from disk to get the latest changes
+            updatedItemInstance.reloadInstances()
+            
+            // Update the icon path if it was changed during save
+            if (item.iconData && item.iconData.stagedIconPath) {
+                const bee2ItemsPath = path.join(packagePath, "resources", "BEE2", "items")
+                const relativePath = path.relative(bee2ItemsPath, item.iconData.stagedIconPath)
+                updatedItemInstance.icon = item.iconData.stagedIconPath
             }
+        } else {
+            // Fallback: reconstruct from disk if not found in memory
+            let itemJSON
+            try {
+                itemJSON = loadOriginalItemJSON(packagePath, item.id)
+            } catch (e) {
+                // fallback to minimal itemJSON if info.json is missing or item not found
+                const itemFolder =
+                    item.itemFolder || path.basename(item.fullItemPath)
+                itemJSON = {
+                    ID: item.id,
+                    Version: { Styles: { BEE2_CLEAN: itemFolder } },
+                }
+            }
+            updatedItemInstance = new Item({ packagePath, itemJSON })
         }
-        const updatedItemInstance = new Item({ packagePath, itemJSON })
+        
         const updatedItem = updatedItemInstance.toJSONWithExistence()
+
+        // Debug logging
+        console.log("Item save completed, sending update:")
+        console.log("- Item ID:", updatedItem.id)
+        console.log("- Item name:", updatedItem.name)
+        console.log("- Icon path:", updatedItem.icon)
+        console.log("- Icon data was provided:", !!item.iconData)
 
         // Send the updated item data to both windows
         event.sender.send("item-updated", updatedItem) // Send to editor window
