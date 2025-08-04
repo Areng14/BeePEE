@@ -31,6 +31,10 @@ function ItemEditor() {
         name: "",
         author: "",
         description: "",
+        // Icon staging
+        stagedIconPath: null,
+        stagedIconName: null,
+        iconChanged: false,
         // Inputs and Outputs data
         inputs: {},
         outputs: {},
@@ -255,6 +259,11 @@ function ItemEditor() {
                         Authors: formData.author,
                         Description: formData.description,
                     },
+                    // Include staged icon data if changed
+                    iconData: formData.iconChanged ? {
+                        stagedIconPath: formData.stagedIconPath,
+                        stagedIconName: formData.stagedIconName
+                    } : null,
                 }
 
                 savePromises.push(
@@ -396,9 +405,13 @@ function ItemEditor() {
                 setSaveError(null)
                 setTimeout(() => setShowSaveSuccess(false), 2000)
 
-                // Clear all modified flags
+                // Clear all modified flags and staged icon data
                 setFormData(prev => ({
                     ...prev,
+                    // Clear staged icon data after successful save
+                    stagedIconPath: null,
+                    stagedIconName: null,
+                    iconChanged: false,
                     _modified: {
                         basicInfo: false,
                         inputs: false,
