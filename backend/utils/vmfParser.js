@@ -1,5 +1,5 @@
-const fs = require('fs')
-const path = require('path')
+const fs = require("fs")
+const path = require("path")
 
 /**
  * Parse a VMF file and extract statistics
@@ -13,33 +13,32 @@ function parseVMFStats(vmfPath) {
                 EntityCount: 0,
                 BrushCount: 0,
                 BrushSideCount: 0,
-                error: 'File not found'
+                error: "File not found",
             }
         }
 
-        const content = fs.readFileSync(vmfPath, 'utf8')
-        
+        const content = fs.readFileSync(vmfPath, "utf8")
+
         // Initialize counters
         let entityCount = 0
         let brushCount = 0
         let brushSideCount = 0
-        
+
         // Parse the VMF content
         const stats = parseVMFContent(content)
-        
+
         return {
             EntityCount: stats.entityCount,
             BrushCount: stats.brushCount,
-            BrushSideCount: stats.brushSideCount
+            BrushSideCount: stats.brushSideCount,
         }
-        
     } catch (error) {
         console.error(`Error parsing VMF file ${vmfPath}:`, error.message)
         return {
             EntityCount: 0,
             BrushCount: 0,
             BrushSideCount: 0,
-            error: error.message
+            error: error.message,
         }
     }
 }
@@ -53,29 +52,29 @@ function parseVMFContent(content) {
     let entityCount = 0
     let brushCount = 0
     let brushSideCount = 0
-    
+
     // Split content into lines for easier parsing
-    const lines = content.split('\n').map(line => line.trim())
+    const lines = content.split("\n").map((line) => line.trim())
     let currentDepth = 0
     let inWorld = false
     let inEntity = false
     let inSolid = false
     let inSide = false
-    
+
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i]
-        
+
         // Skip empty lines and comments
-        if (!line || line.startsWith('//')) {
+        if (!line || line.startsWith("//")) {
             continue
         }
-        
+
         // Track bracket depth
-        if (line === '{') {
+        if (line === "{") {
             currentDepth++
-        } else if (line === '}') {
+        } else if (line === "}") {
             currentDepth--
-            
+
             // Reset flags when exiting blocks based on the depth we're at
             if (inSide && currentDepth <= 2) {
                 inSide = false
@@ -90,47 +89,47 @@ function parseVMFContent(content) {
                 inWorld = false
             }
         }
-        
+
         // Check for world block (contains brushes)
-        if (line === 'world' && currentDepth === 0) {
+        if (line === "world" && currentDepth === 0) {
             // Look ahead to see if next line is opening brace
-            if (i + 1 < lines.length && lines[i + 1] === '{') {
+            if (i + 1 < lines.length && lines[i + 1] === "{") {
                 inWorld = true
             }
         }
-        
+
         // Check for entity blocks (but not the world entity)
-        if (line === 'entity' && currentDepth === 0) {
+        if (line === "entity" && currentDepth === 0) {
             // Look ahead to see if next line is opening brace
-            if (i + 1 < lines.length && lines[i + 1] === '{') {
+            if (i + 1 < lines.length && lines[i + 1] === "{") {
                 entityCount++
                 inEntity = true
             }
         }
-        
+
         // Check for solid blocks (brushes) within world or entities
-        if (line === 'solid' && (inWorld || inEntity)) {
+        if (line === "solid" && (inWorld || inEntity)) {
             // Look ahead to see if next line is opening brace
-            if (i + 1 < lines.length && lines[i + 1] === '{') {
+            if (i + 1 < lines.length && lines[i + 1] === "{") {
                 brushCount++
                 inSolid = true
             }
         }
-        
+
         // Check for side blocks within solids
-        if (line === 'side' && inSolid) {
+        if (line === "side" && inSolid) {
             // Look ahead to see if next line is opening brace
-            if (i + 1 < lines.length && lines[i + 1] === '{') {
+            if (i + 1 < lines.length && lines[i + 1] === "{") {
                 brushSideCount++
                 inSide = true
             }
         }
     }
-    
+
     return {
         entityCount,
         brushCount,
-        brushSideCount
+        brushSideCount,
     }
 }
 
@@ -142,7 +141,7 @@ class VMFStatsCache {
         this.cache = new Map()
         this.fileMtimes = new Map()
     }
-    
+
     /**
      * Get stats for a VMF file, using cache if file hasn't changed
      * @param {string} vmfPath - Path to VMF file
@@ -155,37 +154,39 @@ class VMFStatsCache {
                     EntityCount: 0,
                     BrushCount: 0,
                     BrushSideCount: 0,
-                    error: 'File not found'
+                    error: "File not found",
                 }
             }
-            
+
             const stat = fs.statSync(vmfPath)
             const mtime = stat.mtime.getTime()
             const cachedMtime = this.fileMtimes.get(vmfPath)
-            
+
             // Check if we have cached data and file hasn't changed
             if (cachedMtime === mtime && this.cache.has(vmfPath)) {
                 return this.cache.get(vmfPath)
             }
-            
+
             // Parse the file and cache the result
             const stats = parseVMFStats(vmfPath)
             this.cache.set(vmfPath, stats)
             this.fileMtimes.set(vmfPath, mtime)
-            
+
             return stats
-            
         } catch (error) {
-            console.error(`Error getting VMF stats for ${vmfPath}:`, error.message)
+            console.error(
+                `Error getting VMF stats for ${vmfPath}:`,
+                error.message,
+            )
             return {
                 EntityCount: 0,
                 BrushCount: 0,
                 BrushSideCount: 0,
-                error: error.message
+                error: error.message,
             }
         }
     }
-    
+
     /**
      * Clear cache for a specific file
      * @param {string} vmfPath - Path to VMF file
@@ -194,7 +195,7 @@ class VMFStatsCache {
         this.cache.delete(vmfPath)
         this.fileMtimes.delete(vmfPath)
     }
-    
+
     /**
      * Clear entire cache
      */
@@ -211,5 +212,5 @@ module.exports = {
     parseVMFStats,
     parseVMFContent,
     VMFStatsCache,
-    vmfStatsCache
+    vmfStatsCache,
 }

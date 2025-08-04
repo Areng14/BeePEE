@@ -2385,7 +2385,7 @@ function Inputs({ item, formData, onUpdateInputs, onUpdateOutputs }) {
         try {
             const isInput = tabValue === 0
             const defaultName = isInput ? "Input" : "Output"
-            
+
             // Generate a unique name if default already exists
             let uniqueName = defaultName
             let counter = 1
@@ -2398,14 +2398,14 @@ function Inputs({ item, formData, onUpdateInputs, onUpdateOutputs }) {
             if (isInput) {
                 const updatedInputs = {
                     ...inputs,
-                    [uniqueName]: configData
+                    [uniqueName]: configData,
                 }
                 setInputs(updatedInputs)
                 onUpdateInputs(updatedInputs)
             } else {
                 const updatedOutputs = {
                     ...outputs,
-                    [uniqueName]: configData
+                    [uniqueName]: configData,
                 }
                 setOutputs(updatedOutputs)
                 onUpdateOutputs(updatedOutputs)
@@ -2423,14 +2423,14 @@ function Inputs({ item, formData, onUpdateInputs, onUpdateOutputs }) {
             if (editingConfig.type === "input") {
                 const updatedInputs = {
                     ...inputs,
-                    [editingConfig.name]: configData
+                    [editingConfig.name]: configData,
                 }
                 setInputs(updatedInputs)
                 onUpdateInputs(updatedInputs)
             } else {
                 const updatedOutputs = {
                     ...outputs,
-                    [editingConfig.name]: configData
+                    [editingConfig.name]: configData,
                 }
                 setOutputs(updatedOutputs)
                 onUpdateOutputs(updatedOutputs)

@@ -36,11 +36,11 @@ function Instances({ item, formData, onUpdateInstances }) {
     // Convert formData instances to array format for rendering
     const instances = formData?.instances
         ? Object.entries(formData.instances)
-            .filter(([index, instance]) => !instance._toRemove) // Hide instances marked for removal
-            .map(([index, instance]) => ({
-              ...instance,
-              index,
-          }))
+              .filter(([index, instance]) => !instance._toRemove) // Hide instances marked for removal
+              .map(([index, instance]) => ({
+                  ...instance,
+                  index,
+              }))
         : []
 
     // Debug effect to log when instances change
@@ -57,7 +57,7 @@ function Instances({ item, formData, onUpdateInstances }) {
     }, [item, instances])
 
     const toggleStatsExpansion = (instanceIndex) => {
-        setExpandedStats(prev => {
+        setExpandedStats((prev) => {
             const newSet = new Set(prev)
             if (newSet.has(instanceIndex)) {
                 newSet.delete(instanceIndex)
@@ -81,37 +81,39 @@ function Instances({ item, formData, onUpdateInstances }) {
     }
 
     const handleAddInstanceWithFileDialog = async () => {
-        console.log(
-            "Instances: Selecting instance file for item:",
-            item.id,
-        )
+        console.log("Instances: Selecting instance file for item:", item.id)
         try {
             const result = await window.package.selectInstanceFile(item.id)
             console.log("Instances: File dialog result:", result)
             if (result.success) {
                 // Generate a unique index for the new instance (use pending prefix to avoid conflicts)
                 const existingIndices = Object.keys(formData.instances || {})
-                    .filter(key => !key.startsWith('pending_'))
+                    .filter((key) => !key.startsWith("pending_"))
                     .map(Number)
-                const numericIndices = existingIndices.filter(num => !isNaN(num))
-                const maxIndex = numericIndices.length > 0 ? Math.max(...numericIndices) : -1
+                const numericIndices = existingIndices.filter(
+                    (num) => !isNaN(num),
+                )
+                const maxIndex =
+                    numericIndices.length > 0 ? Math.max(...numericIndices) : -1
                 const newIndex = `pending_${Date.now()}` // Use timestamp to ensure uniqueness
-                
+
                 // Create new instance object with pending data
                 const newInstance = {
                     Name: result.instanceName,
                     _pending: true,
                     _filePath: result.filePath, // Store the source file path for when we actually save
                 }
-                
+
                 // Update formData with new pending instance
                 const updatedInstances = {
                     ...formData.instances,
-                    [newIndex]: newInstance
+                    [newIndex]: newInstance,
                 }
-                
+
                 onUpdateInstances(updatedInstances)
-                console.log(`Instances: Added pending instance: ${newInstance.Name} (will be saved on Save button)`)
+                console.log(
+                    `Instances: Added pending instance: ${newInstance.Name} (will be saved on Save button)`,
+                )
             } else if (!result.canceled) {
                 console.error(
                     "Instances: Failed to select instance:",
@@ -142,12 +144,12 @@ function Instances({ item, formData, onUpdateInstances }) {
                     ...existingInstance,
                     Name: result.instanceName || existingInstance.Name,
                 }
-                
+
                 const updatedInstances = {
                     ...formData.instances,
-                    [instanceIndex]: updatedInstance
+                    [instanceIndex]: updatedInstance,
                 }
-                
+
                 onUpdateInstances(updatedInstances)
                 console.log(
                     `Instances: Replaced instance: ${updatedInstance.Name}`,
@@ -174,31 +176,41 @@ function Instances({ item, formData, onUpdateInstances }) {
         try {
             const updatedInstances = { ...formData.instances }
             const instanceData = updatedInstances[instanceToDelete]
-            
+
             if (instanceData && instanceData._pending) {
                 // If it's a pending instance (not yet saved), just remove it completely
                 delete updatedInstances[instanceToDelete]
-                console.log("Instances: Removed pending instance (not saved yet)")
+                console.log(
+                    "Instances: Removed pending instance (not saved yet)",
+                )
             } else {
                 // Mark existing instance for removal
                 updatedInstances[instanceToDelete] = {
                     ...instanceData,
-                    _toRemove: true
+                    _toRemove: true,
                 }
-                console.log("Instances: Marked instance for removal (will be deleted on Save)")
+                console.log(
+                    "Instances: Marked instance for removal (will be deleted on Save)",
+                )
             }
-            
+
             onUpdateInstances(updatedInstances)
             setDeleteDialogOpen(false)
             setInstanceToDelete(null)
         } catch (error) {
-            console.error("Instances: Failed to mark instance for removal:", error)
+            console.error(
+                "Instances: Failed to mark instance for removal:",
+                error,
+            )
         }
     }
 
     const handleRemoveAllMissingInstances = () => {
         const missingInstances = instances.filter((instance) => {
-            const metadata = instance._metadata || { exists: true, source: 'editor' }
+            const metadata = instance._metadata || {
+                exists: true,
+                source: "editor",
+            }
             return !metadata.exists && metadata.source !== "vbsp"
         })
         if (missingInstances.length === 0) return
@@ -210,11 +222,11 @@ function Instances({ item, formData, onUpdateInstances }) {
             "for item:",
             item.id,
         )
-        
+
         try {
             const updatedInstances = { ...formData.instances }
-            
-            missingInstances.forEach(instance => {
+
+            missingInstances.forEach((instance) => {
                 const instanceData = updatedInstances[instance.index]
                 if (instanceData && instanceData._pending) {
                     // If it's a pending instance (not yet saved), just remove it completely
@@ -223,14 +235,15 @@ function Instances({ item, formData, onUpdateInstances }) {
                     // Mark existing instance for removal
                     updatedInstances[instance.index] = {
                         ...instanceData,
-                        _toRemove: true
+                        _toRemove: true,
                     }
                 }
             })
-            
+
             onUpdateInstances(updatedInstances)
-            console.log("Instances: All missing instances marked for removal (will be deleted on Save)")
-            
+            console.log(
+                "Instances: All missing instances marked for removal (will be deleted on Save)",
+            )
         } catch (error) {
             console.error(
                 "Instances: Failed to mark missing instances for removal:",
@@ -263,7 +276,10 @@ function Instances({ item, formData, onUpdateInstances }) {
                         </Button>
                     </Tooltip>
                     {instances.some((instance) => {
-                        const metadata = instance._metadata || { exists: true, source: 'editor' }
+                        const metadata = instance._metadata || {
+                            exists: true,
+                            source: "editor",
+                        }
                         return !metadata.exists && metadata.source !== "vbsp"
                     }) &&
                         !isRemovingMissing && (
@@ -285,7 +301,10 @@ function Instances({ item, formData, onUpdateInstances }) {
                 <Stack spacing={2}>
                     {instances.map((instance, arrayIndex) => {
                         // Get metadata from the instance or fallback to defaults
-                        const metadata = instance._metadata || { exists: true, source: 'editor' }
+                        const metadata = instance._metadata || {
+                            exists: true,
+                            source: "editor",
+                        }
                         const isVBSP = metadata.source === "vbsp"
                         const instanceExists = metadata.exists
                         const isDisabled = !instanceExists
@@ -293,12 +312,15 @@ function Instances({ item, formData, onUpdateInstances }) {
                         // Use the array index for sequential numbering instead of trying to parse from filename
                         const instanceNumber = arrayIndex
 
-                        const hasStats = instanceExists && !isVBSP && (
-                            instance.EntityCount > 0 || 
-                            instance.BrushCount > 0 || 
-                            instance.BrushSideCount > 0
+                        const hasStats =
+                            instanceExists &&
+                            !isVBSP &&
+                            (instance.EntityCount > 0 ||
+                                instance.BrushCount > 0 ||
+                                instance.BrushSideCount > 0)
+                        const isStatsExpanded = expandedStats.has(
+                            instance.index,
                         )
-                        const isStatsExpanded = expandedStats.has(instance.index)
 
                         return (
                             <Paper
@@ -358,15 +380,25 @@ function Instances({ item, formData, onUpdateInstances }) {
                                                 direction: "rtl", // Make text overflow from the left
                                                 textAlign: "left", // Keep text aligned normally
                                             }}>
-                                            {instance.Name || "(unnamed instance)"}
+                                            {instance.Name ||
+                                                "(unnamed instance)"}
                                         </Typography>
 
                                         <Box sx={{ display: "flex", gap: 1 }}>
                                             {hasStats && (
-                                                <Tooltip title={isStatsExpanded ? "Hide VMF stats" : "Show VMF stats"}>
+                                                <Tooltip
+                                                    title={
+                                                        isStatsExpanded
+                                                            ? "Hide VMF stats"
+                                                            : "Show VMF stats"
+                                                    }>
                                                     <IconButton
                                                         size="small"
-                                                        onClick={() => toggleStatsExpansion(instance.index)}
+                                                        onClick={() =>
+                                                            toggleStatsExpansion(
+                                                                instance.index,
+                                                            )
+                                                        }
                                                         color="info">
                                                         {isStatsExpanded ? (
                                                             <ExpandLessIcon fontSize="small" />
@@ -450,11 +482,23 @@ function Instances({ item, formData, onUpdateInstances }) {
                                     <Collapse in={isStatsExpanded}>
                                         <Divider />
                                         <Box sx={{ p: 2, pt: 1.5 }}>
-                                            <Typography variant="subtitle2" sx={{ mb: 1, display: "flex", alignItems: "center", gap: 1 }}>
+                                            <Typography
+                                                variant="subtitle2"
+                                                sx={{
+                                                    mb: 1,
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    gap: 1,
+                                                }}>
                                                 <InfoIcon fontSize="small" />
                                                 VMF Statistics
                                             </Typography>
-                                            <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
+                                            <Box
+                                                sx={{
+                                                    display: "flex",
+                                                    gap: 1,
+                                                    flexWrap: "wrap",
+                                                }}>
                                                 <Chip
                                                     label={`${instance.EntityCount || 0} Entities`}
                                                     size="small"

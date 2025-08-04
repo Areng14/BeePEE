@@ -176,9 +176,15 @@ class Item {
             this.instances[key] = {
                 Name: instance.Name,
                 // Preserve VMF stats if they exist in the saved data
-                ...(instance.EntityCount !== undefined && { EntityCount: instance.EntityCount }),
-                ...(instance.BrushCount !== undefined && { BrushCount: instance.BrushCount }),
-                ...(instance.BrushSideCount !== undefined && { BrushSideCount: instance.BrushSideCount }),
+                ...(instance.EntityCount !== undefined && {
+                    EntityCount: instance.EntityCount,
+                }),
+                ...(instance.BrushCount !== undefined && {
+                    BrushCount: instance.BrushCount,
+                }),
+                ...(instance.BrushSideCount !== undefined && {
+                    BrushSideCount: instance.BrushSideCount,
+                }),
             }
         })
 
@@ -316,33 +322,43 @@ class Item {
 
         for (const [index, instanceData] of Object.entries(this.instances)) {
             const metadata = this.getInstanceMetadata(index)
-            
+
             // Use saved VMF stats if they exist, otherwise compute them
             let vmfStats = {
                 EntityCount: instanceData.EntityCount || 0,
                 BrushCount: instanceData.BrushCount || 0,
-                BrushSideCount: instanceData.BrushSideCount || 0
+                BrushSideCount: instanceData.BrushSideCount || 0,
             }
 
             // Only compute VMF stats if they're not already saved and the file exists and it's not a VBSP instance
-            if (!instanceData.EntityCount && metadata.exists && metadata.source !== 'vbsp') {
+            if (
+                !instanceData.EntityCount &&
+                metadata.exists &&
+                metadata.source !== "vbsp"
+            ) {
                 try {
                     // Apply path fixing to remove BEE2/ prefix for actual file structure
-                    const actualInstancePath = this.fixInstancePath(instanceData.Name)
+                    const actualInstancePath = this.fixInstancePath(
+                        instanceData.Name,
+                    )
                     const fullInstancePath = Instance.getCleanPath(
                         this.packagePath,
                         actualInstancePath,
                     )
-                    
+
                     // Get VMF stats using the cache
-                    const computedStats = vmfStatsCache.getStats(fullInstancePath)
+                    const computedStats =
+                        vmfStatsCache.getStats(fullInstancePath)
                     vmfStats = {
                         EntityCount: computedStats.EntityCount || 0,
                         BrushCount: computedStats.BrushCount || 0,
-                        BrushSideCount: computedStats.BrushSideCount || 0
+                        BrushSideCount: computedStats.BrushSideCount || 0,
                     }
                 } catch (error) {
-                    console.error(`Error getting VMF stats for instance ${index}:`, error.message)
+                    console.error(
+                        `Error getting VMF stats for instance ${index}:`,
+                        error.message,
+                    )
                 }
             }
 
@@ -350,7 +366,7 @@ class Item {
                 ...instanceData,
                 ...vmfStats,
                 // Add metadata for frontend use
-                _metadata: metadata
+                _metadata: metadata,
             }
         }
 
@@ -359,19 +375,22 @@ class Item {
 
     // Helper method to determine if an instance is a VBSP instance
     isVbspInstance(instanceData) {
-        return instanceData.Name && instanceData.Name.includes('instances/bee2_dev')
+        return (
+            instanceData.Name &&
+            instanceData.Name.includes("instances/bee2_dev")
+        )
     }
 
     // Helper method to get instance metadata (exists, source type)
     getInstanceMetadata(index) {
         const instanceData = this.instances[index]
         if (!instanceData) {
-            return { exists: false, source: 'unknown' }
+            return { exists: false, source: "unknown" }
         }
 
         const exists = this.instanceExists(index)
         const isVbsp = this.isVbspInstance(instanceData)
-        const source = isVbsp ? 'vbsp' : 'editor'
+        const source = isVbsp ? "vbsp" : "editor"
 
         return { exists, source }
     }
@@ -382,7 +401,7 @@ class Item {
         if (!instancePath) {
             return ""
         }
-        
+
         // Normalize path separators to forward slashes
         let normalizedPath = instancePath.replace(/\\/g, "/")
 
@@ -420,7 +439,7 @@ class Item {
         let vmfStats = {
             EntityCount: 0,
             BrushCount: 0,
-            BrushSideCount: 0
+            BrushSideCount: 0,
         }
 
         try {
@@ -430,16 +449,19 @@ class Item {
                 this.packagePath,
                 actualInstancePath,
             )
-            
+
             // Get VMF stats using the cache
             vmfStats = vmfStatsCache.getStats(fullInstancePath)
         } catch (error) {
-            console.error(`Error getting VMF stats for new instance ${instanceName}:`, error.message)
+            console.error(
+                `Error getting VMF stats for new instance ${instanceName}:`,
+                error.message,
+            )
         }
 
         editoritems.Item.Exporting.Instances[nextIndex.toString()] = {
             Name: instanceName,
-            ...vmfStats
+            ...vmfStats,
         }
         this.saveEditorItems(editoritems)
 
@@ -462,17 +484,21 @@ class Item {
 
         // Delete the instance file from filesystem if it exists
         try {
-            const fs = require('fs')
-            const path = require('path')
-            
+            const fs = require("fs")
+            const path = require("path")
+
             // Apply path fixing to remove BEE2/ prefix for actual file structure
             const actualFilePath = this.fixInstancePath(instance.Name)
-            const instanceFilePath = path.join(this.packagePath, "resources", actualFilePath)
-            
+            const instanceFilePath = path.join(
+                this.packagePath,
+                "resources",
+                actualFilePath,
+            )
+
             if (fs.existsSync(instanceFilePath)) {
                 fs.unlinkSync(instanceFilePath)
                 console.log(`Deleted instance file: ${instanceFilePath}`)
-                
+
                 // Also try to remove the directory if it's empty
                 const instanceDir = path.dirname(instanceFilePath)
                 try {
@@ -483,10 +509,14 @@ class Item {
                     }
                 } catch (dirError) {
                     // Directory not empty or other error, ignore
-                    console.log(`Could not remove directory ${instanceDir}: ${dirError.message}`)
+                    console.log(
+                        `Could not remove directory ${instanceDir}: ${dirError.message}`,
+                    )
                 }
             } else {
-                console.log(`Instance file not found, skipping deletion: ${instanceFilePath}`)
+                console.log(
+                    `Instance file not found, skipping deletion: ${instanceFilePath}`,
+                )
             }
         } catch (fileError) {
             console.error(`Error deleting instance file: ${fileError.message}`)

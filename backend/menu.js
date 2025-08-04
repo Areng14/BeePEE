@@ -91,19 +91,29 @@ function createMainMenu(mainWindow) {
                         try {
                             await importPackage(result.filePaths[0])
                             // Continue progress from import (70%) to load (80%)
-                            mainWindow.webContents.send("package-loading-progress", { 
-                                progress: 80, 
-                                message: "Loading imported package..." 
-                            })
-                            const pkg = await loadPackage(result.filePaths[0], true) // Skip progress reset since we're continuing from import
+                            mainWindow.webContents.send(
+                                "package-loading-progress",
+                                {
+                                    progress: 80,
+                                    message: "Loading imported package...",
+                                },
+                            )
+                            const pkg = await loadPackage(
+                                result.filePaths[0],
+                                true,
+                            ) // Skip progress reset since we're continuing from import
                             currentPackageDir = pkg.packageDir
-                            
+
                             // Send final completion message
-                            mainWindow.webContents.send("package-loading-progress", { 
-                                progress: 100, 
-                                message: "Package imported and loaded successfully!" 
-                            })
-                            
+                            mainWindow.webContents.send(
+                                "package-loading-progress",
+                                {
+                                    progress: 100,
+                                    message:
+                                        "Package imported and loaded successfully!",
+                                },
+                            )
+
                             mainWindow.webContents.send(
                                 "package:loaded",
                                 pkg.items,

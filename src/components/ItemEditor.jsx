@@ -1,5 +1,20 @@
 import { useEffect, useState } from "react"
-import { Box, Tabs, Tab, Button, Stack, Alert, Tooltip, Badge, Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText } from "@mui/material"
+import {
+    Box,
+    Tabs,
+    Tab,
+    Button,
+    Stack,
+    Alert,
+    Tooltip,
+    Badge,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    DialogContentText,
+    CircularProgress,
+} from "@mui/material"
 import {
     Info,
     Input,
@@ -24,6 +39,7 @@ function ItemEditor() {
     const [tabValue, setTabValue] = useState(0)
     const [saveError, setSaveError] = useState(null)
     const [showSaveSuccess, setShowSaveSuccess] = useState(false)
+    const [isSaving, setIsSaving] = useState(false)
     const [discardDialogOpen, setDiscardDialogOpen] = useState(false)
 
     // Form state for all tabs
@@ -52,7 +68,7 @@ function ItemEditor() {
             instances: false,
             vbsp: false,
             other: false,
-        }
+        },
     })
 
     useEffect(() => {
@@ -84,16 +100,20 @@ function ItemEditor() {
                         window.package.getInputs(item.id),
                         window.package.getOutputs(item.id),
                     ])
-                    
-                    setFormData(prev => ({
+
+                    setFormData((prev) => ({
                         ...prev,
                         name: item.name || "",
                         author: item.details?.Authors || "",
                         description: description,
                         inputs: inputResult.success ? inputResult.inputs : {},
-                        outputs: outputResult.success ? outputResult.outputs : {},
+                        outputs: outputResult.success
+                            ? outputResult.outputs
+                            : {},
                         // Update instances from item data, but preserve local modifications
-                        instances: prev._modified.instances ? prev.instances : (item.instances || {}),
+                        instances: prev._modified.instances
+                            ? prev.instances
+                            : item.instances || {},
                         vbsp: item.vbsp || {},
                         other: item.other || {},
                         _modified: {
@@ -104,11 +124,11 @@ function ItemEditor() {
                             instances: prev._modified.instances,
                             vbsp: false,
                             other: false,
-                        }
+                        },
                     }))
                 } catch (error) {
                     console.error("Failed to load inputs/outputs:", error)
-                    setFormData(prev => ({
+                    setFormData((prev) => ({
                         ...prev,
                         name: item.name || "",
                         author: item.details?.Authors || "",
@@ -116,7 +136,9 @@ function ItemEditor() {
                         inputs: {},
                         outputs: {},
                         // Update instances from item data, but preserve local modifications
-                        instances: prev._modified.instances ? prev.instances : (item.instances || {}),
+                        instances: prev._modified.instances
+                            ? prev.instances
+                            : item.instances || {},
                         vbsp: item.vbsp || {},
                         other: item.other || {},
                         _modified: {
@@ -127,11 +149,11 @@ function ItemEditor() {
                             instances: prev._modified.instances,
                             vbsp: false,
                             other: false,
-                        }
+                        },
                     }))
                 }
             }
-            
+
             loadInputsOutputs()
 
             // Clear unsaved changes indicator when loading a new item
@@ -156,19 +178,21 @@ function ItemEditor() {
         setTabValue(newValue)
     }
 
-    const updateFormData = (field, value, section = 'basicInfo') => {
+    const updateFormData = (field, value, section = "basicInfo") => {
         setFormData((prev) => {
             const newData = {
                 ...prev,
                 [field]: value,
                 _modified: {
                     ...prev._modified,
-                    [section]: true
-                }
+                    [section]: true,
+                },
             }
 
             // Check if any section has changes
-            const hasChanges = Object.values(newData._modified).some(modified => modified)
+            const hasChanges = Object.values(newData._modified).some(
+                (modified) => modified,
+            )
 
             // Update window title with unsaved changes indicator
             window.package?.setUnsavedChanges?.(hasChanges)
@@ -179,67 +203,70 @@ function ItemEditor() {
 
     // Specialized update functions for different sections
     const updateInputsData = (inputs) => {
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             inputs,
             _modified: {
                 ...prev._modified,
-                inputs: true
-            }
+                inputs: true,
+            },
         }))
         window.package?.setUnsavedChanges?.(true)
     }
 
     const updateOutputsData = (outputs) => {
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             outputs,
             _modified: {
                 ...prev._modified,
-                outputs: true
-            }
+                outputs: true,
+            },
         }))
         window.package?.setUnsavedChanges?.(true)
     }
 
     const updateInstancesData = (instances) => {
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             instances,
             _modified: {
                 ...prev._modified,
-                instances: true
-            }
+                instances: true,
+            },
         }))
         window.package?.setUnsavedChanges?.(true)
     }
 
     const updateVbspData = (vbsp) => {
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             vbsp,
             _modified: {
                 ...prev._modified,
-                vbsp: true
-            }
+                vbsp: true,
+            },
         }))
         window.package?.setUnsavedChanges?.(true)
     }
 
     const updateOtherData = (other) => {
-        setFormData(prev => ({
+        setFormData((prev) => ({
             ...prev,
             other,
             _modified: {
                 ...prev._modified,
-                other: true
-            }
+                other: true,
+            },
         }))
         window.package?.setUnsavedChanges?.(true)
     }
 
     const handleSave = async () => {
         try {
+            setIsSaving(true)
+            setSaveError(null)
+
             // Validate required fields
             if (!formData.name?.trim()) {
                 throw new Error("Item name cannot be empty")
@@ -260,18 +287,20 @@ function ItemEditor() {
                         Description: formData.description,
                     },
                     // Include staged icon data if changed
-                    iconData: formData.iconChanged ? {
-                        stagedIconPath: formData.stagedIconPath,
-                        stagedIconName: formData.stagedIconName
-                    } : null,
+                    iconData: formData.iconChanged
+                        ? {
+                              stagedIconPath: formData.stagedIconPath,
+                              stagedIconName: formData.stagedIconName,
+                          }
+                        : null,
                 }
 
                 savePromises.push(
-                    window.package?.saveItem?.(saveData).catch(error => {
+                    window.package?.saveItem?.(saveData).catch((error) => {
                         console.error("Failed to save basic info:", error)
                         hasErrors = true
                         throw new Error(`Basic info: ${error.message}`)
-                    })
+                    }),
                 )
             }
 
@@ -279,27 +308,41 @@ function ItemEditor() {
             if (formData._modified.inputs) {
                 try {
                     // Get original inputs to compare changes
-                    const originalInputsResult = await window.package.getInputs(item.id)
-                    const originalInputs = originalInputsResult.success ? originalInputsResult.inputs : {}
-                    
+                    const originalInputsResult = await window.package.getInputs(
+                        item.id,
+                    )
+                    const originalInputs = originalInputsResult.success
+                        ? originalInputsResult.inputs
+                        : {}
+
                     // Find inputs to add, update, or remove
                     const currentInputs = formData.inputs || {}
-                    
+
                     // Remove inputs that are in original but not in current
                     for (const inputName of Object.keys(originalInputs)) {
                         if (!(inputName in currentInputs)) {
                             await window.package.removeInput(item.id, inputName)
                         }
                     }
-                    
+
                     // Add or update inputs
-                    for (const [inputName, inputConfig] of Object.entries(currentInputs)) {
+                    for (const [inputName, inputConfig] of Object.entries(
+                        currentInputs,
+                    )) {
                         if (inputName in originalInputs) {
                             // Update existing input
-                            await window.package.updateInput(item.id, inputName, inputConfig)
+                            await window.package.updateInput(
+                                item.id,
+                                inputName,
+                                inputConfig,
+                            )
                         } else {
                             // Add new input
-                            await window.package.addInput(item.id, inputName, inputConfig)
+                            await window.package.addInput(
+                                item.id,
+                                inputName,
+                                inputConfig,
+                            )
                         }
                     }
                 } catch (error) {
@@ -313,27 +356,43 @@ function ItemEditor() {
             if (formData._modified.outputs) {
                 try {
                     // Get original outputs to compare changes
-                    const originalOutputsResult = await window.package.getOutputs(item.id)
-                    const originalOutputs = originalOutputsResult.success ? originalOutputsResult.outputs : {}
-                    
+                    const originalOutputsResult =
+                        await window.package.getOutputs(item.id)
+                    const originalOutputs = originalOutputsResult.success
+                        ? originalOutputsResult.outputs
+                        : {}
+
                     // Find outputs to add, update, or remove
                     const currentOutputs = formData.outputs || {}
-                    
+
                     // Remove outputs that are in original but not in current
                     for (const outputName of Object.keys(originalOutputs)) {
                         if (!(outputName in currentOutputs)) {
-                            await window.package.removeOutput(item.id, outputName)
+                            await window.package.removeOutput(
+                                item.id,
+                                outputName,
+                            )
                         }
                     }
-                    
+
                     // Add or update outputs
-                    for (const [outputName, outputConfig] of Object.entries(currentOutputs)) {
+                    for (const [outputName, outputConfig] of Object.entries(
+                        currentOutputs,
+                    )) {
                         if (outputName in originalOutputs) {
                             // Update existing output
-                            await window.package.updateOutput(item.id, outputName, outputConfig)
+                            await window.package.updateOutput(
+                                item.id,
+                                outputName,
+                                outputConfig,
+                            )
                         } else {
                             // Add new output
-                            await window.package.addOutput(item.id, outputName, outputConfig)
+                            await window.package.addOutput(
+                                item.id,
+                                outputName,
+                                outputConfig,
+                            )
                         }
                     }
                 } catch (error) {
@@ -348,21 +407,34 @@ function ItemEditor() {
                 try {
                     const currentInstances = formData.instances || {}
                     const originalInstances = item.instances || {}
-                    
+
                     // Process removals first
-                    for (const [index, instanceData] of Object.entries(currentInstances)) {
-                        if (instanceData._toRemove && originalInstances[index]) {
+                    for (const [index, instanceData] of Object.entries(
+                        currentInstances,
+                    )) {
+                        if (
+                            instanceData._toRemove &&
+                            originalInstances[index]
+                        ) {
                             console.log(`Removing instance at index ${index}`)
                             await window.package.removeInstance(item.id, index)
                         }
                     }
-                    
+
                     // Process additions
-                    for (const [index, instanceData] of Object.entries(currentInstances)) {
+                    for (const [index, instanceData] of Object.entries(
+                        currentInstances,
+                    )) {
                         if (instanceData._pending && instanceData._filePath) {
-                            console.log(`Adding pending instance: ${instanceData.Name}`)
+                            console.log(
+                                `Adding pending instance: ${instanceData.Name}`,
+                            )
                             // Use a new backend function to add instance from file path
-                            await window.package.addInstanceFromFile(item.id, instanceData._filePath, instanceData.Name)
+                            await window.package.addInstanceFromFile(
+                                item.id,
+                                instanceData._filePath,
+                                instanceData.Name,
+                            )
                         }
                     }
                 } catch (error) {
@@ -406,7 +478,7 @@ function ItemEditor() {
                 setTimeout(() => setShowSaveSuccess(false), 2000)
 
                 // Clear all modified flags and staged icon data
-                setFormData(prev => ({
+                setFormData((prev) => ({
                     ...prev,
                     // Clear staged icon data after successful save
                     stagedIconPath: null,
@@ -419,7 +491,7 @@ function ItemEditor() {
                         instances: false,
                         vbsp: false,
                         other: false,
-                    }
+                    },
                 }))
 
                 // Clear unsaved changes indicator
@@ -431,6 +503,8 @@ function ItemEditor() {
         } catch (error) {
             console.error("Failed to save:", error)
             setSaveError(error.message)
+        } finally {
+            setIsSaving(false)
         }
     }
 
@@ -439,8 +513,10 @@ function ItemEditor() {
     }
 
     const handleCloseOrDiscard = () => {
-        const hasUnsavedChanges = Object.values(formData._modified).some(modified => modified)
-        
+        const hasUnsavedChanges = Object.values(formData._modified).some(
+            (modified) => modified,
+        )
+
         if (hasUnsavedChanges) {
             setDiscardDialogOpen(true)
         } else {
@@ -497,67 +573,75 @@ function ItemEditor() {
                     <Tooltip
                         title="Basic Info - Edit name, author, description"
                         placement="right">
-                        <Tab icon={
-                            <Badge 
-                                color="primary" 
-                                variant="dot" 
-                                invisible={!formData._modified.basicInfo}
-                            >
-                                <Info />
-                            </Badge>
-                        } />
+                        <Tab
+                            icon={
+                                <Badge
+                                    color="primary"
+                                    variant="dot"
+                                    invisible={!formData._modified.basicInfo}>
+                                    <Info />
+                                </Badge>
+                            }
+                        />
                     </Tooltip>
                     <Tooltip
                         title="Inputs - Configure item inputs and outputs"
                         placement="right">
-                        <Tab icon={
-                            <Badge 
-                                color="primary" 
-                                variant="dot" 
-                                invisible={!formData._modified.inputs && !formData._modified.outputs}
-                            >
-                                <Input />
-                            </Badge>
-                        } />
+                        <Tab
+                            icon={
+                                <Badge
+                                    color="primary"
+                                    variant="dot"
+                                    invisible={
+                                        !formData._modified.inputs &&
+                                        !formData._modified.outputs
+                                    }>
+                                    <Input />
+                                </Badge>
+                            }
+                        />
                     </Tooltip>
                     <Tooltip
                         title="Instances - Manage item's VMF instances"
                         placement="right">
-                        <Tab icon={
-                            <Badge 
-                                color="primary" 
-                                variant="dot" 
-                                invisible={!formData._modified.instances}
-                            >
-                                <ViewInAr />
-                            </Badge>
-                        } />
+                        <Tab
+                            icon={
+                                <Badge
+                                    color="primary"
+                                    variant="dot"
+                                    invisible={!formData._modified.instances}>
+                                    <ViewInAr />
+                                </Badge>
+                            }
+                        />
                     </Tooltip>
                     <Tooltip
                         title="VBSP - Configure instance swapping and conditions"
                         placement="right">
-                        <Tab icon={
-                            <Badge 
-                                color="primary" 
-                                variant="dot" 
-                                invisible={!formData._modified.vbsp}
-                            >
-                                <Code />
-                            </Badge>
-                        } />
+                        <Tab
+                            icon={
+                                <Badge
+                                    color="primary"
+                                    variant="dot"
+                                    invisible={!formData._modified.vbsp}>
+                                    <Code />
+                                </Badge>
+                            }
+                        />
                     </Tooltip>
                     <Tooltip
                         title="Other - Additional item settings"
                         placement="right">
-                        <Tab icon={
-                            <Badge 
-                                color="primary" 
-                                variant="dot" 
-                                invisible={!formData._modified.other}
-                            >
-                                <Construction />
-                            </Badge>
-                        } />
+                        <Tab
+                            icon={
+                                <Badge
+                                    color="primary"
+                                    variant="dot"
+                                    invisible={!formData._modified.other}>
+                                    <Construction />
+                                </Badge>
+                            }
+                        />
                     </Tooltip>
                     <Tooltip
                         title="Metadata - Item metadata and tags"
@@ -617,52 +701,92 @@ function ItemEditor() {
             {/* Save/Close Buttons */}
             <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
                 <Stack direction="row" spacing={1}>
-                    <Tooltip title={(() => {
-                        const modifiedSections = Object.entries(formData._modified)
-                            .filter(([section, isModified]) => isModified)
-                            .map(([section]) => {
-                                switch(section) {
-                                    case 'basicInfo': return 'Basic Info'
-                                    case 'inputs': return 'Inputs'
-                                    case 'outputs': return 'Outputs'
-                                    case 'instances': return 'Instances'
-                                    case 'vbsp': return 'VBSP'
-                                    case 'other': return 'Other'
-                                    default: return section
-                                }
-                            })
-                        
-                        if (modifiedSections.length === 0) {
-                            return "No unsaved changes"
-                        }
-                        
-                        return `Save changes to: ${modifiedSections.join(', ')}`
-                    })()}>
+                    <Tooltip
+                        title={(() => {
+                            const modifiedSections = Object.entries(
+                                formData._modified,
+                            )
+                                .filter(([section, isModified]) => isModified)
+                                .map(([section]) => {
+                                    switch (section) {
+                                        case "basicInfo":
+                                            return "Basic Info"
+                                        case "inputs":
+                                            return "Inputs"
+                                        case "outputs":
+                                            return "Outputs"
+                                        case "instances":
+                                            return "Instances"
+                                        case "vbsp":
+                                            return "VBSP"
+                                        case "other":
+                                            return "Other"
+                                        default:
+                                            return section
+                                    }
+                                })
+
+                            if (modifiedSections.length === 0) {
+                                return "No unsaved changes"
+                            }
+
+                            return `Save changes to: ${modifiedSections.join(", ")}`
+                        })()}>
                         <Button
                             variant="contained"
                             startIcon={
-                                showSaveSuccess ? <CheckCircle /> : <Save />
+                                isSaving ? (
+                                    <CircularProgress
+                                        size={20}
+                                        color="inherit"
+                                    />
+                                ) : showSaveSuccess ? (
+                                    <CheckCircle />
+                                ) : (
+                                    <Save />
+                                )
                             }
                             onClick={handleSave}
                             color={showSaveSuccess ? "success" : "primary"}
-                            disabled={!Object.values(formData._modified).some(modified => modified)}
+                            disabled={
+                                !Object.values(formData._modified).some(
+                                    (modified) => modified,
+                                ) || isSaving
+                            }
                             sx={{ flex: 1 }}>
-                            {showSaveSuccess ? "Saved!" : "Save"}
+                            {isSaving
+                                ? "Saving..."
+                                : showSaveSuccess
+                                  ? "Saved!"
+                                  : "Save"}
                         </Button>
                     </Tooltip>
-                    <Tooltip title={(() => {
-                        const hasUnsavedChanges = Object.values(formData._modified).some(modified => modified)
-                        return hasUnsavedChanges 
-                            ? "Discard unsaved changes and close editor" 
-                            : "Close editor"
-                    })()}>
+                    <Tooltip
+                        title={(() => {
+                            const hasUnsavedChanges = Object.values(
+                                formData._modified,
+                            ).some((modified) => modified)
+                            return hasUnsavedChanges
+                                ? "Discard unsaved changes and close editor"
+                                : "Close editor"
+                        })()}>
                         <Button
                             variant="outlined"
                             startIcon={<Close />}
                             onClick={handleCloseOrDiscard}
-                            color={Object.values(formData._modified).some(modified => modified) ? "error" : "primary"}
+                            color={
+                                Object.values(formData._modified).some(
+                                    (modified) => modified,
+                                )
+                                    ? "error"
+                                    : "primary"
+                            }
                             sx={{ flex: 1 }}>
-                            {Object.values(formData._modified).some(modified => modified) ? "Discard" : "Close"}
+                            {Object.values(formData._modified).some(
+                                (modified) => modified,
+                            )
+                                ? "Discard"
+                                : "Close"}
                         </Button>
                     </Tooltip>
                 </Stack>
@@ -687,14 +811,19 @@ function ItemEditor() {
                 </DialogTitle>
                 <DialogContent>
                     <DialogContentText id="discard-dialog-description">
-                        You have unsaved changes that will be lost if you close the editor. Are you sure you want to discard these changes?
+                        You have unsaved changes that will be lost if you close
+                        the editor. Are you sure you want to discard these
+                        changes?
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleCancelDiscard} color="primary">
                         Cancel
                     </Button>
-                    <Button onClick={handleConfirmDiscard} color="error" variant="contained">
+                    <Button
+                        onClick={handleConfirmDiscard}
+                        color="error"
+                        variant="contained">
                         Discard Changes
                     </Button>
                 </DialogActions>
