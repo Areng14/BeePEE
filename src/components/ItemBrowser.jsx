@@ -31,15 +31,37 @@ function ItemBrowser() {
         window.package.onItemUpdated((event, updatedItem) => {
             console.log(
                 "ItemBrowser received item update:",
-                updatedItem.id,
-                updatedItem.icon,
+                updatedItem?.id,
+                updatedItem?.icon,
             )
-            setItems((currentItems) =>
-                currentItems.map((item) =>
-                    item.id === updatedItem.id ? updatedItem : item,
-                ),
-            )
+            
+            if (!updatedItem || !updatedItem.id) {
+                console.warn("Received invalid item update:", updatedItem)
+                return
+            }
+            
+            setItems((currentItems) => {
+                const itemIndex = currentItems.findIndex(item => item.id === updatedItem.id)
+                if (itemIndex === -1) {
+                    console.log("Item not found in current list, adding:", updatedItem.id)
+                    return [...currentItems, updatedItem]
+                } else {
+                    console.log("Updating existing item:", updatedItem.id)
+                    return currentItems.map((item) =>
+                        item.id === updatedItem.id ? updatedItem : item,
+                    )
+                }
+            })
         })
+
+        // Add a manual refresh function to window for debugging
+        window.refreshItemBrowser = () => {
+            console.log("Manual refresh triggered")
+            // Try to reload the current package
+            if (window.package && window.package.reloadPackage) {
+                window.package.reloadPackage()
+            }
+        }
     }, [])
 
     useEffect(() => {

@@ -1,4 +1,4 @@
-const { reg_loadPackagePopup, packages } = require("./packageManager")
+const { reg_loadPackagePopup, packages, loadPackage } = require("./packageManager")
 const {
     createItemEditor,
     sendItemUpdateToEditor,
@@ -207,6 +207,40 @@ function reg_events(mainWindow) {
             global.titleManager.setUnsavedChanges(hasChanges)
         }
         return { success: true }
+    })
+
+    // Register package reload handler
+    ipcMain.handle("reload-package", async (event) => {
+        try {
+            console.log("Reloading current package...")
+            
+            // Get the current package path from the first loaded package
+            if (packages.length === 0) {
+                throw new Error("No package currently loaded")
+            }
+            
+            const currentPackage = packages[0]
+            const packagePath = currentPackage.packageDir
+            
+            console.log("Reloading package at:", packagePath)
+            
+            // Clear current packages
+            packages.length = 0
+            
+            // Reload the package
+            const reloadedPackage = await loadPackage(packagePath)
+            packages.push(reloadedPackage)
+            
+            // Send updated items to main window
+            const updatedItems = reloadedPackage.items.map(item => item.toJSONWithExistence())
+            mainWindow.webContents.send("package-loaded", updatedItems)
+            
+            console.log("Package reloaded successfully")
+            return { success: true, itemCount: updatedItems.length }
+        } catch (error) {
+            console.error("Failed to reload package:", error)
+            throw error
+        }
     })
 
     // Register icon preview handler
