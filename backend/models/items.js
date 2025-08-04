@@ -283,7 +283,7 @@ class Item {
     // Check if an instance file actually exists
     instanceExists(index) {
         const instanceData = this.instances[index]
-        if (!instanceData) {
+        if (!instanceData || !instanceData.Name) {
             return false
         }
 
@@ -378,6 +378,11 @@ class Item {
 
     // Helper function to fix instance paths by removing BEE2/ prefix
     fixInstancePath(instancePath) {
+        // Safety check for undefined or null instancePath
+        if (!instancePath) {
+            return ""
+        }
+        
         // Normalize path separators to forward slashes
         let normalizedPath = instancePath.replace(/\\/g, "/")
 
