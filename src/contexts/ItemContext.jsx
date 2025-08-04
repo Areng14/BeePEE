@@ -93,6 +93,7 @@ export const ItemProvider = ({ children }) => {
         return () => {
             console.log("ItemContext: Cleaning up event listeners")
             try {
+                // Remove all listeners for these events
                 if (window.package?.onItemUpdated) {
                     window.package.onItemUpdated(null)
                 }

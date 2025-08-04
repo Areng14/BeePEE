@@ -17,6 +17,7 @@ const {
 const { spawn } = require("child_process")
 const { Instance } = require("./items/Instance")
 const { getCleanInstancePath } = require("./utils/instancePaths")
+const { vmfStatsCache } = require("./utils/vmfParser")
 
 // Track last saved .bpee path in memory (could be improved with persistent storage)
 let lastSavedBpeePath = null
@@ -152,7 +153,7 @@ async function handleItemSave(item, event, mainWindow) {
             }
         }
         const updatedItemInstance = new Item({ packagePath, itemJSON })
-        const updatedItem = updatedItemInstance.toJSON()
+        const updatedItem = updatedItemInstance.toJSONWithExistence()
 
         // Send the updated item data to both windows
         event.sender.send("item-updated", updatedItem) // Send to editor window
@@ -416,7 +417,7 @@ function reg_events(mainWindow) {
             const newIndex = item.addInstance(instanceName)
 
             // Send updated item data to frontend
-            const updatedItem = item.toJSON()
+            const updatedItem = item.toJSONWithExistence()
             console.log("Sending updated item after add instance from file:", {
                 id: updatedItem.id,
                 instances: updatedItem.instances,
@@ -448,7 +449,7 @@ function reg_events(mainWindow) {
             const newIndex = item.addInstance(instanceName)
 
             // Send updated item data to frontend
-            const updatedItem = item.toJSON()
+            const updatedItem = item.toJSONWithExistence()
             console.log("Sending updated item after add instance:", {
                 id: updatedItem.id,
                 instances: updatedItem.instances,
@@ -750,7 +751,7 @@ function reg_events(mainWindow) {
             const newIndex = item.addInstance(instanceName)
 
             // Send updated item data to frontend
-            const updatedItem = item.toJSON()
+            const updatedItem = item.toJSONWithExistence()
             console.log(
                 "Sending updated item after file dialog add instance:",
                 {
@@ -834,9 +835,35 @@ function reg_events(mainWindow) {
 
                 // Clear the cached instance so it gets reloaded
                 item._loadedInstances.delete(instanceIndex)
+                
+                // Clear VMF stats cache for this instance
+                vmfStatsCache.clearCache(currentInstancePath)
+
+                // Update VMF stats in the saved editoritems file
+                try {
+                    const editoritems = item.getEditorItems()
+                    if (editoritems.Item?.Exporting?.Instances?.[instanceIndex]) {
+                        // Get updated VMF stats
+                        const actualInstancePath = fixInstancePath(instanceData.Name)
+                        const fullInstancePath = Instance.getCleanPath(
+                            item.packagePath,
+                            actualInstancePath,
+                        )
+                        const vmfStats = vmfStatsCache.getStats(fullInstancePath)
+                        
+                        // Update the saved instance data with new stats
+                        editoritems.Item.Exporting.Instances[instanceIndex] = {
+                            ...editoritems.Item.Exporting.Instances[instanceIndex],
+                            ...vmfStats
+                        }
+                        item.saveEditorItems(editoritems)
+                    }
+                } catch (error) {
+                    console.warn("Failed to update VMF stats in editoritems:", error.message)
+                }
 
                 // Send updated item data to frontend
-                const updatedItem = item.toJSON()
+                const updatedItem = item.toJSONWithExistence()
                 console.log("Sending updated item after replace instance:", {
                     id: updatedItem.id,
                     instances: updatedItem.instances,
@@ -868,10 +895,26 @@ function reg_events(mainWindow) {
                     throw new Error("Item not found")
                 }
 
+                // Get instance path before removing it for cache invalidation
+                const instanceData = item.instances[instanceIndex]
+                if (instanceData) {
+                    try {
+                        const actualInstancePath = fixInstancePath(instanceData.Name)
+                        const fullInstancePath = Instance.getCleanPath(
+                            item.packagePath,
+                            actualInstancePath,
+                        )
+                        // Clear VMF stats cache for this instance
+                        vmfStatsCache.clearCache(fullInstancePath)
+                    } catch (error) {
+                        console.warn("Could not clear VMF cache for removed instance:", error.message)
+                    }
+                }
+
                 item.removeInstance(instanceIndex)
 
                 // Send updated item data to frontend
-                const updatedItem = item.toJSON()
+                const updatedItem = item.toJSONWithExistence()
                 console.log("Sending updated item after remove instance:", {
                     id: updatedItem.id,
                     instances: updatedItem.instances,
@@ -1086,6 +1129,21 @@ function reg_events(mainWindow) {
         }
     })
 
+    // Instance metadata handler
+    ipcMain.handle("get-instance-metadata", async (event, { itemId, instanceIndex }) => {
+        try {
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+
+            const metadata = item.getInstanceMetadata(instanceIndex)
+            return { success: true, metadata }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
     // Metadata management handlers
     ipcMain.handle("get-item-metadata", async (event, { itemId }) => {
         try {
@@ -1112,7 +1170,7 @@ function reg_events(mainWindow) {
                 const success = item.updateMetadata(metadata)
                 if (success) {
                     // Send updated item to frontend
-                    const updatedItem = item.toJSON()
+                    const updatedItem = item.toJSONWithExistence()
                     mainWindow.webContents.send("item-updated", updatedItem)
                     sendItemUpdateToEditor(itemId, updatedItem)
                 }

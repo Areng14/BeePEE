@@ -1,6 +1,7 @@
 const fs = require("fs")
 const path = require("path")
 const { Instance } = require("../items/Instance")
+const { vmfStatsCache } = require("../utils/vmfParser")
 
 class Item {
     constructor({ packagePath, itemJSON }) {
@@ -174,7 +175,10 @@ class Item {
         Object.entries(editorInstances).forEach(([key, instance]) => {
             this.instances[key] = {
                 Name: instance.Name,
-                source: "editor",
+                // Preserve VMF stats if they exist in the saved data
+                ...(instance.EntityCount !== undefined && { EntityCount: instance.EntityCount }),
+                ...(instance.BrushCount !== undefined && { BrushCount: instance.BrushCount }),
+                ...(instance.BrushSideCount !== undefined && { BrushSideCount: instance.BrushSideCount }),
             }
         })
 
@@ -306,19 +310,70 @@ class Item {
         return validInstances
     }
 
-    // Get instances with their existence status
+    // Get instances with VMF stats and metadata
     getInstancesWithStatus() {
         const instancesWithStatus = {}
 
         for (const [index, instanceData] of Object.entries(this.instances)) {
-            const exists = this.instanceExists(index)
+            const metadata = this.getInstanceMetadata(index)
+            
+            // Use saved VMF stats if they exist, otherwise compute them
+            let vmfStats = {
+                EntityCount: instanceData.EntityCount || 0,
+                BrushCount: instanceData.BrushCount || 0,
+                BrushSideCount: instanceData.BrushSideCount || 0
+            }
+
+            // Only compute VMF stats if they're not already saved and the file exists and it's not a VBSP instance
+            if (!instanceData.EntityCount && metadata.exists && metadata.source !== 'vbsp') {
+                try {
+                    // Apply path fixing to remove BEE2/ prefix for actual file structure
+                    const actualInstancePath = this.fixInstancePath(instanceData.Name)
+                    const fullInstancePath = Instance.getCleanPath(
+                        this.packagePath,
+                        actualInstancePath,
+                    )
+                    
+                    // Get VMF stats using the cache
+                    const computedStats = vmfStatsCache.getStats(fullInstancePath)
+                    vmfStats = {
+                        EntityCount: computedStats.EntityCount || 0,
+                        BrushCount: computedStats.BrushCount || 0,
+                        BrushSideCount: computedStats.BrushSideCount || 0
+                    }
+                } catch (error) {
+                    console.error(`Error getting VMF stats for instance ${index}:`, error.message)
+                }
+            }
+
             instancesWithStatus[index] = {
                 ...instanceData,
-                exists: exists,
+                ...vmfStats,
+                // Add metadata for frontend use
+                _metadata: metadata
             }
         }
 
         return instancesWithStatus
+    }
+
+    // Helper method to determine if an instance is a VBSP instance
+    isVbspInstance(instanceData) {
+        return instanceData.Name && instanceData.Name.includes('instances/bee2_dev')
+    }
+
+    // Helper method to get instance metadata (exists, source type)
+    getInstanceMetadata(index) {
+        const instanceData = this.instances[index]
+        if (!instanceData) {
+            return { exists: false, source: 'unknown' }
+        }
+
+        const exists = this.instanceExists(index)
+        const isVbsp = this.isVbspInstance(instanceData)
+        const source = isVbsp ? 'vbsp' : 'editor'
+
+        return { exists, source }
     }
 
     // Helper function to fix instance paths by removing BEE2/ prefix
@@ -355,8 +410,31 @@ class Item {
         if (!editoritems.Item.Exporting.Instances) {
             editoritems.Item.Exporting.Instances = {}
         }
+
+        // Get VMF stats for the new instance
+        let vmfStats = {
+            EntityCount: 0,
+            BrushCount: 0,
+            BrushSideCount: 0
+        }
+
+        try {
+            // Apply path fixing to remove BEE2/ prefix for actual file structure
+            const actualInstancePath = this.fixInstancePath(instanceName)
+            const fullInstancePath = Instance.getCleanPath(
+                this.packagePath,
+                actualInstancePath,
+            )
+            
+            // Get VMF stats using the cache
+            vmfStats = vmfStatsCache.getStats(fullInstancePath)
+        } catch (error) {
+            console.error(`Error getting VMF stats for new instance ${instanceName}:`, error.message)
+        }
+
         editoritems.Item.Exporting.Instances[nextIndex.toString()] = {
             Name: instanceName,
+            ...vmfStats
         }
         this.saveEditorItems(editoritems)
 
