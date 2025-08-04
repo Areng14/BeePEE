@@ -25,7 +25,7 @@ class Package {
         try {
             const infoPath = path.join(this.packageDir, "info.json")
             if (!fs.existsSync(infoPath)) {
-                throw new Error("Package not imported - missing info.json")
+                throw new Error(`[package : ${this.name}]: Missing info.json file`)
             }
 
             // Read and parse info.json
@@ -34,7 +34,7 @@ class Package {
             // Items
             let rawitems = parsedInfo["Item"]
             if (!rawitems) {
-                throw new Error("Invalid package format - no items found")
+                throw new Error(`[package : ${this.name}]: Invalid package format - no items found`)
             }
 
             // Convert single item to array
@@ -53,7 +53,7 @@ class Package {
 
             return this.items
         } catch (error) {
-            console.error("Failed to load package:", error.message)
+            console.error(`[package : ${this.name}]: Failed to load - ${error.message}`)
             this.items = []
             throw error
         }

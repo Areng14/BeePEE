@@ -107,4 +107,10 @@ contextBridge.exposeInMainWorld("package", {
     // ========================================
     setUnsavedChanges: (hasChanges) =>
         ipcRenderer.invoke("set-unsaved-changes", hasChanges),
+
+    // ========================================
+    // PACKAGE LOADING PROGRESS
+    // ========================================
+    onPackageLoadingProgress: (callback) =>
+        ipcRenderer.on("package-loading-progress", (event, data) => callback(data)),
 })

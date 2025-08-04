@@ -90,17 +90,27 @@ function createMainMenu(mainWindow) {
                         if (result.canceled) return null
                         try {
                             await importPackage(result.filePaths[0])
-                            const pkg = await loadPackage(result.filePaths[0])
+                            // Continue progress from import (70%) to load (80%)
+                            mainWindow.webContents.send("package-loading-progress", { 
+                                progress: 80, 
+                                message: "Loading imported package..." 
+                            })
+                            const pkg = await loadPackage(result.filePaths[0], true) // Skip progress reset since we're continuing from import
                             currentPackageDir = pkg.packageDir
+                            
+                            // Send final completion message
+                            mainWindow.webContents.send("package-loading-progress", { 
+                                progress: 100, 
+                                message: "Package imported and loaded successfully!" 
+                            })
+                            
                             mainWindow.webContents.send(
                                 "package:loaded",
                                 pkg.items,
                             )
                         } catch (error) {
-                            dialog.showErrorBox(
-                                "Import Failed",
-                                `Failed to import package: ${error.message}`,
-                            )
+                            // Error is already sent to frontend via progress update
+                            // No need for additional dialog since we show it in the loading popup
                         }
                     },
                 },

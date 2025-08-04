@@ -9,22 +9,40 @@ const { add } = require("node-7z")
 const { timeOperation } = require("./utils/timing")
 const { vmfStatsCache } = require("./utils/vmfParser")
 
+// Global reference to main window for progress updates
+let mainWindow = null
+
+// Helper function to send progress updates
+function sendProgressUpdate(progress, message, error = null) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("package-loading-progress", { progress, message, error })
+    }
+}
+
 var packages = []
 
 // Helper function to convert VDF to JSON
 function convertVdfToJson(filePath) {
-    const rawData = fs.readFileSync(filePath, "utf-8")
-    let emptyKeyCounter = 0
+    try {
+        const rawData = fs.readFileSync(filePath, "utf-8")
+        let emptyKeyCounter = 0
 
-    // Split into lines and process each line
-    const lines = rawData.split("\n")
-    const fixedLines = lines.map((line) => {
-        return line.replace(/^(\s*)""\s+(".*")/, (match, indent, value) => {
-            return `${indent}"desc_${emptyKeyCounter++}" ${value}`
+        // Split into lines and process each line
+        const lines = rawData.split("\n")
+        const fixedLines = lines.map((line) => {
+            return line.replace(/^(\s*)""\s+(".*")/, (match, indent, value) => {
+                return `${indent}"desc_${emptyKeyCounter++}" ${value}`
+            })
         })
-    })
 
-    return vdf.parse(fixedLines.join("\n"))
+        return vdf.parse(fixedLines.join("\n"))
+    } catch (error) {
+        // Extract item name from file path for better error reporting
+        const fileName = path.basename(filePath, '.txt')
+        const itemName = fileName.replace(/\.txt$/i, '')
+        
+        throw new Error(`[${itemName} : ${path.basename(filePath)}]: ${error.message}`)
+    }
 }
 
 // Helper function to recursively process VDF files
@@ -39,15 +57,20 @@ function processVdfFiles(directory) {
             // Recursively process subdirectories
             processVdfFiles(fullPath)
         } else if (file.endsWith(".txt")) {
-            // Convert VDF to JSON
-            const jsonData = convertVdfToJson(fullPath)
+            try {
+                // Convert VDF to JSON
+                const jsonData = convertVdfToJson(fullPath)
 
-            // Save as JSON file (same name but .json extension)
-            const jsonPath = fullPath.replace(/\.txt$/i, ".json")
-            fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 4))
+                // Save as JSON file (same name but .json extension)
+                const jsonPath = fullPath.replace(/\.txt$/i, ".json")
+                fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 4))
 
-            // Delete the original .txt file
-            fs.unlinkSync(fullPath)
+                // Delete the original .txt file
+                fs.unlinkSync(fullPath)
+            } catch (error) {
+                // The error already contains the file context from convertVdfToJson
+                throw error
+            }
         } else if (file.endsWith(".vmx")) {
             // Delete .vmx files (not needed)
             fs.unlinkSync(fullPath)
@@ -98,10 +121,17 @@ const updateVMFStatsForPackage = async (packageDir) => {
             const editorItemsFiles = findEditorItemsFiles(packageDir)
             let updatedFiles = 0
             
-            for (const editorItemsPath of editorItemsFiles) {
-                try {
-                    const editorItems = JSON.parse(fs.readFileSync(editorItemsPath, "utf-8"))
-                    let hasChanges = false
+            if (editorItemsFiles.length > 0) {
+                sendProgressUpdate(75, `Analyzing ${editorItemsFiles.length} item files...`)
+                
+                for (let i = 0; i < editorItemsFiles.length; i++) {
+                    const editorItemsPath = editorItemsFiles[i]
+                    const progress = 75 + Math.floor((i / editorItemsFiles.length) * 20)
+                    sendProgressUpdate(progress, `Analyzing item ${i + 1}/${editorItemsFiles.length}...`)
+                    
+                    try {
+                        const editorItems = JSON.parse(fs.readFileSync(editorItemsPath, "utf-8"))
+                        let hasChanges = false
                     
                     if (editorItems.Item?.Exporting?.Instances) {
                         for (const [index, instance] of Object.entries(editorItems.Item.Exporting.Instances)) {
@@ -142,7 +172,9 @@ const updateVMFStatsForPackage = async (packageDir) => {
                         }
                     }
                 } catch (error) {
-                    console.warn(`Failed to update VMF stats in ${editorItemsPath}:`, error.message)
+                    const itemName = path.basename(path.dirname(editorItemsPath))
+                    console.warn(`[${itemName} : editoritems.json]: Failed to update VMF stats - ${error.message}`)
+                }
                 }
             }
             
@@ -151,7 +183,7 @@ const updateVMFStatsForPackage = async (packageDir) => {
             }
             
         } catch (error) {
-            console.error("Failed to update VMF stats for package:", error.message)
+            console.error(`[package : ${path.basename(packageDir)}]: Failed to update VMF stats - ${error.message}`)
         }
     })
 }
@@ -179,7 +211,9 @@ const extractPackage = async (pathToPackage, packageDir) => {
 
     await new Promise((resolve, reject) => {
         stream.on("end", resolve)
-        stream.on("error", reject)
+        stream.on("error", (error) => {
+            reject(new Error(`[package : ${path.basename(pathToPackage)}]: Extraction failed - ${error.message}`))
+        })
     })
     console.log("Extraction complete")
 }
@@ -188,7 +222,10 @@ const importPackage = async (pathToPackage) => {
     return timeOperation("Import package", async () => {
         let tempPkg = null
         try {
+            sendProgressUpdate(0, "Starting package import...")
+            
             tempPkg = new Package(pathToPackage)
+            sendProgressUpdate(10, "Preparing package directory...")
 
             // Extract package - wipe existing directory first
             if (fs.existsSync(tempPkg.packageDir)) {
@@ -198,20 +235,28 @@ const importPackage = async (pathToPackage) => {
                 )
             }
             fs.mkdirSync(tempPkg.packageDir, { recursive: true })
+            
+            sendProgressUpdate(20, "Extracting package files...")
             await extractPackage(pathToPackage, tempPkg.packageDir)
 
+            sendProgressUpdate(50, "Processing VDF files...")
             // Process all VDF files recursively
             await timeOperation("Process VDF files", () => {
                 processVdfFiles(tempPkg.packageDir)
                 return Promise.resolve()
             })
 
+            sendProgressUpdate(70, "Analyzing VMF files...")
             // Update VMF stats for all instances in the package
             await updateVMFStatsForPackage(tempPkg.packageDir)
 
+            // Don't send 100% here since we're continuing to load
             return true
         } catch (error) {
             console.error("Failed to import package:", error.message)
+
+            // Send error to frontend
+            sendProgressUpdate(100, "Package import failed!", error.message)
 
             // Cleanup on failure
             if (tempPkg?.packageDir && fs.existsSync(tempPkg.packageDir)) {
@@ -229,25 +274,33 @@ const importPackage = async (pathToPackage) => {
                 }
             }
 
-            dialog.showErrorBox(
-                "Package Import Failed",
-                `Failed to import package ${path.parse(pathToPackage).name}: ${error.message}`,
-            )
+            // Don't show error dialog since we're already showing it in the loading popup
+            // dialog.showErrorBox(
+            //     "Package Import Failed",
+            //     `Failed to import package ${path.parse(pathToPackage).name}: ${error.message}`,
+            // )
 
             throw error
         }
     })
 }
 
-const loadPackage = async (pathToPackage) => {
+const loadPackage = async (pathToPackage, skipProgressReset = false) => {
     return timeOperation("Load package", async () => {
         try {
+            if (!skipProgressReset) {
+                sendProgressUpdate(0, "Starting package load...")
+            }
+            
             // Create package instance
             const pkg = new Package(pathToPackage)
+            if (!skipProgressReset) {
+                sendProgressUpdate(10, "Preparing package directory...")
+            }
 
             // Check if the package file exists
             if (!fs.existsSync(pathToPackage)) {
-                throw new Error(`Package file ${pathToPackage} does not exist`)
+                throw new Error(`[package : ${path.basename(pathToPackage)}]: Package file does not exist`)
             }
 
             // Always extract fresh - wipe existing directory first
@@ -258,14 +311,24 @@ const loadPackage = async (pathToPackage) => {
                 )
             }
             fs.mkdirSync(pkg.packageDir, { recursive: true })
+            
+            if (!skipProgressReset) {
+                sendProgressUpdate(20, "Extracting package files...")
+            }
             await extractPackage(pathToPackage, pkg.packageDir)
 
+            if (!skipProgressReset) {
+                sendProgressUpdate(50, "Processing VDF files...")
+            }
             // Process all VDF files recursively (convert .txt to .json)
             await timeOperation("Process VDF files", () => {
                 processVdfFiles(pkg.packageDir)
                 return Promise.resolve()
             })
 
+            if (!skipProgressReset) {
+                sendProgressUpdate(80, "Loading package data...")
+            }
             // Now load the package
             await pkg.load()
             packages.push(pkg)
@@ -275,9 +338,16 @@ const loadPackage = async (pathToPackage) => {
                 global.titleManager.setCurrentPackage(pathToPackage)
             }
 
+            if (!skipProgressReset) {
+                sendProgressUpdate(100, "Package loaded successfully!")
+            }
             return pkg
         } catch (error) {
             console.error("Failed to load package:", error)
+            
+            // Send error to frontend
+            sendProgressUpdate(100, "Package load failed!", error.message)
+            
             throw error
         }
     })
@@ -349,6 +419,11 @@ const closePackage = async () => {
     return true
 }
 
+// Function to set main window reference
+const setMainWindow = (window) => {
+    mainWindow = window
+}
+
 module.exports = {
     reg_loadPackagePopup,
     loadPackage,
@@ -358,4 +433,5 @@ module.exports = {
     savePackageAsBpee,
     clearPackagesDirectory,
     closePackage, // Export the new function
+    setMainWindow,
 }
