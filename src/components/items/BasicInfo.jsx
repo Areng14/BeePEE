@@ -128,18 +128,37 @@ function BasicInfo({ item, formData, onUpdate }) {
                                     size="small"
                                     onClick={async () => {
                                         try {
-                                            const result = await window.package.browseForIconFile()
+                                            const result =
+                                                await window.package.browseForIconFile()
                                             if (result.success) {
-                                                console.log("Icon staged successfully")
+                                                console.log(
+                                                    "Icon staged successfully",
+                                                )
                                                 // Stage the icon change
-                                                onUpdate('stagedIconPath', result.filePath)
-                                                onUpdate('stagedIconName', result.fileName)
-                                                onUpdate('iconChanged', true, 'basicInfo')
+                                                onUpdate(
+                                                    "stagedIconPath",
+                                                    result.filePath,
+                                                )
+                                                onUpdate(
+                                                    "stagedIconName",
+                                                    result.fileName,
+                                                )
+                                                onUpdate(
+                                                    "iconChanged",
+                                                    true,
+                                                    "basicInfo",
+                                                )
                                             } else if (!result.canceled) {
-                                                console.error("Failed to browse for icon:", result.error)
+                                                console.error(
+                                                    "Failed to browse for icon:",
+                                                    result.error,
+                                                )
                                             }
                                         } catch (error) {
-                                            console.error("Failed to browse for icon:", error)
+                                            console.error(
+                                                "Failed to browse for icon:",
+                                                error,
+                                            )
                                         }
                                     }}
                                     title="Browse for Icon"
@@ -149,7 +168,9 @@ function BasicInfo({ item, formData, onUpdate }) {
                                 <IconButton
                                     size="small"
                                     onClick={async () => {
-                                        const iconToShow = formData.stagedIconPath || item?.icon
+                                        const iconToShow =
+                                            formData.stagedIconPath ||
+                                            item?.icon
                                         if (iconToShow) {
                                             try {
                                                 await window.package.showIconPreview(
@@ -165,7 +186,9 @@ function BasicInfo({ item, formData, onUpdate }) {
                                         }
                                     }}
                                     title="View Icon"
-                                    disabled={!formData.stagedIconPath && !item?.icon}>
+                                    disabled={
+                                        !formData.stagedIconPath && !item?.icon
+                                    }>
                                     <Image />
                                 </IconButton>
                             </InputAdornment>

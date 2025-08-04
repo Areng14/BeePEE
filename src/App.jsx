@@ -11,7 +11,7 @@ function App() {
         open: false,
         progress: 0,
         message: "Loading...",
-        error: null
+        error: null,
     })
 
     useEffect(() => {
@@ -21,12 +21,12 @@ function App() {
                 open: true,
                 progress: data.progress,
                 message: data.message,
-                error: data.error || null
+                error: data.error || null,
             })
 
             // Auto-hide when complete (unless there's an error)
             if (data.progress >= 100 && !data.error) {
-                setLoadingState(prev => ({ ...prev, open: false }))
+                setLoadingState((prev) => ({ ...prev, open: false }))
             }
         }
 
@@ -52,7 +52,13 @@ function App() {
                 progress={loadingState.progress}
                 message={loadingState.message}
                 error={loadingState.error}
-                onClose={() => setLoadingState(prev => ({ ...prev, open: false, error: null }))}
+                onClose={() =>
+                    setLoadingState((prev) => ({
+                        ...prev,
+                        open: false,
+                        error: null,
+                    }))
+                }
             />
         </ItemProvider>
     )

@@ -27,12 +27,13 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.invoke("show-icon-preview", { iconPath, itemName }),
     browseForIcon: (itemId) =>
         ipcRenderer.invoke("browse-for-icon", { itemId }),
-    browseForIconFile: () =>
-        ipcRenderer.invoke("browse-for-icon-file"),
+    browseForIconFile: () => ipcRenderer.invoke("browse-for-icon-file"),
     saveItem: (itemData) => ipcRenderer.invoke("save-item", itemData),
     onItemUpdated: (callback) => {
         if (callback) {
-            ipcRenderer.on("item-updated", (event, item) => callback(event, item))
+            ipcRenderer.on("item-updated", (event, item) =>
+                callback(event, item),
+            )
         } else {
             ipcRenderer.removeAllListeners("item-updated")
         }
@@ -46,7 +47,11 @@ contextBridge.exposeInMainWorld("package", {
     addInstance: (itemId, instanceName) =>
         ipcRenderer.invoke("add-instance", { itemId, instanceName }),
     addInstanceFromFile: (itemId, filePath, instanceName) =>
-        ipcRenderer.invoke("add-instance-from-file", { itemId, filePath, instanceName }),
+        ipcRenderer.invoke("add-instance-from-file", {
+            itemId,
+            filePath,
+            instanceName,
+        }),
     addInstanceFileDialog: (itemId) =>
         ipcRenderer.invoke("add-instance-file-dialog", { itemId }),
     selectInstanceFile: (itemId) =>
@@ -114,5 +119,7 @@ contextBridge.exposeInMainWorld("package", {
     // PACKAGE LOADING PROGRESS
     // ========================================
     onPackageLoadingProgress: (callback) =>
-        ipcRenderer.on("package-loading-progress", (event, data) => callback(data)),
+        ipcRenderer.on("package-loading-progress", (event, data) =>
+            callback(data),
+        ),
 })

@@ -15,7 +15,11 @@ let mainWindow = null
 // Helper function to send progress updates
 function sendProgressUpdate(progress, message, error = null) {
     if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send("package-loading-progress", { progress, message, error })
+        mainWindow.webContents.send("package-loading-progress", {
+            progress,
+            message,
+            error,
+        })
     }
 }
 
@@ -26,20 +30,20 @@ function isVdfFile(filePath) {
     try {
         const content = fs.readFileSync(filePath, "utf-8")
         const lines = content.split("\n")
-        
+
         // Check if the file contains VDF-like content
         // VDF files typically start with a key and have opening/closing braces
         let hasVdfStructure = false
         let braceCount = 0
-        
+
         for (const line of lines) {
             const trimmedLine = line.trim()
-            
+
             // Skip empty lines and comments
             if (!trimmedLine || trimmedLine.startsWith("//")) {
                 continue
             }
-            
+
             // Count braces to check for VDF structure
             if (trimmedLine.includes("{")) {
                 braceCount++
@@ -48,13 +52,18 @@ function isVdfFile(filePath) {
             if (trimmedLine.includes("}")) {
                 braceCount--
             }
-            
+
             // If we find a line that looks like a VDF key (no spaces around =, or just a key)
-            if (trimmedLine.includes("=") || (trimmedLine && !trimmedLine.includes(" ") && !trimmedLine.includes("\t"))) {
+            if (
+                trimmedLine.includes("=") ||
+                (trimmedLine &&
+                    !trimmedLine.includes(" ") &&
+                    !trimmedLine.includes("\t"))
+            ) {
                 hasVdfStructure = true
             }
         }
-        
+
         // File is VDF if it has VDF structure and balanced braces
         return hasVdfStructure && braceCount === 0
     } catch (error) {
@@ -80,10 +89,12 @@ function convertVdfToJson(filePath) {
         return vdf.parse(fixedLines.join("\n"))
     } catch (error) {
         // Extract item name from file path for better error reporting
-        const fileName = path.basename(filePath, '.txt')
-        const itemName = fileName.replace(/\.txt$/i, '')
-        
-        throw new Error(`[${itemName} : ${path.basename(filePath)}]: ${error.message}`)
+        const fileName = path.basename(filePath, ".txt")
+        const itemName = fileName.replace(/\.txt$/i, "")
+
+        throw new Error(
+            `[${itemName} : ${path.basename(filePath)}]: ${error.message}`,
+        )
     }
 }
 
@@ -107,7 +118,10 @@ function processVdfFiles(directory) {
 
                     // Save as JSON file (same name but .json extension)
                     const jsonPath = fullPath.replace(/\.txt$/i, ".json")
-                    fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 4))
+                    fs.writeFileSync(
+                        jsonPath,
+                        JSON.stringify(jsonData, null, 4),
+                    )
 
                     // Delete the original .txt file
                     fs.unlinkSync(fullPath)
@@ -149,87 +163,138 @@ const updateVMFStatsForPackage = async (packageDir) => {
             const findEditorItemsFiles = (dir) => {
                 const files = []
                 const items = fs.readdirSync(dir)
-                
+
                 for (const item of items) {
                     const fullPath = path.join(dir, item)
                     const stat = fs.statSync(fullPath)
-                    
+
                     if (stat.isDirectory()) {
                         files.push(...findEditorItemsFiles(fullPath))
                     } else if (item === "editoritems.json") {
                         files.push(fullPath)
                     }
                 }
-                
+
                 return files
             }
-            
+
             const editorItemsFiles = findEditorItemsFiles(packageDir)
             let updatedFiles = 0
-            
+
             if (editorItemsFiles.length > 0) {
-                sendProgressUpdate(75, `Analyzing ${editorItemsFiles.length} item files...`)
-                
+                sendProgressUpdate(
+                    75,
+                    `Analyzing ${editorItemsFiles.length} item files...`,
+                )
+
                 for (let i = 0; i < editorItemsFiles.length; i++) {
                     const editorItemsPath = editorItemsFiles[i]
-                    const progress = 75 + Math.floor((i / editorItemsFiles.length) * 20)
-                    sendProgressUpdate(progress, `Analyzing item ${i + 1}/${editorItemsFiles.length}...`)
-                    
+                    const progress =
+                        75 + Math.floor((i / editorItemsFiles.length) * 20)
+                    sendProgressUpdate(
+                        progress,
+                        `Analyzing item ${i + 1}/${editorItemsFiles.length}...`,
+                    )
+
                     try {
-                        const editorItems = JSON.parse(fs.readFileSync(editorItemsPath, "utf-8"))
+                        const editorItems = JSON.parse(
+                            fs.readFileSync(editorItemsPath, "utf-8"),
+                        )
                         let hasChanges = false
-                    
-                    if (editorItems.Item?.Exporting?.Instances) {
-                        for (const [index, instance] of Object.entries(editorItems.Item.Exporting.Instances)) {
-                            if (instance.Name) {
-                                // Check if this is a VMF file (not VBSP)
-                                const isVbspInstance = instance.Name.includes('instances/bee2_dev')
-                                if (!isVbspInstance) {
-                                    // Build the full path to the VMF file
-                                    const instancePath = instance.Name.replace(/^instances\/BEE2\//, 'instances/')
-                                    const fullInstancePath = path.join(packageDir, "resources", instancePath)
-                                    
-                                    if (fs.existsSync(fullInstancePath)) {
-                                        // Always get VMF stats on import (don't check if they already exist)
-                                        const vmfStats = vmfStatsCache.getStats(fullInstancePath)
-                                        console.log(`Raw VMF stats for ${instance.Name}:`, vmfStats)
-                                        
-                                        // Always update the instance data with current stats
-                                        const updatedInstance = {
-                                            ...instance,
-                                            EntityCount: vmfStats.EntityCount || 0,
-                                            BrushCount: vmfStats.BrushCount || 0,
-                                            BrushSideCount: vmfStats.BrushSideCount || 0
+
+                        if (editorItems.Item?.Exporting?.Instances) {
+                            for (const [index, instance] of Object.entries(
+                                editorItems.Item.Exporting.Instances,
+                            )) {
+                                if (instance.Name) {
+                                    // Check if this is a VMF file (not VBSP)
+                                    const isVbspInstance =
+                                        instance.Name.includes(
+                                            "instances/bee2_dev",
+                                        )
+                                    if (!isVbspInstance) {
+                                        // Build the full path to the VMF file
+                                        const instancePath =
+                                            instance.Name.replace(
+                                                /^instances\/BEE2\//,
+                                                "instances/",
+                                            )
+                                        const fullInstancePath = path.join(
+                                            packageDir,
+                                            "resources",
+                                            instancePath,
+                                        )
+
+                                        if (fs.existsSync(fullInstancePath)) {
+                                            // Always get VMF stats on import (don't check if they already exist)
+                                            const vmfStats =
+                                                vmfStatsCache.getStats(
+                                                    fullInstancePath,
+                                                )
+                                            console.log(
+                                                `Raw VMF stats for ${instance.Name}:`,
+                                                vmfStats,
+                                            )
+
+                                            // Always update the instance data with current stats
+                                            const updatedInstance = {
+                                                ...instance,
+                                                EntityCount:
+                                                    vmfStats.EntityCount || 0,
+                                                BrushCount:
+                                                    vmfStats.BrushCount || 0,
+                                                BrushSideCount:
+                                                    vmfStats.BrushSideCount ||
+                                                    0,
+                                            }
+                                            editorItems.Item.Exporting.Instances[
+                                                index
+                                            ] = updatedInstance
+                                            hasChanges = true
+                                            console.log(
+                                                `Updated VMF stats for ${instance.Name}: ${updatedInstance.EntityCount} entities, ${updatedInstance.BrushCount} brushes, ${updatedInstance.BrushSideCount} brush sides`,
+                                            )
+                                            console.log(
+                                                `Saved instance data:`,
+                                                updatedInstance,
+                                            )
+                                        } else {
+                                            console.warn(
+                                                `VMF file not found: ${fullInstancePath}`,
+                                            )
                                         }
-                                        editorItems.Item.Exporting.Instances[index] = updatedInstance
-                                        hasChanges = true
-                                        console.log(`Updated VMF stats for ${instance.Name}: ${updatedInstance.EntityCount} entities, ${updatedInstance.BrushCount} brushes, ${updatedInstance.BrushSideCount} brush sides`)
-                                        console.log(`Saved instance data:`, updatedInstance)
-                                    } else {
-                                        console.warn(`VMF file not found: ${fullInstancePath}`)
                                     }
                                 }
                             }
+
+                            if (hasChanges) {
+                                fs.writeFileSync(
+                                    editorItemsPath,
+                                    JSON.stringify(editorItems, null, 4),
+                                )
+                                updatedFiles++
+                            }
                         }
-                        
-                        if (hasChanges) {
-                            fs.writeFileSync(editorItemsPath, JSON.stringify(editorItems, null, 4))
-                            updatedFiles++
-                        }
+                    } catch (error) {
+                        const itemName = path.basename(
+                            path.dirname(editorItemsPath),
+                        )
+                        console.warn(
+                            `[${itemName} : editoritems.json]: Failed to update VMF stats - ${error.message}`,
+                        )
                     }
-                } catch (error) {
-                    const itemName = path.basename(path.dirname(editorItemsPath))
-                    console.warn(`[${itemName} : editoritems.json]: Failed to update VMF stats - ${error.message}`)
-                }
                 }
             }
-            
+
             if (updatedFiles > 0) {
-                console.log(`Updated VMF stats in ${updatedFiles} editoritems.json files`)
+                console.log(
+                    `Updated VMF stats in ${updatedFiles} editoritems.json files`,
+                )
             }
-            
         } catch (error) {
-            console.error(`[package : ${path.basename(packageDir)}]: Failed to update VMF stats - ${error.message}`)
+            console.error(
+                `[package : ${path.basename(packageDir)}]: Failed to update VMF stats - ${error.message}`,
+            )
         }
     })
 }
@@ -258,7 +323,11 @@ const extractPackage = async (pathToPackage, packageDir) => {
     await new Promise((resolve, reject) => {
         stream.on("end", resolve)
         stream.on("error", (error) => {
-            reject(new Error(`[package : ${path.basename(pathToPackage)}]: Extraction failed - ${error.message}`))
+            reject(
+                new Error(
+                    `[package : ${path.basename(pathToPackage)}]: Extraction failed - ${error.message}`,
+                ),
+            )
         })
     })
     console.log("Extraction complete")
@@ -269,7 +338,7 @@ const importPackage = async (pathToPackage) => {
         let tempPkg = null
         try {
             sendProgressUpdate(0, "Starting package import...")
-            
+
             tempPkg = new Package(pathToPackage)
             sendProgressUpdate(10, "Preparing package directory...")
 
@@ -281,7 +350,7 @@ const importPackage = async (pathToPackage) => {
                 )
             }
             fs.mkdirSync(tempPkg.packageDir, { recursive: true })
-            
+
             sendProgressUpdate(20, "Extracting package files...")
             await extractPackage(pathToPackage, tempPkg.packageDir)
 
@@ -337,7 +406,7 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
             if (!skipProgressReset) {
                 sendProgressUpdate(0, "Starting package load...")
             }
-            
+
             // Create package instance
             const pkg = new Package(pathToPackage)
             if (!skipProgressReset) {
@@ -346,7 +415,9 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
 
             // Check if the package file exists
             if (!fs.existsSync(pathToPackage)) {
-                throw new Error(`[package : ${path.basename(pathToPackage)}]: Package file does not exist`)
+                throw new Error(
+                    `[package : ${path.basename(pathToPackage)}]: Package file does not exist`,
+                )
             }
 
             // Always extract fresh - wipe existing directory first
@@ -357,7 +428,7 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
                 )
             }
             fs.mkdirSync(pkg.packageDir, { recursive: true })
-            
+
             if (!skipProgressReset) {
                 sendProgressUpdate(20, "Extracting package files...")
             }
@@ -390,10 +461,10 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
             return pkg
         } catch (error) {
             console.error("Failed to load package:", error)
-            
+
             // Send error to frontend
             sendProgressUpdate(100, "Package load failed!", error.message)
-            
+
             throw error
         }
     })

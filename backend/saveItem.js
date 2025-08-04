@@ -1,6 +1,10 @@
 const fs = require("fs")
 const path = require("path")
-const { convertImageToVTF, getVTFPathFromImagePath, updateEditorItemsWithVTF } = require("./utils/vtfConverter")
+const {
+    convertImageToVTF,
+    getVTFPathFromImagePath,
+    updateEditorItemsWithVTF,
+} = require("./utils/vtfConverter")
 
 /**
  * Handles VTF conversion for palette images referenced in editoritems.json
@@ -9,11 +13,18 @@ const { convertImageToVTF, getVTFPathFromImagePath, updateEditorItemsWithVTF } =
  * @param {string} packagePath - Path to the package directory
  * @param {string} editorItemsPath - Path to the editoritems.json file
  */
-async function handleVTFConversion(editorItems, iconPath, packagePath, editorItemsPath) {
+async function handleVTFConversion(
+    editorItems,
+    iconPath,
+    packagePath,
+    editorItemsPath,
+) {
     const editor = editorItems.Item?.Editor
     if (!editor?.SubType) return
 
-    const subType = Array.isArray(editor.SubType) ? editor.SubType[0] : editor.SubType
+    const subType = Array.isArray(editor.SubType)
+        ? editor.SubType[0]
+        : editor.SubType
     const paletteImage = subType?.Palette?.Image
 
     if (!paletteImage) return
@@ -21,15 +32,15 @@ async function handleVTFConversion(editorItems, iconPath, packagePath, editorIte
     console.log(`Found palette image reference: ${paletteImage}`)
 
     // Check if this is a palette image path that needs VTF conversion
-    if (paletteImage.startsWith('palette/')) {
+    if (paletteImage.startsWith("palette/")) {
         try {
             // Get the VTF output path
             const vtfPath = getVTFPathFromImagePath(packagePath, paletteImage)
-            
+
             // Convert the icon to VTF format
             await convertImageToVTF(iconPath, vtfPath, {
-                format: 'DXT5',
-                generateMipmaps: true
+                format: "DXT5",
+                generateMipmaps: true,
             })
 
             // Update the editoritems.json to reference the VTF path instead of the palette image
@@ -37,15 +48,17 @@ async function handleVTFConversion(editorItems, iconPath, packagePath, editorIte
                 editorItemsPath,
                 paletteImage,
                 vtfPath,
-                packagePath
+                packagePath,
             )
 
             // Update the editorItems object that will be saved
             if (updatedEditorItems.Item?.Editor?.SubType) {
-                const updatedSubType = Array.isArray(updatedEditorItems.Item.Editor.SubType) 
-                    ? updatedEditorItems.Item.Editor.SubType[0] 
+                const updatedSubType = Array.isArray(
+                    updatedEditorItems.Item.Editor.SubType,
+                )
+                    ? updatedEditorItems.Item.Editor.SubType[0]
                     : updatedEditorItems.Item.Editor.SubType
-                
+
                 if (Array.isArray(editor.SubType)) {
                     editor.SubType[0].Palette = updatedSubType.Palette
                 } else {
@@ -53,9 +66,14 @@ async function handleVTFConversion(editorItems, iconPath, packagePath, editorIte
                 }
             }
 
-            console.log(`Successfully converted and updated VTF reference: ${vtfPath}`)
+            console.log(
+                `Successfully converted and updated VTF reference: ${vtfPath}`,
+            )
         } catch (error) {
-            console.error(`Failed to handle VTF conversion for ${paletteImage}:`, error)
+            console.error(
+                `Failed to handle VTF conversion for ${paletteImage}:`,
+                error,
+            )
             throw error
         }
     }
@@ -114,53 +132,98 @@ async function saveItem(item) {
         try {
             const stagedIconPath = item.iconData.stagedIconPath
             const stagedIconName = item.iconData.stagedIconName
-            
+
             if (fs.existsSync(stagedIconPath)) {
                 const fileExt = path.extname(stagedIconName).toLowerCase()
-                
+
                 // Get the current icon path or create a new one
-                const packagePath = path.dirname(path.dirname(item.fullItemPath))
+                const packagePath = path.dirname(
+                    path.dirname(item.fullItemPath),
+                )
                 let targetIconPath
-                
+
                 // Check if item already has an icon
                 const currentIconPath = properties.Properties.Icon?.["0"]
                 if (currentIconPath) {
                     // Replace existing icon - keep same directory but update extension if needed
-                    const bee2ItemsPath = path.join(packagePath, "resources", "BEE2", "items")
-                    const currentFullPath = path.join(bee2ItemsPath, currentIconPath)
+                    const bee2ItemsPath = path.join(
+                        packagePath,
+                        "resources",
+                        "BEE2",
+                        "items",
+                    )
+                    const currentFullPath = path.join(
+                        bee2ItemsPath,
+                        currentIconPath,
+                    )
                     const currentDir = path.dirname(currentFullPath)
-                    const currentBaseName = path.basename(currentFullPath, path.extname(currentFullPath))
-                    targetIconPath = path.join(currentDir, currentBaseName + fileExt)
-                    
+                    const currentBaseName = path.basename(
+                        currentFullPath,
+                        path.extname(currentFullPath),
+                    )
+                    targetIconPath = path.join(
+                        currentDir,
+                        currentBaseName + fileExt,
+                    )
+
                     // Delete the old icon file if it's different from the new target
-                    if (currentFullPath !== targetIconPath && fs.existsSync(currentFullPath)) {
+                    if (
+                        currentFullPath !== targetIconPath &&
+                        fs.existsSync(currentFullPath)
+                    ) {
                         fs.unlinkSync(currentFullPath)
                     }
                 } else {
                     // Create new icon path - use item name as filename in the BEE2/items structure
-                    const iconDir = path.join(packagePath, "resources", "BEE2", "items", "beepkg")
+                    const iconDir = path.join(
+                        packagePath,
+                        "resources",
+                        "BEE2",
+                        "items",
+                        "beepkg",
+                    )
                     if (!fs.existsSync(iconDir)) {
                         fs.mkdirSync(iconDir, { recursive: true })
                     }
-                    const safeItemName = item.name.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase()
+                    const safeItemName = item.name
+                        .replace(/[^a-zA-Z0-9_-]/g, "_")
+                        .toLowerCase()
                     targetIconPath = path.join(iconDir, safeItemName + fileExt)
                 }
-                
+
                 // Copy the staged icon file to the target location
                 fs.copyFileSync(stagedIconPath, targetIconPath)
-                
+
                 // Update the properties file with the new icon path (relative to resources/BEE2/items/)
-                const bee2ItemsPath = path.join(packagePath, "resources", "BEE2", "items")
-                const relativePath = path.relative(bee2ItemsPath, targetIconPath)
-                
+                const bee2ItemsPath = path.join(
+                    packagePath,
+                    "resources",
+                    "BEE2",
+                    "items",
+                )
+                const relativePath = path.relative(
+                    bee2ItemsPath,
+                    targetIconPath,
+                )
+
                 if (!properties.Properties.Icon) properties.Properties.Icon = {}
-                properties.Properties.Icon["0"] = relativePath.replace(/\\/g, '/')
-                
-                console.log(`Icon updated: ${stagedIconPath} -> ${targetIconPath}`)
-                
+                properties.Properties.Icon["0"] = relativePath.replace(
+                    /\\/g,
+                    "/",
+                )
+
+                console.log(
+                    `Icon updated: ${stagedIconPath} -> ${targetIconPath}`,
+                )
+
                 // Also convert to VTF and update editoritems.json if the item uses palette images
                 try {
-                    await handleVTFConversion(editorItems, targetIconPath, packagePath, editorItemsPath)
+                    await handleVTFConversion(
+                        editorItems,
+                        targetIconPath,
+                        packagePath,
+                        editorItemsPath,
+                    )
                 } catch (error) {
                     console.error("Failed to convert icon to VTF:", error)
                     // Don't throw here - let the save continue even if VTF conversion fails
