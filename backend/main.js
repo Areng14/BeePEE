@@ -60,7 +60,7 @@ ipcMain.handle("api:loadImage", async (event, filePath) => {
 app.whenReady().then(createWindow)
 
 // Clean up packages directory when app exits
-app.on('before-quit', async () => {
+app.on("before-quit", async () => {
     try {
         console.log("Cleaning up packages directory...")
         await clearPackagesDirectory()

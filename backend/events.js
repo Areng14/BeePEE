@@ -258,13 +258,15 @@ function reg_events(mainWindow) {
             // Validate it's an image file
             const validExtensions = [".png", ".jpg", ".jpeg", ".tga", ".vtf"]
             if (!validExtensions.includes(fileExt)) {
-                throw new Error("Selected file must be an image file (PNG, JPG, TGA, or VTF)")
+                throw new Error(
+                    "Selected file must be an image file (PNG, JPG, TGA, or VTF)",
+                )
             }
 
-            return { 
-                success: true, 
+            return {
+                success: true,
                 filePath: selectedFilePath,
-                fileName: fileName
+                fileName: fileName,
             }
         } catch (error) {
             console.error("Failed to browse for icon file:", error)
@@ -310,7 +312,9 @@ function reg_events(mainWindow) {
             // Validate it's an image file
             const validExtensions = [".png", ".jpg", ".jpeg", ".tga", ".vtf"]
             if (!validExtensions.includes(fileExt)) {
-                throw new Error("Selected file must be an image file (PNG, JPG, TGA, or VTF)")
+                throw new Error(
+                    "Selected file must be an image file (PNG, JPG, TGA, or VTF)",
+                )
             }
 
             // Get the current icon path or create a new one
@@ -318,20 +322,34 @@ function reg_events(mainWindow) {
             if (item.icon && fs.existsSync(item.icon)) {
                 // Replace existing icon - keep same path but update extension if needed
                 const currentDir = path.dirname(item.icon)
-                const currentBaseName = path.basename(item.icon, path.extname(item.icon))
-                targetIconPath = path.join(currentDir, currentBaseName + fileExt)
-                
+                const currentBaseName = path.basename(
+                    item.icon,
+                    path.extname(item.icon),
+                )
+                targetIconPath = path.join(
+                    currentDir,
+                    currentBaseName + fileExt,
+                )
+
                 // Delete the old icon file if it's different from the new target
                 if (item.icon !== targetIconPath && fs.existsSync(item.icon)) {
                     fs.unlinkSync(item.icon)
                 }
             } else {
                 // Create new icon path - use item name as filename in the BEE2/items structure
-                const iconDir = path.join(item.packagePath, "resources", "BEE2", "items", "beepkg")
+                const iconDir = path.join(
+                    item.packagePath,
+                    "resources",
+                    "BEE2",
+                    "items",
+                    "beepkg",
+                )
                 if (!fs.existsSync(iconDir)) {
                     fs.mkdirSync(iconDir, { recursive: true })
                 }
-                const safeItemName = item.name.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase()
+                const safeItemName = item.name
+                    .replace(/[^a-zA-Z0-9_-]/g, "_")
+                    .toLowerCase()
                 targetIconPath = path.join(iconDir, safeItemName + fileExt)
             }
 
@@ -339,32 +357,51 @@ function reg_events(mainWindow) {
             fs.copyFileSync(selectedFilePath, targetIconPath)
 
             // Update the item's icon path in the properties file (where Item class actually reads it)
-            const propertiesPath = path.join(item.fullItemPath, "properties.json")
+            const propertiesPath = path.join(
+                item.fullItemPath,
+                "properties.json",
+            )
             if (fs.existsSync(propertiesPath)) {
-                const properties = JSON.parse(fs.readFileSync(propertiesPath, "utf-8"))
-                
+                const properties = JSON.parse(
+                    fs.readFileSync(propertiesPath, "utf-8"),
+                )
+
                 // Make path relative to resources/BEE2/items/ (as expected by Item class line 84)
-                const bee2ItemsPath = path.join(item.packagePath, "resources", "BEE2", "items")
-                const relativePath = path.relative(bee2ItemsPath, targetIconPath)
-                
+                const bee2ItemsPath = path.join(
+                    item.packagePath,
+                    "resources",
+                    "BEE2",
+                    "items",
+                )
+                const relativePath = path.relative(
+                    bee2ItemsPath,
+                    targetIconPath,
+                )
+
                 if (!properties.Properties) properties.Properties = {}
                 if (!properties.Properties.Icon) properties.Properties.Icon = {}
-                properties.Properties.Icon["0"] = relativePath.replace(/\\/g, '/')
-                
-                fs.writeFileSync(propertiesPath, JSON.stringify(properties, null, 2))
+                properties.Properties.Icon["0"] = relativePath.replace(
+                    /\\/g,
+                    "/",
+                )
+
+                fs.writeFileSync(
+                    propertiesPath,
+                    JSON.stringify(properties, null, 2),
+                )
             }
 
             // Reload the item to get updated data
-            const updatedItemInstance = new Item({ 
-                packagePath: item.packagePath, 
-                itemJSON: loadOriginalItemJSON(item.packagePath, item.id) 
+            const updatedItemInstance = new Item({
+                packagePath: item.packagePath,
+                itemJSON: loadOriginalItemJSON(item.packagePath, item.id),
             })
             const updatedItem = updatedItemInstance.toJSON()
 
             // Send updated item data to frontend
-            console.log('Sending updated item after icon change:', {
+            console.log("Sending updated item after icon change:", {
                 id: updatedItem.id,
-                icon: updatedItem.icon
+                icon: updatedItem.icon,
             })
             mainWindow.webContents.send("item-updated", updatedItem)
             sendItemUpdateToEditor(itemId, updatedItem)
@@ -374,7 +411,7 @@ function reg_events(mainWindow) {
             console.error("Failed to browse for icon:", error)
             dialog.showErrorBox(
                 "Failed to Set Icon",
-                `Could not set icon: ${error.message}`
+                `Could not set icon: ${error.message}`,
             )
             return { success: false, error: error.message }
         }
@@ -425,59 +462,65 @@ function reg_events(mainWindow) {
     })
 
     // Add instance from file path (for buffered save)
-    ipcMain.handle("add-instance-from-file", async (event, { itemId, filePath, instanceName }) => {
-        try {
-            // Find the item in any loaded package
-            const item = packages
-                .flatMap((p) => p.items)
-                .find((i) => i.id === itemId)
-            if (!item) {
-                throw new Error("Item not found")
+    ipcMain.handle(
+        "add-instance-from-file",
+        async (event, { itemId, filePath, instanceName }) => {
+            try {
+                // Find the item in any loaded package
+                const item = packages
+                    .flatMap((p) => p.items)
+                    .find((i) => i.id === itemId)
+                if (!item) {
+                    throw new Error("Item not found")
+                }
+
+                // Verify the file exists
+                if (!fs.existsSync(filePath)) {
+                    throw new Error("Source file not found")
+                }
+
+                // Apply path fixing to remove BEE2/ prefix for actual file structure
+                const actualFilePath = fixInstancePath(instanceName)
+                const targetPath = path.join(
+                    item.packagePath,
+                    "resources",
+                    actualFilePath,
+                )
+                const targetDir = path.dirname(targetPath)
+
+                // Ensure the instances directory exists
+                if (!fs.existsSync(targetDir)) {
+                    fs.mkdirSync(targetDir, { recursive: true })
+                }
+
+                // Copy the file
+                fs.copyFileSync(filePath, targetPath)
+
+                // Add to editoritems
+                const newIndex = item.addInstance(instanceName)
+
+                // Send updated item data to frontend
+                const updatedItem = item.toJSONWithExistence()
+                console.log(
+                    "Sending updated item after add instance from file:",
+                    {
+                        id: updatedItem.id,
+                        instances: updatedItem.instances,
+                    },
+                )
+                mainWindow.webContents.send("item-updated", updatedItem)
+                sendItemUpdateToEditor(itemId, updatedItem)
+
+                return { success: true, index: newIndex }
+            } catch (error) {
+                dialog.showErrorBox(
+                    "Failed to Add Instance",
+                    `Could not add instance: ${error.message}`,
+                )
+                return { success: false, error: error.message }
             }
-
-            // Verify the file exists
-            if (!fs.existsSync(filePath)) {
-                throw new Error("Source file not found")
-            }
-
-            // Apply path fixing to remove BEE2/ prefix for actual file structure
-            const actualFilePath = fixInstancePath(instanceName)
-            const targetPath = path.join(
-                item.packagePath,
-                "resources",
-                actualFilePath,
-            )
-            const targetDir = path.dirname(targetPath)
-
-            // Ensure the instances directory exists
-            if (!fs.existsSync(targetDir)) {
-                fs.mkdirSync(targetDir, { recursive: true })
-            }
-
-            // Copy the file
-            fs.copyFileSync(filePath, targetPath)
-
-            // Add to editoritems
-            const newIndex = item.addInstance(instanceName)
-
-            // Send updated item data to frontend
-            const updatedItem = item.toJSONWithExistence()
-            console.log("Sending updated item after add instance from file:", {
-                id: updatedItem.id,
-                instances: updatedItem.instances,
-            })
-            mainWindow.webContents.send("item-updated", updatedItem)
-            sendItemUpdateToEditor(itemId, updatedItem)
-
-            return { success: true, index: newIndex }
-        } catch (error) {
-            dialog.showErrorBox(
-                "Failed to Add Instance",
-                `Could not add instance: ${error.message}`,
-            )
-            return { success: false, error: error.message }
-        }
-    })
+        },
+    )
 
     // Add instance
     ipcMain.handle("add-instance", async (event, { itemId, instanceName }) => {
@@ -879,31 +922,41 @@ function reg_events(mainWindow) {
 
                 // Clear the cached instance so it gets reloaded
                 item._loadedInstances.delete(instanceIndex)
-                
+
                 // Clear VMF stats cache for this instance
                 vmfStatsCache.clearCache(currentInstancePath)
 
                 // Update VMF stats in the saved editoritems file
                 try {
                     const editoritems = item.getEditorItems()
-                    if (editoritems.Item?.Exporting?.Instances?.[instanceIndex]) {
+                    if (
+                        editoritems.Item?.Exporting?.Instances?.[instanceIndex]
+                    ) {
                         // Get updated VMF stats
-                        const actualInstancePath = fixInstancePath(instanceData.Name)
+                        const actualInstancePath = fixInstancePath(
+                            instanceData.Name,
+                        )
                         const fullInstancePath = Instance.getCleanPath(
                             item.packagePath,
                             actualInstancePath,
                         )
-                        const vmfStats = vmfStatsCache.getStats(fullInstancePath)
-                        
+                        const vmfStats =
+                            vmfStatsCache.getStats(fullInstancePath)
+
                         // Update the saved instance data with new stats
                         editoritems.Item.Exporting.Instances[instanceIndex] = {
-                            ...editoritems.Item.Exporting.Instances[instanceIndex],
-                            ...vmfStats
+                            ...editoritems.Item.Exporting.Instances[
+                                instanceIndex
+                            ],
+                            ...vmfStats,
                         }
                         item.saveEditorItems(editoritems)
                     }
                 } catch (error) {
-                    console.warn("Failed to update VMF stats in editoritems:", error.message)
+                    console.warn(
+                        "Failed to update VMF stats in editoritems:",
+                        error.message,
+                    )
                 }
 
                 // Send updated item data to frontend
@@ -943,7 +996,9 @@ function reg_events(mainWindow) {
                 const instanceData = item.instances[instanceIndex]
                 if (instanceData) {
                     try {
-                        const actualInstancePath = fixInstancePath(instanceData.Name)
+                        const actualInstancePath = fixInstancePath(
+                            instanceData.Name,
+                        )
                         const fullInstancePath = Instance.getCleanPath(
                             item.packagePath,
                             actualInstancePath,
@@ -951,7 +1006,10 @@ function reg_events(mainWindow) {
                         // Clear VMF stats cache for this instance
                         vmfStatsCache.clearCache(fullInstancePath)
                     } catch (error) {
-                        console.warn("Could not clear VMF cache for removed instance:", error.message)
+                        console.warn(
+                            "Could not clear VMF cache for removed instance:",
+                            error.message,
+                        )
                     }
                 }
 
@@ -1174,19 +1232,22 @@ function reg_events(mainWindow) {
     })
 
     // Instance metadata handler
-    ipcMain.handle("get-instance-metadata", async (event, { itemId, instanceIndex }) => {
-        try {
-            const item = packages
-                .flatMap((p) => p.items)
-                .find((i) => i.id === itemId)
-            if (!item) throw new Error("Item not found")
+    ipcMain.handle(
+        "get-instance-metadata",
+        async (event, { itemId, instanceIndex }) => {
+            try {
+                const item = packages
+                    .flatMap((p) => p.items)
+                    .find((i) => i.id === itemId)
+                if (!item) throw new Error("Item not found")
 
-            const metadata = item.getInstanceMetadata(instanceIndex)
-            return { success: true, metadata }
-        } catch (error) {
-            return { success: false, error: error.message }
-        }
-    })
+                const metadata = item.getInstanceMetadata(instanceIndex)
+                return { success: true, metadata }
+            } catch (error) {
+                return { success: false, error: error.message }
+            }
+        },
+    )
 
     // Metadata management handlers
     ipcMain.handle("get-item-metadata", async (event, { itemId }) => {
