@@ -29,7 +29,11 @@ function ItemBrowser() {
 
         // Handle item updates
         window.package.onItemUpdated((event, updatedItem) => {
-            console.log("ItemBrowser received item update:", updatedItem.id, updatedItem.icon)
+            console.log(
+                "ItemBrowser received item update:",
+                updatedItem.id,
+                updatedItem.icon,
+            )
             setItems((currentItems) =>
                 currentItems.map((item) =>
                     item.id === updatedItem.id ? updatedItem : item,

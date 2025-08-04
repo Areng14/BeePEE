@@ -10,7 +10,13 @@ import {
 import CloseIcon from "@mui/icons-material/Close"
 import { useState, useEffect } from "react"
 
-function LoadingPopup({ open, progress = 0, message = "Loading...", error = null, onClose }) {
+function LoadingPopup({
+    open,
+    progress = 0,
+    message = "Loading...",
+    error = null,
+    onClose,
+}) {
     const [showSpinner, setShowSpinner] = useState(false)
 
     // Show spinner if progress is stuck at 0 or 100 for too long
@@ -37,8 +43,7 @@ function LoadingPopup({ open, progress = 0, message = "Loading...", error = null
                     flexDirection: "column",
                     justifyContent: "center",
                 },
-            }}
-        >
+            }}>
             <DialogContent>
                 <Box
                     sx={{
@@ -47,22 +52,31 @@ function LoadingPopup({ open, progress = 0, message = "Loading...", error = null
                         alignItems: "center",
                         gap: 3,
                         py: 2,
-                    }}
-                >
+                    }}>
                     {/* Spinner, Progress, or Error Icon */}
-                    <Box sx={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Box
+                        sx={{
+                            position: "relative",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                        }}>
                         {error ? (
                             // Error state: Red circle with X
-                            <Box sx={{ position: "relative", display: "inline-flex" }}>
+                            <Box
+                                sx={{
+                                    position: "relative",
+                                    display: "inline-flex",
+                                }}>
                                 <CircularProgress
                                     variant="determinate"
                                     value={100}
                                     size={60}
-                                    sx={{ 
+                                    sx={{
                                         color: "#ff4444",
                                         "& .MuiCircularProgress-circle": {
-                                            stroke: "#ff4444"
-                                        }
+                                            stroke: "#ff4444",
+                                        },
                                     }}
                                 />
                                 <Box
@@ -75,21 +89,27 @@ function LoadingPopup({ open, progress = 0, message = "Loading...", error = null
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                    }}
-                                >
-                                    <CloseIcon 
-                                        sx={{ 
-                                            color: "#ff4444", 
+                                    }}>
+                                    <CloseIcon
+                                        sx={{
+                                            color: "#ff4444",
                                             fontSize: 30,
-                                            fontWeight: "bold"
-                                        }} 
+                                            fontWeight: "bold",
+                                        }}
                                     />
                                 </Box>
                             </Box>
                         ) : showSpinner ? (
-                            <CircularProgress size={60} sx={{ color: "primary.main" }} />
+                            <CircularProgress
+                                size={60}
+                                sx={{ color: "primary.main" }}
+                            />
                         ) : (
-                            <Box sx={{ position: "relative", display: "inline-flex" }}>
+                            <Box
+                                sx={{
+                                    position: "relative",
+                                    display: "inline-flex",
+                                }}>
                                 <CircularProgress
                                     variant="determinate"
                                     value={progress}
@@ -106,14 +126,15 @@ function LoadingPopup({ open, progress = 0, message = "Loading...", error = null
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                    }}
-                                >
+                                    }}>
                                     <Typography
                                         variant="caption"
                                         component="div"
                                         color="white"
-                                        sx={{ fontSize: "0.75rem", fontWeight: "bold" }}
-                                    >
+                                        sx={{
+                                            fontSize: "0.75rem",
+                                            fontWeight: "bold",
+                                        }}>
                                         {`${Math.round(progress)}%`}
                                     </Typography>
                                 </Box>
@@ -125,8 +146,7 @@ function LoadingPopup({ open, progress = 0, message = "Loading...", error = null
                     <Typography
                         variant="h6"
                         align="center"
-                        sx={{ color: "white", fontWeight: "medium" }}
-                    >
+                        sx={{ color: "white", fontWeight: "medium" }}>
                         {message}
                     </Typography>
 
@@ -138,7 +158,9 @@ function LoadingPopup({ open, progress = 0, message = "Loading...", error = null
                             sx={{
                                 height: 8,
                                 borderRadius: 4,
-                                bgcolor: error ? "rgba(255,0,0,0.2)" : "rgba(255,255,255,0.1)",
+                                bgcolor: error
+                                    ? "rgba(255,0,0,0.2)"
+                                    : "rgba(255,255,255,0.1)",
                                 "& .MuiLinearProgress-bar": {
                                     borderRadius: 4,
                                     bgcolor: error ? "#ff4444" : undefined,
@@ -149,18 +171,23 @@ function LoadingPopup({ open, progress = 0, message = "Loading...", error = null
 
                     {/* Error Message or Additional Info */}
                     {error ? (
-                        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: 2,
+                            }}>
                             <Typography
                                 variant="body2"
                                 align="center"
-                                sx={{ 
-                                    color: "#ff6666", 
+                                sx={{
+                                    color: "#ff6666",
                                     fontSize: "0.875rem",
                                     fontWeight: "medium",
                                     maxWidth: 400,
-                                    wordBreak: "break-word"
-                                }}
-                            >
+                                    wordBreak: "break-word",
+                                }}>
                                 {error}
                             </Typography>
                             <Button
@@ -171,10 +198,10 @@ function LoadingPopup({ open, progress = 0, message = "Loading...", error = null
                                     borderColor: "#ff6666",
                                     "&:hover": {
                                         borderColor: "#ff8888",
-                                        backgroundColor: "rgba(255,102,102,0.1)"
-                                    }
-                                }}
-                            >
+                                        backgroundColor:
+                                            "rgba(255,102,102,0.1)",
+                                    },
+                                }}>
                                 Close
                             </Button>
                         </Box>
@@ -182,8 +209,10 @@ function LoadingPopup({ open, progress = 0, message = "Loading...", error = null
                         <Typography
                             variant="body2"
                             align="center"
-                            sx={{ color: "rgba(255,255,255,0.7)", fontSize: "0.875rem" }}
-                        >
+                            sx={{
+                                color: "rgba(255,255,255,0.7)",
+                                fontSize: "0.875rem",
+                            }}>
                             Please wait while we process your package...
                         </Typography>
                     )}
@@ -193,4 +222,4 @@ function LoadingPopup({ open, progress = 0, message = "Loading...", error = null
     )
 }
 
-export default LoadingPopup 
+export default LoadingPopup
