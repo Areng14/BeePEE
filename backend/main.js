@@ -4,7 +4,7 @@ const { createMainMenu } = require("./menu.js")
 const fs = require("fs")
 const { reg_events } = require("./events.js")
 const { WindowTitleManager } = require("./windowTitleManager.js")
-const { setMainWindow } = require("./packageManager.js")
+const { setMainWindow, clearPackagesDirectory } = require("./packageManager.js")
 
 const createWindow = () => {
     const isDev = !app.isPackaged
@@ -58,3 +58,14 @@ ipcMain.handle("api:loadImage", async (event, filePath) => {
 })
 
 app.whenReady().then(createWindow)
+
+// Clean up packages directory when app exits
+app.on('before-quit', async () => {
+    try {
+        console.log("Cleaning up packages directory...")
+        await clearPackagesDirectory()
+        console.log("Packages directory cleaned up successfully")
+    } catch (error) {
+        console.error("Failed to clean up packages directory:", error.message)
+    }
+})

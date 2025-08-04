@@ -21,6 +21,48 @@ function sendProgressUpdate(progress, message, error = null) {
 
 var packages = []
 
+// Helper function to check if a file is a VDF file
+function isVdfFile(filePath) {
+    try {
+        const content = fs.readFileSync(filePath, "utf-8")
+        const lines = content.split("\n")
+        
+        // Check if the file contains VDF-like content
+        // VDF files typically start with a key and have opening/closing braces
+        let hasVdfStructure = false
+        let braceCount = 0
+        
+        for (const line of lines) {
+            const trimmedLine = line.trim()
+            
+            // Skip empty lines and comments
+            if (!trimmedLine || trimmedLine.startsWith("//")) {
+                continue
+            }
+            
+            // Count braces to check for VDF structure
+            if (trimmedLine.includes("{")) {
+                braceCount++
+                hasVdfStructure = true
+            }
+            if (trimmedLine.includes("}")) {
+                braceCount--
+            }
+            
+            // If we find a line that looks like a VDF key (no spaces around =, or just a key)
+            if (trimmedLine.includes("=") || (trimmedLine && !trimmedLine.includes(" ") && !trimmedLine.includes("\t"))) {
+                hasVdfStructure = true
+            }
+        }
+        
+        // File is VDF if it has VDF structure and balanced braces
+        return hasVdfStructure && braceCount === 0
+    } catch (error) {
+        // If we can't read the file, assume it's not a VDF file
+        return false
+    }
+}
+
 // Helper function to convert VDF to JSON
 function convertVdfToJson(filePath) {
     try {
@@ -57,20 +99,24 @@ function processVdfFiles(directory) {
             // Recursively process subdirectories
             processVdfFiles(fullPath)
         } else if (file.endsWith(".txt")) {
-            try {
-                // Convert VDF to JSON
-                const jsonData = convertVdfToJson(fullPath)
+            // Only process files that are actually VDF files
+            if (isVdfFile(fullPath)) {
+                try {
+                    // Convert VDF to JSON
+                    const jsonData = convertVdfToJson(fullPath)
 
-                // Save as JSON file (same name but .json extension)
-                const jsonPath = fullPath.replace(/\.txt$/i, ".json")
-                fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 4))
+                    // Save as JSON file (same name but .json extension)
+                    const jsonPath = fullPath.replace(/\.txt$/i, ".json")
+                    fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 4))
 
-                // Delete the original .txt file
-                fs.unlinkSync(fullPath)
-            } catch (error) {
-                // The error already contains the file context from convertVdfToJson
-                throw error
+                    // Delete the original .txt file
+                    fs.unlinkSync(fullPath)
+                } catch (error) {
+                    // The error already contains the file context from convertVdfToJson
+                    throw error
+                }
             }
+            // Skip non-VDF .txt files (like README.txt)
         } else if (file.endsWith(".vmx")) {
             // Delete .vmx files (not needed)
             fs.unlinkSync(fullPath)
