@@ -259,7 +259,14 @@ function Instances({ item, formData, onUpdateInstances, editingNames, setEditing
 
 
     return (
-        <Box>
+        <Box sx={{ 
+            overflow: "hidden",
+            "&::-webkit-scrollbar": {
+                display: "none"
+            },
+            msOverflowStyle: "none",
+            scrollbarWidth: "none"
+        }}>
             <Box
                 sx={{
                     display: "flex",
@@ -341,12 +348,14 @@ function Instances({ item, formData, onUpdateInstances, editingNames, setEditing
                                     opacity: isDisabled ? 0.8 : 1,
                                 }}>
                                 <Box sx={{ p: 2 }}>
-                                    <Box
-                                        sx={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: 1,
-                                        }}>
+                                                                         <Box
+                                         sx={{
+                                             display: "flex",
+                                             alignItems: "center",
+                                             gap: 1,
+                                             width: "100%",
+                                             minWidth: 0,
+                                         }}>
                                         {/* Instance Type Icon */}
                                         <Tooltip
                                             title={
@@ -400,24 +409,24 @@ function Instances({ item, formData, onUpdateInstances, editingNames, setEditing
                                             />
                                         </Box>
 
-                                        {/* Instance Path */}
-                                        <Typography
-                                            variant="body2"
-                                            color="text.secondary"
-                                            sx={{
-                                                fontFamily: "monospace",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                                whiteSpace: "nowrap",
-                                                flex: 1,
-                                                direction: "rtl",
-                                                textAlign: "left",
-                                                fontSize: "0.75rem",
-                                            }}>
-                                            {instance.Name || "(unnamed instance)"}
-                                        </Typography>
+                                                                                 {/* Instance Path */}
+                                         <Typography
+                                             variant="body2"
+                                             color="text.secondary"
+                                             sx={{
+                                                 fontFamily: "monospace",
+                                                 overflow: "hidden",
+                                                 textOverflow: "ellipsis",
+                                                 whiteSpace: "nowrap",
+                                                 flex: 1,
+                                                 minWidth: 0,
+                                                 maxWidth: "100%",
+                                                 fontSize: "0.75rem",
+                                             }}>
+                                             {instance.Name || "(unnamed instance)"}
+                                         </Typography>
 
-                                        <Box sx={{ display: "flex", gap: 1 }}>
+                                        <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
                                             {hasStats && (
                                                 <Tooltip
                                                     title={

@@ -841,6 +841,224 @@ class Item {
         return outputName in outputs
     }
 
+    // Variables management functions
+    getVariables() {
+        try {
+            // Read editoritems.json to get Properties section
+            if (!fs.existsSync(this.paths.editorItems)) {
+                return []
+            }
+
+            const editorItems = JSON.parse(
+                fs.readFileSync(this.paths.editorItems, "utf-8")
+            )
+
+            const properties = editorItems?.Item?.Properties
+            if (!properties) {
+                return []
+            }
+
+            // Convert Properties object to array format expected by frontend
+            const variables = []
+            let index = 0
+            
+            for (const [key, value] of Object.entries(properties)) {
+                // Skip non-variable properties (like ConnectionCount which isn't a VBSP variable)
+                if (this.isVBSPVariable(key)) {
+                    variables.push({
+                        id: `var_${index}`,
+                        presetKey: key,
+                        displayName: this.getDisplayNameForVariable(key),
+                        fixupName: this.getFixupNameForVariable(key),
+                        description: this.getDescriptionForVariable(key),
+                        defaultValue: value.DefaultValue?.toString() || "0",
+                        type: this.getVariableType(key),
+                        enumValues: this.getEnumValuesForVariable(key),
+                        customValue: value.DefaultValue?.toString() || "0",
+                        index: value.Index || index
+                    })
+                    index++
+                }
+            }
+
+            // Sort by index to maintain order
+            variables.sort((a, b) => a.index - b.index)
+            return variables
+
+        } catch (error) {
+            console.error("Failed to get variables:", error)
+            return []
+        }
+    }
+
+    saveVariables(variables) {
+        try {
+            // Read current editoritems.json
+            if (!fs.existsSync(this.paths.editorItems)) {
+                throw new Error("editoritems.json not found")
+            }
+
+            const editorItems = JSON.parse(
+                fs.readFileSync(this.paths.editorItems, "utf-8")
+            )
+
+            // Initialize Properties section if it doesn't exist
+            if (!editorItems.Item.Properties) {
+                editorItems.Item.Properties = {}
+            }
+
+            // Clear existing VBSP variables
+            for (const key of Object.keys(editorItems.Item.Properties)) {
+                if (this.isVBSPVariable(key)) {
+                    delete editorItems.Item.Properties[key]
+                }
+            }
+
+            // Add new variables (starting from index 2 since index 1 is ConnectionCount)
+            variables.forEach((variable, index) => {
+                if (variable.presetKey) {
+                    editorItems.Item.Properties[variable.presetKey] = {
+                        DefaultValue: this.convertValueToCorrectType(variable.customValue, variable.type),
+                        Index: index + 2
+                    }
+                }
+            })
+
+            // Write back to file
+            fs.writeFileSync(
+                this.paths.editorItems,
+                JSON.stringify(editorItems, null, 4)
+            )
+
+            return true
+
+        } catch (error) {
+            console.error("Failed to save variables:", error)
+            return false
+        }
+    }
+
+    // Helper methods for variable management
+    isVBSPVariable(key) {
+        // List of known VBSP variable keys (excludes ConnectionCount which is at index 1)
+        const vbspVariables = [
+            'StartEnabled', 'StartActive', 'StartDeployed', 'StartOpen', 'StartLocked', 'StartReversed',
+            'AutoDrop', 'AutoRespawn', 'TimerDelay', 'ButtonType', 'CubeType'
+        ]
+        return vbspVariables.includes(key)
+    }
+
+    getDisplayNameForVariable(key) {
+        const displayNames = {
+            'StartEnabled': 'Start Enabled',
+            'StartActive': 'Start Active',
+            'StartDeployed': 'Start Deployed',
+            'StartOpen': 'Start Open',
+            'StartLocked': 'Start Locked',
+            'StartReversed': 'Start Reversed',
+            'AutoDrop': 'Auto Drop',
+            'AutoRespawn': 'Auto Respawn',
+            'TimerDelay': 'Timer Delay',
+            'ButtonType': 'Button Type',
+            'CubeType': 'Cube Type'
+        }
+        return displayNames[key] || key
+    }
+
+    getFixupNameForVariable(key) {
+        const fixupNames = {
+            'StartEnabled': '$start_enabled',
+            'StartActive': '$start_active',
+            'StartDeployed': '$start_deployed',
+            'StartOpen': '$start_open',
+            'StartLocked': '$start_locked',
+            'StartReversed': '$start_reversed',
+            'AutoDrop': '$disable_autodrop',
+            'AutoRespawn': '$disable_autorespawn',
+            'TimerDelay': '$timer_delay',
+            'ButtonType': '$button_type',
+            'CubeType': '$cube_type'
+        }
+        return fixupNames[key] || `$${key.toLowerCase()}`
+    }
+
+    getDescriptionForVariable(key) {
+        const descriptions = {
+            'StartEnabled': 'Whether the entity starts enabled',
+            'StartActive': 'Whether the entity starts active',
+            'StartDeployed': 'Whether the entity starts deployed',
+            'StartOpen': 'Whether the entity starts open',
+            'StartLocked': 'Whether the entity starts locked',
+            'StartReversed': 'Whether the entity starts reversed',
+            'AutoDrop': 'Disable automatic dropping',
+            'AutoRespawn': 'Disable automatic respawning',
+            'TimerDelay': 'Delay before timer activation',
+            'ButtonType': 'Type of button mechanism',
+            'CubeType': 'Type of cube to spawn'
+        }
+        return descriptions[key] || `VBSP variable: ${key}`
+    }
+
+    getVariableType(key) {
+        const types = {
+            'StartEnabled': 'boolean',
+            'StartActive': 'boolean',
+            'StartDeployed': 'boolean',
+            'StartOpen': 'boolean',
+            'StartLocked': 'boolean',
+            'StartReversed': 'boolean',
+            'AutoDrop': 'boolean',
+            'AutoRespawn': 'boolean',
+            'TimerDelay': 'number',
+            'ButtonType': 'enum',
+            'CubeType': 'enum'
+        }
+        return types[key] || 'string'
+    }
+
+    getEnumValuesForVariable(key) {
+        const enumValues = {
+            'ButtonType': {
+                "0": "Weighted",
+                "1": "Cube", 
+                "2": "Sphere"
+            },
+            'CubeType': {
+                "0": "Standard",
+                "1": "Companion",
+                "2": "Reflective", 
+                "3": "Sphere",
+                "4": "Franken"
+            }
+        }
+        return enumValues[key] || null
+    }
+
+    convertValueToCorrectType(value, type) {
+        switch (type) {
+            case 'boolean':
+                return value === "1" || value === true ? 1 : 0
+            case 'number':
+                return parseInt(value) || 0
+            case 'enum':
+                return parseInt(value) || 0
+            default:
+                return value
+        }
+    }
+
+    // Conditions management functions
+    getConditions() {
+        // For now, return empty object - this will be implemented based on VBSP config
+        return {}
+    }
+
+    saveConditions(conditions) {
+        // For now, this is a placeholder - will be implemented to save to VBSP config
+        console.log("Saving conditions:", conditions)
+        return true
+    }
+
     exists() {
         return (
             fs.existsSync(this.paths.editorItems) &&
