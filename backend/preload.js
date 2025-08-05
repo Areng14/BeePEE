@@ -105,6 +105,20 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.invoke("remove-output", { itemId, outputName }),
 
     // ========================================
+    // VARIABLES MANAGEMENT FUNCTIONS
+    // ========================================
+    getVariables: (itemId) => ipcRenderer.invoke("get-variables", { itemId }),
+    saveVariables: (itemId, variables) =>
+        ipcRenderer.invoke("save-variables", { itemId, variables }),
+
+    // ========================================
+    // CONDITIONS MANAGEMENT FUNCTIONS
+    // ========================================
+    getConditions: (itemId) => ipcRenderer.invoke("get-conditions", { itemId }),
+    saveConditions: (itemId, conditions) =>
+        ipcRenderer.invoke("save-conditions", { itemId, conditions }),
+
+    // ========================================
     // ENTITY AND FGD DATA FUNCTIONS
     // ========================================
     getItemEntities: (itemId) =>

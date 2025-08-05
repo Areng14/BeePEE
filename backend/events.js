@@ -1517,6 +1517,73 @@ function reg_events(mainWindow) {
             }
         },
     )
+
+    // Variables management handlers
+    ipcMain.handle("get-variables", async (event, { itemId }) => {
+        try {
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+
+            return { success: true, variables: item.getVariables() }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    ipcMain.handle("save-variables", async (event, { itemId, variables }) => {
+        try {
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+
+            const success = item.saveVariables(variables)
+            if (!success) {
+                throw new Error("Failed to save variables to editoritems.json")
+            }
+
+            // Send updated item data to frontend
+            const updatedItem = item.toJSONWithExistence()
+            mainWindow.webContents.send("item-updated", updatedItem)
+            sendItemUpdateToEditor(itemId, updatedItem)
+
+            return { success: true }
+        } catch (error) {
+            dialog.showErrorBox("Failed to Save Variables", error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Conditions management handlers
+    ipcMain.handle("get-conditions", async (event, { itemId }) => {
+        try {
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+
+            return { success: true, conditions: item.getConditions() }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    ipcMain.handle("save-conditions", async (event, { itemId, conditions }) => {
+        try {
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+
+            item.saveConditions(conditions)
+            return { success: true }
+        } catch (error) {
+            dialog.showErrorBox("Failed to Save Conditions", error.message)
+            return { success: false, error: error.message }
+        }
+    })
 }
 
 module.exports = { reg_events }

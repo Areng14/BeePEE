@@ -1,17 +1,17 @@
 import { Box, Typography } from "@mui/material"
 
-function Vbsp({ item, formData, onUpdateVbsp }) {
+function Conditions({ item, formData, onUpdateConditions }) {
     return (
         <Box>
             <Typography variant="h6" gutterBottom>
-                VBSP Editing
+                Conditions
             </Typography>
             <Typography variant="body2" color="text.secondary">
-                Edit VBSP in a abstracted way
+                Configure VBSP conditions and logic
             </Typography>
-            {/* TODO: Add VBSP editing */}
+            {/* TODO: Add Conditions editing */}
         </Box>
     )
 }
 
-export default Vbsp
+export default Conditions 

@@ -28,11 +28,15 @@ import {
     Description,
     Undo,
     Redo,
+    Functions,
+    DataObject,
+    Rule,
 } from "@mui/icons-material"
 import BasicInfo from "./items/BasicInfo"
 import Inputs from "./items/Inputs"
 import Instances from "./items/Instances"
-import Vbsp from "./items/Vbsp"
+import Variables from "./items/Variables"
+import Conditions from "./items/Conditions"
 import Other from "./items/Other"
 import Metadata from "./items/Metadata"
 import { useItemContext } from "../contexts/ItemContext"
@@ -134,8 +138,9 @@ function ItemEditor() {
         outputs: {},
         // Instances data
         instances: {},
-        // VBSP data
-        vbsp: {},
+        // Variables and Conditions data
+        variables: {},
+        conditions: {},
         // Other tab data
         other: {},
         // Track what has been modified
@@ -144,7 +149,8 @@ function ItemEditor() {
             inputs: false,
             outputs: false,
             instances: false,
-            vbsp: false,
+            variables: false,
+            conditions: false,
             other: false,
         },
     })
@@ -171,12 +177,14 @@ function ItemEditor() {
                 description = desc || ""
             }
 
-            // Load inputs and outputs
-            const loadInputsOutputs = async () => {
+            // Load inputs, outputs, variables, and conditions
+            const loadData = async () => {
                 try {
-                    const [inputResult, outputResult] = await Promise.all([
+                    const [inputResult, outputResult, variablesResult, conditionsResult] = await Promise.all([
                         window.package.getInputs(item.id),
                         window.package.getOutputs(item.id),
+                        window.package.getVariables(item.id),
+                        window.package.getConditions(item.id),
                     ])
 
                     setFormData((prev) => ({
@@ -192,7 +200,8 @@ function ItemEditor() {
                         instances: prev._modified.instances
                             ? prev.instances
                             : item.instances || {},
-                        vbsp: item.vbsp || {},
+                        variables: variablesResult.success ? variablesResult.variables : {},
+                        conditions: conditionsResult.success ? conditionsResult.conditions : {},
                         other: item.other || {},
                         _modified: {
                             basicInfo: false,
@@ -200,12 +209,13 @@ function ItemEditor() {
                             outputs: false,
                             // Keep instances modified flag if it was already set
                             instances: prev._modified.instances,
-                            vbsp: false,
+                            variables: false,
+                            conditions: false,
                             other: false,
                         },
                     }))
                 } catch (error) {
-                    console.error("Failed to load inputs/outputs:", error)
+                    console.error("Failed to load data:", error)
                     setFormData((prev) => ({
                         ...prev,
                         name: item.name || "",
@@ -217,7 +227,8 @@ function ItemEditor() {
                         instances: prev._modified.instances
                             ? prev.instances
                             : item.instances || {},
-                        vbsp: item.vbsp || {},
+                        variables: {},
+                        conditions: {},
                         other: item.other || {},
                         _modified: {
                             basicInfo: false,
@@ -225,14 +236,15 @@ function ItemEditor() {
                             outputs: false,
                             // Keep instances modified flag if it was already set
                             instances: prev._modified.instances,
-                            vbsp: false,
+                            variables: false,
+                            conditions: false,
                             other: false,
                         },
                     }))
                 }
             }
 
-            loadInputsOutputs()
+            loadData()
 
             // Clear unsaved changes indicator when loading a new item
             window.package?.setUnsavedChanges?.(false)
@@ -328,16 +340,31 @@ function ItemEditor() {
         window.package?.setUnsavedChanges?.(true)
     }
 
-    const updateVbspData = (vbsp) => {
+    const updateVariablesData = (variables) => {
         // Add to undo stack before making changes
-        addToUndoStack('vbsp', 'Update VBSP')
+        addToUndoStack('variables', 'Update Variables')
         
         setFormData((prev) => ({
             ...prev,
-            vbsp,
+            variables,
             _modified: {
                 ...prev._modified,
-                vbsp: true,
+                variables: true,
+            },
+        }))
+        window.package?.setUnsavedChanges?.(true)
+    }
+
+    const updateConditionsData = (conditions) => {
+        // Add to undo stack before making changes
+        addToUndoStack('conditions', 'Update Conditions')
+        
+        setFormData((prev) => ({
+            ...prev,
+            conditions,
+            _modified: {
+                ...prev._modified,
+                conditions: true,
             },
         }))
         window.package?.setUnsavedChanges?.(true)
@@ -565,14 +592,25 @@ function ItemEditor() {
                 }
             }
 
-            // Save VBSP data if modified
-            if (formData._modified.vbsp) {
+            // Save Variables data if modified
+            if (formData._modified.variables) {
                 try {
-                    await window.package.saveVbsp?.(item.id, formData.vbsp)
+                    await window.package.saveVariables?.(item.id, formData.variables)
                 } catch (error) {
-                    console.error("Failed to save VBSP data:", error)
+                    console.error("Failed to save Variables data:", error)
                     hasErrors = true
-                    throw new Error(`VBSP: ${error.message}`)
+                    throw new Error(`Variables: ${error.message}`)
+                }
+            }
+
+            // Save Conditions data if modified
+            if (formData._modified.conditions) {
+                try {
+                    await window.package.saveConditions?.(item.id, formData.conditions)
+                } catch (error) {
+                    console.error("Failed to save Conditions data:", error)
+                    hasErrors = true
+                    throw new Error(`Conditions: ${error.message}`)
                 }
             }
 
@@ -610,7 +648,8 @@ function ItemEditor() {
                         inputs: false,
                         outputs: false,
                         instances: false,
-                        vbsp: false,
+                        variables: false,
+                        conditions: false,
                         other: false,
                     },
                 }))
@@ -737,15 +776,29 @@ function ItemEditor() {
                         />
                     </Tooltip>
                     <Tooltip
-                        title="VBSP - Configure instance swapping and conditions"
+                        title="Variables - Configure VBSP variables and instance swapping"
                         placement="right">
                         <Tab
                             icon={
                                 <Badge
                                     color="primary"
                                     variant="dot"
-                                    invisible={!formData._modified.vbsp}>
-                                    <Code />
+                                    invisible={!formData._modified.variables}>
+                                    <DataObject />
+                                </Badge>
+                            }
+                        />
+                    </Tooltip>
+                    <Tooltip
+                        title="Conditions - Configure VBSP conditions and logic"
+                        placement="right">
+                        <Tab
+                            icon={
+                                <Badge
+                                    color="primary"
+                                    variant="dot"
+                                    invisible={!formData._modified.conditions}>
+                                    <Rule />
                                 </Badge>
                             }
                         />
@@ -800,14 +853,22 @@ function ItemEditor() {
                         />
                     </Box>
                     <Box sx={{ display: tabValue === 3 ? "block" : "none" }}>
-                        <Vbsp
+                        <Variables
                             item={item}
                             formData={formData}
                             onUpdate={updateFormData}
-                            onUpdateVbsp={updateVbspData}
+                            onUpdateVariables={updateVariablesData}
                         />
                     </Box>
                     <Box sx={{ display: tabValue === 4 ? "block" : "none" }}>
+                        <Conditions
+                            item={item}
+                            formData={formData}
+                            onUpdate={updateFormData}
+                            onUpdateConditions={updateConditionsData}
+                        />
+                    </Box>
+                    <Box sx={{ display: tabValue === 5 ? "block" : "none" }}>
                         <Other
                             item={item}
                             formData={formData}
@@ -815,7 +876,7 @@ function ItemEditor() {
                             onUpdateOther={updateOtherData}
                         />
                     </Box>
-                    <Box sx={{ display: tabValue === 5 ? "block" : "none" }}>
+                    <Box sx={{ display: tabValue === 6 ? "block" : "none" }}>
                         <Metadata item={item} />
                     </Box>
                 </Box>
@@ -857,8 +918,10 @@ function ItemEditor() {
                                             return "Outputs"
                                         case "instances":
                                             return "Instances"
-                                        case "vbsp":
-                                            return "VBSP"
+                                        case "variables":
+                                            return "Variables"
+                                        case "conditions":
+                                            return "Conditions"
                                         case "other":
                                             return "Other"
                                         default:
