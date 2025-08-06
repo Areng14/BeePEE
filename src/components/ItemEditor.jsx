@@ -866,6 +866,7 @@ function ItemEditor() {
                             formData={formData}
                             onUpdate={updateFormData}
                             onUpdateConditions={updateConditionsData}
+                            editingNames={editingNames}
                         />
                     </Box>
                     <Box sx={{ display: tabValue === 5 ? "block" : "none" }}>
