@@ -107,7 +107,7 @@ function DroppableZone({ id, children, isEmpty = false, label = "Drop blocks her
 }
 
 // Sortable Block Component - Generic for all block types
-function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, availableInstances, availableVariables, formData, editingNames = {}, depth = 0 }) {
+function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, availableInstances, availableVariables, formData, editingNames = {}, depth = 0, blocks = [] }) {
     const {
         attributes,
         listeners,
@@ -131,9 +131,39 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
         onAddChildBlock(block.id, containerKey)
     }
 
+    // Helper function to find parent switch block
+    const findParentSwitch = (caseBlockId, allBlocks) => {
+        const searchInBlock = (blockList) => {
+            for (const block of blockList) {
+                if (block.type === 'switchCase' && block.cases) {
+                    const hasCase = block.cases.some(caseBlock => caseBlock.id === caseBlockId)
+                    if (hasCase) {
+                        return block
+                    }
+                }
+                
+                // Check child containers
+                if (BLOCK_DEFINITIONS[block.type]?.canContainChildren) {
+                    const childContainers = BLOCK_DEFINITIONS[block.type].childContainers || []
+                    for (const container of childContainers) {
+                        if (block[container] && Array.isArray(block[container])) {
+                            const found = searchInBlock(block[container])
+                            if (found) return found
+                        }
+                    }
+                }
+            }
+            return null
+        }
+        
+        return searchInBlock(allBlocks)
+    }
+
     const getBlockIcon = (blockType) => {
         switch (blockType) {
             case 'if': return <AccountTree fontSize="small" />
+            case 'switchCase': return <Category fontSize="small" />
+            case 'case': return <Code fontSize="small" />
             case 'changeInstance': return <SwapHoriz fontSize="small" />
             case 'addOverlay': return <AddCircleOutline fontSize="small" />
             case 'test': return <Functions fontSize="small" />
@@ -144,6 +174,8 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
     const getBlockColor = (blockType) => {
         switch (blockType) {
             case 'if': return '#d2b019ff' // Primary gold
+            case 'switchCase': return '#9c27b0' // Purple
+            case 'case': return '#673ab7' // Deep purple
             case 'changeInstance': return '#1db34fff' // Success green
             case 'addOverlay': return '#dc004e' // Secondary pink
             case 'test': return '#ff9800' // Orange
@@ -426,6 +458,7 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                                         availableVariables={availableVariables}
                                         formData={formData}
                                         editingNames={editingNames}
+                                        blocks={blocks}
                                         depth={depth + 1}
                                     />
                                 ))}
@@ -522,6 +555,264 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                                 ))}
                             </Select>
                         </FormControl>
+                        </Box>
+                    </Box>
+                )
+
+            case 'case':
+                return (
+                    <Box sx={{ p: 2 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                Case: {block.value || "Default"}
+                            </Typography>
+                        </Box>
+                        
+                        {/* Case Value - gets the variable type from parent switch */}
+                        <Box sx={{ mt: 2 }}>
+                            <Grid container spacing={2}>
+                                <Grid item xs={12}>
+                                    {/* Dynamic value field based on parent switch variable type */}
+                                    {(() => {
+                                        // Find the parent switch block to get the variable type
+                                        const parentSwitch = findParentSwitch(block.id, blocks)
+                                        const switchVariable = parentSwitch?.variable
+                                        const fullVariableData = formData.variables?.find(v => v.fixupName === switchVariable)
+                                        
+                                        if (!switchVariable) {
+                                            return (
+                                                <TextField
+                                                    fullWidth
+                                                    size="small"
+                                                    label="Case Value"
+                                                    value={block.value || ""}
+                                                    onChange={(e) => handleUpdateProperty('value', e.target.value)}
+                                                    placeholder="Select variable in parent switch first"
+                                                    sx={{ 
+                                                        "& .MuiOutlinedInput-root": {
+                                                            height: 40,
+                                                            minHeight: 40,
+                                                            maxHeight: 40
+                                                        },
+                                                        "& .MuiInputBase-input": {
+                                                            height: "20px !important",
+                                                            lineHeight: "20px !important",
+                                                            paddingTop: "10px !important",
+                                                            paddingBottom: "10px !important",
+                                                            minWidth: "100px",
+                                                            display: "flex",
+                                                            alignItems: "center"
+                                                        }
+                                                    }}
+                                                />
+                                            );
+                                        }
+
+                                        if (fullVariableData?.type === "boolean") {
+                                            return (
+                                                <FormControl fullWidth size="small">
+                                                    <InputLabel>Case Value</InputLabel>
+                                                    <Select
+                                                        value={block.value || "1"}
+                                                        onChange={(e) => handleUpdateProperty('value', e.target.value)}
+                                                        label="Case Value"
+                                                        sx={{ 
+                                                            "& .MuiOutlinedInput-root": {
+                                                                height: 40,
+                                                                minHeight: 40,
+                                                                maxHeight: 40
+                                                            },
+                                                            "& .MuiSelect-select": {
+                                                                height: "20px !important",
+                                                                lineHeight: "20px !important",
+                                                                paddingTop: "10px !important",
+                                                                paddingBottom: "10px !important",
+                                                                minWidth: "100px",
+                                                                display: "flex",
+                                                                alignItems: "center"
+                                                            }
+                                                        }}
+                                                    >
+                                                        <MenuItem value="1">True</MenuItem>
+                                                        <MenuItem value="0">False</MenuItem>
+                                                    </Select>
+                                                </FormControl>
+                                            );
+                                        } else if (fullVariableData?.type === "enum" && fullVariableData?.enumValues) {
+                                            return (
+                                                <FormControl fullWidth size="small">
+                                                    <InputLabel>Case Value</InputLabel>
+                                                    <Select
+                                                        value={block.value || Object.keys(fullVariableData.enumValues)[0]}
+                                                        onChange={(e) => handleUpdateProperty('value', e.target.value)}
+                                                        label="Case Value"
+                                                        sx={{ 
+                                                            "& .MuiOutlinedInput-root": {
+                                                                height: 40,
+                                                                minHeight: 40,
+                                                                maxHeight: 40
+                                                            },
+                                                            "& .MuiSelect-select": {
+                                                                height: "20px !important",
+                                                                lineHeight: "20px !important",
+                                                                paddingTop: "10px !important",
+                                                                paddingBottom: "10px !important",
+                                                                minWidth: "120px",
+                                                                display: "flex",
+                                                                alignItems: "center"
+                                                            }
+                                                        }}
+                                                    >
+                                                        {Object.entries(fullVariableData.enumValues).map(([value, label]) => (
+                                                            <MenuItem key={value} value={value}>
+                                                                {label}
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            );
+                                        } else {
+                                            return (
+                                                <TextField
+                                                    fullWidth
+                                                    size="small"
+                                                    label="Case Value"
+                                                    type={fullVariableData?.type === "number" ? "number" : "text"}
+                                                    value={block.value || ""}
+                                                    onChange={(e) => handleUpdateProperty('value', e.target.value)}
+                                                    inputProps={{
+                                                        min: fullVariableData?.type === "number" ? 0 : undefined,
+                                                        step: fullVariableData?.type === "number" ? 1 : undefined,
+                                                    }}
+                                                    sx={{ 
+                                                        "& .MuiOutlinedInput-root": {
+                                                            height: 40,
+                                                            minHeight: 40,
+                                                            maxHeight: 40
+                                                        },
+                                                        "& .MuiInputBase-input": {
+                                                            height: "20px !important",
+                                                            lineHeight: "20px !important",
+                                                            paddingTop: "10px !important",
+                                                            paddingBottom: "10px !important",
+                                                            minWidth: "100px",
+                                                            display: "flex",
+                                                            alignItems: "center"
+                                                        }
+                                                    }}
+                                                />
+                                            );
+                                        }
+                                    })()}
+                                </Grid>
+                            </Grid>
+                        </Box>
+                        
+                        <Box sx={{ mt: 2 }}>
+                            <DroppableZone
+                                id={`${block.id}-then`}
+                                isEmpty={!block.thenBlocks || block.thenBlocks.length === 0}
+                                label="Drop action blocks here (you can add multiple)"
+                            >
+                                {block.thenBlocks && block.thenBlocks.map((childBlock) => (
+                                    <SortableBlock
+                                        key={childBlock.id}
+                                        block={childBlock}
+                                        onUpdateBlock={onUpdateBlock}
+                                        onDeleteBlock={onDeleteBlock}
+                                        onAddChildBlock={onAddChildBlock}
+                                        availableInstances={availableInstances}
+                                        availableVariables={availableVariables}
+                                        formData={formData}
+                                        editingNames={editingNames}
+                                        blocks={blocks}
+                                        depth={depth + 1}
+                                    />
+                                ))}
+                            </DroppableZone>
+                        </Box>
+                    </Box>
+                )
+
+            case 'switchCase':
+                return (
+                    <Box sx={{ p: 2 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                SWITCH
+                            </Typography>
+                            <Chip 
+                                label={`${block.cases?.length || 0} cases`} 
+                                size="small" 
+                                color="primary"
+                                sx={{ backgroundColor: "#d2b019ff", color: "#000" }}
+                            />
+                        </Box>
+                        
+                        {/* Switch Variable Selection */}
+                        <Box sx={{ mb: 2 }}>
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                                Switch Variable
+                            </Typography>
+                            <FormControl fullWidth size="small">
+                                <InputLabel>Variable</InputLabel>
+                                <Select
+                                    value={block.variable || ""}
+                                    onChange={(e) => handleUpdateProperty('variable', e.target.value)}
+                                    label="Variable"
+                                    sx={{ 
+                                        "& .MuiOutlinedInput-root": {
+                                            height: 40,
+                                            minHeight: 40,
+                                            maxHeight: 40
+                                        },
+                                        "& .MuiSelect-select": {
+                                            height: "20px !important",
+                                            lineHeight: "20px !important",
+                                            paddingTop: "10px !important",
+                                            paddingBottom: "10px !important",
+                                            minWidth: "120px",
+                                            display: "flex",
+                                            alignItems: "center"
+                                        }
+                                    }}
+                                >
+                                    {availableVariables.map((variable, index) => (
+                                        <MenuItem key={index} value={variable.fixupName}>
+                                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
+                                                <Functions fontSize="small" />
+                                                <Typography variant="body2">
+                                                    {variable.displayName}
+                                                </Typography>
+                                            </Box>
+                                        </MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        </Box>
+                        
+                        <Box sx={{ mt: 2 }}>
+                            <DroppableZone
+                                id={`${block.id}-cases`}
+                                isEmpty={!block.cases || block.cases.length === 0}
+                                label="Drop case blocks here (you can add multiple)"
+                            >
+                                {block.cases && block.cases.map((caseBlock) => (
+                                    <SortableBlock
+                                        key={caseBlock.id}
+                                        block={caseBlock}
+                                        onUpdateBlock={onUpdateBlock}
+                                        onDeleteBlock={onDeleteBlock}
+                                        onAddChildBlock={onAddChildBlock}
+                                        availableInstances={availableInstances}
+                                        availableVariables={availableVariables}
+                                        formData={formData}
+                                        editingNames={editingNames}
+                                        blocks={blocks}
+                                        depth={depth + 1}
+                                    />
+                                ))}
+                            </DroppableZone>
                         </Box>
                     </Box>
                 )
@@ -651,6 +942,20 @@ const BLOCK_DEFINITIONS = {
         description: "Empty test block for development",
         category: "Test",
         canContainChildren: false
+    },
+    switchCase: {
+        displayName: "Switch Case",
+        description: "Handle multiple conditions with different outcomes",
+        category: "Logic",
+        canContainChildren: true,
+        childContainers: ['cases']
+    },
+    case: {
+        displayName: "Case",
+        description: "Individual case in a switch statement",
+        category: "Logic",
+        canContainChildren: true,
+        childContainers: ['thenBlocks']
     }
 }
 
@@ -785,12 +1090,13 @@ function Conditions({ item, formData, onUpdateConditions, editingNames = {} }) {
 
         console.log('Drag end:', { active: active?.id, over: over?.id })
 
-        // Check if we're dropping into a droppable zone (IF block container)
-        if (over.id && over.id.includes('-then')) {
-            const parentBlockId = over.id.replace('-then', '')
+        // Check if we're dropping into a droppable zone (IF block or Switch case container)
+        if (over.id && (over.id.includes('-then') || over.id.includes('-cases'))) {
+            const parentBlockId = over.id.replace('-then', '').replace('-cases', '')
             const draggedBlockId = active.id
+            const containerType = over.id.includes('-then') ? 'then' : 'cases'
             
-            console.log('Dropping into IF block:', { parentBlockId, draggedBlockId })
+            console.log('Dropping into block:', { parentBlockId, draggedBlockId, containerType })
             
             // Find and remove the dragged block from wherever it currently is
             const findAndRemoveBlock = (blockList) => {
@@ -817,13 +1123,20 @@ function Conditions({ item, formData, onUpdateConditions, editingNames = {} }) {
                 return null
             }
 
-            // Add block to the target IF block
-            const addBlockToIF = (blockList, blockToAdd) => {
+            // Add block to the target block
+            const addBlockToContainer = (blockList, blockToAdd) => {
                 return blockList.map(block => {
                     if (block.id === parentBlockId) {
-                        return {
-                            ...block,
-                            thenBlocks: [...(block.thenBlocks || []), blockToAdd]
+                        if (containerType === 'then') {
+                            return {
+                                ...block,
+                                thenBlocks: [...(block.thenBlocks || []), blockToAdd]
+                            }
+                        } else if (containerType === 'cases') {
+                            return {
+                                ...block,
+                                cases: [...(block.cases || []), blockToAdd]
+                            }
                         }
                     }
                     
@@ -832,7 +1145,7 @@ function Conditions({ item, formData, onUpdateConditions, editingNames = {} }) {
                         const childContainers = BLOCK_DEFINITIONS[block.type].childContainers || []
                         for (const container of childContainers) {
                             if (block[container]) {
-                                block[container] = addBlockToIF(block[container], blockToAdd)
+                                block[container] = addBlockToContainer(block[container], blockToAdd)
                             }
                         }
                     }
@@ -847,8 +1160,8 @@ function Conditions({ item, formData, onUpdateConditions, editingNames = {} }) {
             if (draggedBlock) {
                 console.log('Found dragged block:', draggedBlock)
                 
-                // Then add it to the target IF block
-                const updatedBlocks = addBlockToIF(blocksCopy, draggedBlock)
+                // Then add it to the target block
+                const updatedBlocks = addBlockToContainer(blocksCopy, draggedBlock)
                 setBlocks(updatedBlocks)
                 onUpdateConditions(updatedBlocks)
             }
@@ -947,6 +1260,7 @@ function Conditions({ item, formData, onUpdateConditions, editingNames = {} }) {
                                 availableVariables={availableVariables}
                                 formData={formData}
                                 editingNames={editingNames}
+                                blocks={blocks}
                                 depth={0}
                             />
                         ))}
