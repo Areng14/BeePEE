@@ -82,16 +82,18 @@ describe("VBSP Auto-Registration", () => {
             JSON.stringify(properties, null, 2)
         )
 
-        // Create VBSP config with instances
-        const vbspConfig = `
-"Changeinstance" "instances/test_instance1.vmf"
-"Changeinstance" "instances/test_instance2.vmf"
-"Changeinstance" "instances/test_instance3.vmf"
-        `.trim()
+        // Create VBSP config with instances (as JSON since it gets converted)
+        const vbspConfig = {
+            Changeinstance: [
+                "instances/test_instance1.vmf",
+                "instances/test_instance2.vmf",
+                "instances/test_instance3.vmf"
+            ]
+        }
 
         fs.writeFileSync(
-            path.join(testItemPath, "vbsp_config.cfg"),
-            vbspConfig
+            path.join(testItemPath, "vbsp_config.json"),
+            JSON.stringify(vbspConfig, null, 2)
         )
 
         // Create the Item instance (this should trigger auto-registration)
@@ -182,14 +184,16 @@ describe("VBSP Auto-Registration", () => {
         )
 
         // Create VBSP config with the same instance plus a new one
-        const vbspConfig = `
-"Changeinstance" "instances/test_instance1.vmf"
-"Changeinstance" "instances/test_instance2.vmf"
-        `.trim()
+        const vbspConfig = {
+            Changeinstance: [
+                "instances/test_instance1.vmf",
+                "instances/test_instance2.vmf"
+            ]
+        }
 
         fs.writeFileSync(
-            path.join(testItemPath, "vbsp_config.cfg"),
-            vbspConfig
+            path.join(testItemPath, "vbsp_config.json"),
+            JSON.stringify(vbspConfig, null, 2)
         )
 
         // Create the Item instance (this should trigger auto-registration)
@@ -272,11 +276,11 @@ describe("VBSP Auto-Registration", () => {
         )
 
         // Create empty VBSP config
-        const vbspConfig = `# No instances defined`
+        const vbspConfig = {}
 
         fs.writeFileSync(
-            path.join(testItemPath, "vbsp_config.cfg"),
-            vbspConfig
+            path.join(testItemPath, "vbsp_config.json"),
+            JSON.stringify(vbspConfig, null, 2)
         )
 
         // Create the Item instance (this should not crash)
@@ -352,14 +356,16 @@ describe("VBSP Auto-Registration", () => {
         )
 
         // Create VBSP config with the same instance but different case
-        const vbspConfig = `
-"Changeinstance" "instances/bee2/test/instance.vmf"
-"Changeinstance" "instances/BEE2/test/instance.vmf"
-        `.trim()
+        const vbspConfig = {
+            Changeinstance: [
+                "instances/bee2/test/instance.vmf",
+                "instances/BEE2/test/instance.vmf"
+            ]
+        }
 
         fs.writeFileSync(
-            path.join(testItemPath, "vbsp_config.cfg"),
-            vbspConfig
+            path.join(testItemPath, "vbsp_config.json"),
+            JSON.stringify(vbspConfig, null, 2)
         )
 
         // Create the Item instance (this should trigger auto-registration)

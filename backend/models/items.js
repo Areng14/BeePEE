@@ -41,9 +41,9 @@ class Item {
             meta: path.join(fullItemPath, "meta.json"),
         }
 
-        //If there is vbsp add it (keeping .cfg as it's not VDF)
-        if (fs.existsSync(path.join(fullItemPath, "vbsp_config.cfg"))) {
-            this.paths.vbsp_config = path.join(fullItemPath, "vbsp_config.cfg")
+        //If there is vbsp add it (now using .json instead of .cfg)
+        if (fs.existsSync(path.join(fullItemPath, "vbsp_config.json"))) {
+            this.paths.vbsp_config = path.join(fullItemPath, "vbsp_config.json")
         }
 
         //parse editoritems file
@@ -122,19 +122,18 @@ class Item {
         // Add VBSP instances if they exist
         if (this.paths.vbsp_config && fs.existsSync(this.paths.vbsp_config)) {
             try {
-                const vbspContent = fs.readFileSync(
-                    this.paths.vbsp_config,
-                    "utf-8",
+                const vbspData = JSON.parse(
+                    fs.readFileSync(this.paths.vbsp_config, "utf-8"),
                 )
-                const matches = [
-                    ...vbspContent.matchAll(/"Changeinstance"\s+"([^"]+)"/g),
-                ]
+                
+                // Extract Changeinstance entries from the JSON structure
+                const changeInstances = []
+                this.extractChangeInstances(vbspData, changeInstances)
 
                 // Start index after the last editor instance
                 let nextIndex = Object.keys(this.instances).length
 
-                for (const match of matches) {
-                    const instancePath = match[1]
+                for (const instancePath of changeInstances) {
                     // Only add if not already present (case-insensitive comparison)
                     if (
                         !Object.values(this.instances).some(
@@ -150,7 +149,7 @@ class Item {
                 }
                 
                 // Auto-register VBSP instances in editoritems.json
-                this.autoRegisterVbspInstances(matches)
+                this.autoRegisterVbspInstances(changeInstances)
             } catch (error) {
                 console.error(
                     `Failed to parse VBSP config for ${this.name}:`,
@@ -162,7 +161,24 @@ class Item {
         console.log(`Added item: ${this.name} (id: ${this.id})`)
     }
 
-    autoRegisterVbspInstances(vbspMatches) {
+    extractChangeInstances(obj, result) {
+        // Recursively search for "Changeinstance" keys in the JSON structure
+        if (typeof obj === 'object' && obj !== null) {
+            for (const [key, value] of Object.entries(obj)) {
+                if (key === "Changeinstance") {
+                    if (Array.isArray(value)) {
+                        result.push(...value)
+                    } else {
+                        result.push(value)
+                    }
+                } else if (typeof value === 'object') {
+                    this.extractChangeInstances(value, result)
+                }
+            }
+        }
+    }
+
+    autoRegisterVbspInstances(changeInstances) {
         try {
             // Get current editoritems.json
             const editoritems = this.getEditorItems()
@@ -183,8 +199,7 @@ class Item {
             let skippedCount = 0
 
             // Process each VBSP instance
-            for (const match of vbspMatches) {
-                const instancePath = match[1]
+            for (const instancePath of changeInstances) {
                 
                 // Skip if already registered in editoritems.json (case-insensitive comparison)
                 if (existingInstanceNamesLower.includes(instancePath.toLowerCase())) {
@@ -276,19 +291,18 @@ class Item {
         // Re-add VBSP instances if they exist
         if (this.paths.vbsp_config && fs.existsSync(this.paths.vbsp_config)) {
             try {
-                const vbspContent = fs.readFileSync(
-                    this.paths.vbsp_config,
-                    "utf-8",
+                const vbspData = JSON.parse(
+                    fs.readFileSync(this.paths.vbsp_config, "utf-8"),
                 )
-                const matches = [
-                    ...vbspContent.matchAll(/"Changeinstance"\s+"([^"]+)"/g),
-                ]
+                
+                // Extract Changeinstance entries from the JSON structure
+                const changeInstances = []
+                this.extractChangeInstances(vbspData, changeInstances)
 
                 // Start index after the last editor instance
                 let nextIndex = Object.keys(this.instances).length
 
-                for (const match of matches) {
-                    const instancePath = match[1]
+                for (const instancePath of changeInstances) {
                     // Only add if not already present (case-insensitive comparison)
                     if (
                         !Object.values(this.instances).some(
@@ -304,7 +318,7 @@ class Item {
                 }
                 
                 // Auto-register VBSP instances in editoritems.json
-                this.autoRegisterVbspInstances(matches)
+                this.autoRegisterVbspInstances(changeInstances)
             } catch (error) {
                 console.error(
                     `Failed to parse VBSP config for ${this.name}:`,
@@ -1049,8 +1063,19 @@ class Item {
 
     // Conditions management functions
     getConditions() {
-        // For now, return empty object - this will be implemented based on VBSP config
-        return {}
+        try {
+            if (this.paths.vbsp_config && fs.existsSync(this.paths.vbsp_config)) {
+                const vbspData = JSON.parse(
+                    fs.readFileSync(this.paths.vbsp_config, "utf-8"),
+                )
+                console.log("VBSP Config JSON:", JSON.stringify(vbspData, null, 2))
+                return vbspData
+            }
+            return {}
+        } catch (error) {
+            console.error(`Failed to read VBSP config for ${this.name}:`, error.message)
+            return {}
+        }
     }
 
     saveConditions(conditions) {
