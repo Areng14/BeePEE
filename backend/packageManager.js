@@ -72,6 +72,38 @@ function isVdfFile(filePath) {
     }
 }
 
+// Helper function to add UUIDs to VBSP blocks that can have duplicates
+function addUuidsToVbspConditions(data) {
+    const generateUuid = () => `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    function processObject(obj) {
+        if (typeof obj !== 'object' || obj === null) {
+            return obj
+        }
+        
+        const newObj = {}
+        for (const [key, value] of Object.entries(obj)) {
+            let newKey = key
+            let newValue = value
+            
+            // Add UUID to blocks that can have multiple instances
+            if ((key === 'Switch' || key === 'Condition' || key === 'MapInstVar') && typeof value === 'object') {
+                newKey = `${key}_${generateUuid()}`
+                newValue = typeof value === 'object' ? processObject(value) : value
+            } else {
+                // Recursively process nested objects
+                newValue = typeof value === 'object' ? processObject(value) : value
+            }
+            
+            newObj[newKey] = newValue
+        }
+        
+        return newObj
+    }
+    
+    return processObject(data)
+}
+
 // Helper function to convert VDF to JSON
 function convertVdfToJson(filePath) {
     try {
@@ -86,7 +118,14 @@ function convertVdfToJson(filePath) {
             })
         })
 
-        return vdf.parse(fixedLines.join("\n"))
+        const parsedData = vdf.parse(fixedLines.join("\n"))
+        
+        // Add UUIDs to VBSP condition keys if this is a vbsp_config file
+        if (filePath.includes('vbsp_config')) {
+            return addUuidsToVbspConditions(parsedData)
+        }
+        
+        return parsedData
     } catch (error) {
         // Extract item name from file path for better error reporting
         const fileName = path.basename(filePath, ".txt")

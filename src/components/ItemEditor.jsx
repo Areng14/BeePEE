@@ -355,19 +355,28 @@ function ItemEditor() {
         window.package?.setUnsavedChanges?.(true)
     }
 
-    const updateConditionsData = (conditions) => {
+    const updateConditionsData = (blocks) => {
         // Add to undo stack before making changes
         addToUndoStack('conditions', 'Update Conditions')
         
         setFormData((prev) => ({
             ...prev,
-            conditions,
+            blocks, // Store as blocks format
             _modified: {
                 ...prev._modified,
                 conditions: true,
             },
         }))
         window.package?.setUnsavedChanges?.(true)
+    }
+
+    const importConditionsData = (blocks) => {
+        // Import conditions without marking as modified (for VBSP conversion)
+        setFormData((prev) => ({
+            ...prev,
+            blocks, // Store as blocks instead of conditions
+        }))
+        // Don't mark as modified or add to undo stack since this is just a format conversion
     }
 
     const updateOtherData = (other) => {
@@ -606,7 +615,8 @@ function ItemEditor() {
             // Save Conditions data if modified
             if (formData._modified.conditions) {
                 try {
-                    await window.package.saveConditions?.(item.id, formData.conditions)
+                    // Save blocks format - the backend will handle conversion if needed
+                    await window.package.saveConditions?.(item.id, { blocks: formData.blocks })
                 } catch (error) {
                     console.error("Failed to save Conditions data:", error)
                     hasErrors = true
@@ -866,6 +876,7 @@ function ItemEditor() {
                             formData={formData}
                             onUpdate={updateFormData}
                             onUpdateConditions={updateConditionsData}
+                            onImportConditions={importConditionsData}
                             editingNames={editingNames}
                         />
                     </Box>
@@ -888,20 +899,24 @@ function ItemEditor() {
                 <Stack direction="row" spacing={1}>
                     {/* Undo/Redo Buttons */}
                     <Tooltip title={`Undo (Ctrl+Z)${undoStack.length > 0 ? ` - ${undoStack[undoStack.length - 1]?.description}` : ' - No actions to undo'}`}>
-                        <IconButton
-                            onClick={performUndo}
-                            disabled={undoStack.length === 0}
-                            size="small">
-                            <Undo />
-                        </IconButton>
+                        <span>
+                            <IconButton
+                                onClick={performUndo}
+                                disabled={undoStack.length === 0}
+                                size="small">
+                                <Undo />
+                            </IconButton>
+                        </span>
                     </Tooltip>
                     <Tooltip title={`Redo (Ctrl+Y)${redoStack.length > 0 ? ` - ${redoStack[redoStack.length - 1]?.description}` : ' - No actions to redo'}`}>
-                        <IconButton
-                            onClick={performRedo}
-                            disabled={redoStack.length === 0}
-                            size="small">
-                            <Redo />
-                        </IconButton>
+                        <span>
+                            <IconButton
+                                onClick={performRedo}
+                                disabled={redoStack.length === 0}
+                                size="small">
+                                <Redo />
+                            </IconButton>
+                        </span>
                     </Tooltip>
                                             <Tooltip
                         title={(() => {
