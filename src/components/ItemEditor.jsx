@@ -786,7 +786,7 @@ function ItemEditor() {
                         />
                     </Tooltip>
                     <Tooltip
-                        title="Variables - Configure VBSP variables and instance swapping"
+                        title="Variables - Configure VBSP variables"
                         placement="right">
                         <Tab
                             icon={
