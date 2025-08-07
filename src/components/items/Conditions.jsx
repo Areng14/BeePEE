@@ -44,6 +44,12 @@ import {
     OpenWith,
     SwapVert,
     BugReport,
+    Hive,
+    Language,
+    HelpOutline,
+    ContentCopy,
+    ContentCut,
+    ContentPaste,
 } from "@mui/icons-material"
 import {
     DndContext,
@@ -77,14 +83,22 @@ const validateBlock = (block, allBlocks = [], availableVariables = [], formData 
             return validateIfBlock(block, availableVariables, formData)
         case 'ifElse':
             return validateIfElseBlock(block, availableVariables, formData)
+        case 'ifHas':
+            return validateIfHasBlock(block)
+        case 'ifHasElse':
+            return validateIfHasElseBlock(block)
         case 'switchCase':
             return validateSwitchBlock(block, availableVariables, formData)
+        case 'switchGlobal':
+            return validateSwitchGlobalBlock(block)
         case 'case':
-            return validateCaseBlock(block, allBlocks, formData)
+            return validateCaseBlock(block, allBlocks, availableVariables, formData)
         case 'changeInstance':
             return validateChangeInstanceBlock(block, formData)
         case 'addOverlay':
             return validateAddOverlayBlock(block, formData)
+        case 'addGlobalEnt':
+            return validateAddGlobalEntBlock(block, formData)
         case 'offsetInstance':
             return validateOffsetInstanceBlock(block)
         case 'debug':
@@ -108,7 +122,7 @@ const validateIfBlock = (block, availableVariables = [], formData = {}) => {
     
     // Find variable data to understand expected defaults
     const selectedVariable = availableVariables.find(v => v.fixupName === block.variable)
-    const fullVariableData = formData.variables?.find(v => v.fixupName === block.variable)
+    const fullVariableData = availableVariables.find(v => v.fixupName === block.variable) || formData.variables?.find(v => v.fixupName === block.variable)
     
     // Get effective values (including UI defaults)
     const effectiveOperator = block.operator || '==' // UI default
@@ -187,7 +201,7 @@ const validateIfElseBlock = (block, availableVariables = [], formData = {}) => {
     
     // Find variable data to understand expected defaults
     const selectedVariable = availableVariables.find(v => v.fixupName === block.variable)
-    const fullVariableData = formData.variables?.find(v => v.fixupName === block.variable)
+    const fullVariableData = availableVariables.find(v => v.fixupName === block.variable) || formData.variables?.find(v => v.fixupName === block.variable)
     
     // Get effective values (including UI defaults)
     const effectiveOperator = block.operator || '==' // UI default
@@ -262,6 +276,83 @@ const validateIfElseBlock = (block, availableVariables = [], formData = {}) => {
     return errors
 }
 
+const validateIfHasBlock = (block) => {
+    const errors = []
+    
+    if (!block.hasValue || block.hasValue.trim() === '') {
+        errors.push({
+            type: 'error',
+            message: 'If Global condition must have a global variable value specified (e.g., CLEAN, CAVE_JOHNSON)',
+            field: 'hasValue'
+        })
+    }
+    
+    if (!block.thenBlocks || block.thenBlocks.length === 0) {
+        errors.push({
+            type: 'warning',
+            message: 'If Global block has no actions defined - it will not do anything',
+            field: 'thenBlocks'
+        })
+    }
+    
+    return errors
+}
+
+const validateIfHasElseBlock = (block) => {
+    const errors = []
+    
+    if (!block.hasValue || block.hasValue.trim() === '') {
+        errors.push({
+            type: 'error',
+            message: 'If Global Else condition must have a global variable value specified (e.g., CLEAN, CAVE_JOHNSON)',
+            field: 'hasValue'
+        })
+    }
+    
+    if (!block.thenBlocks || block.thenBlocks.length === 0) {
+        errors.push({
+            type: 'warning',
+            message: 'If Global Else block has no THEN actions defined',
+            field: 'thenBlocks'
+        })
+    }
+    
+    if (!block.elseBlocks || block.elseBlocks.length === 0) {
+        errors.push({
+            type: 'warning',
+            message: 'If Global Else block has no ELSE actions defined',
+            field: 'elseBlocks'
+        })
+    }
+    
+    return errors
+}
+
+const validateSwitchGlobalBlock = (block) => {
+    const errors = []
+    
+    if (!block.cases || block.cases.length === 0) {
+        errors.push({
+            type: 'error',
+            message: 'Switch Global block must have at least one case',
+            field: 'cases'
+        })
+    } else {
+        // Check for duplicate case values
+        const caseValues = block.cases.map(c => c.value).filter(v => v !== undefined && v !== null && v.toString().trim() !== '')
+        const duplicates = caseValues.filter((value, index) => caseValues.indexOf(value) !== index)
+        if (duplicates.length > 0) {
+            errors.push({
+                type: 'warning',
+                message: `Duplicate case values found: ${[...new Set(duplicates)].join(', ')}`,
+                field: 'cases'
+            })
+        }
+    }
+    
+    return errors
+}
+
 // Helper function to get the effective value (including UI defaults)
 const getEffectiveValue = (block, fullVariableData) => {
     // If block has explicit value, use it
@@ -330,7 +421,7 @@ const validateSwitchBlock = (block, availableVariables = [], formData = {}) => {
     }
     
     // Find variable data to understand expected case values
-    const fullVariableData = formData.variables?.find(v => v.fixupName === block.variable)
+    const fullVariableData = availableVariables.find(v => v.fixupName === block.variable) || formData.variables?.find(v => v.fixupName === block.variable)
     
     if (!block.cases || block.cases.length === 0) {
         errors.push({
@@ -379,7 +470,7 @@ const validateSwitchBlock = (block, availableVariables = [], formData = {}) => {
     return errors
 }
 
-const validateCaseBlock = (block, allBlocks = [], formData = {}) => {
+const validateCaseBlock = (block, allBlocks = [], availableVariables = [], formData = {}) => {
     const errors = []
     
     // Find the parent switch to understand expected value types
@@ -412,7 +503,7 @@ const validateCaseBlock = (block, allBlocks = [], formData = {}) => {
     
     const parentSwitch = findParentSwitch(block.id, allBlocks)
     const switchVariable = parentSwitch?.variable
-    const fullVariableData = formData.variables?.find(v => v.fixupName === switchVariable)
+    const fullVariableData = availableVariables.find(v => v.fixupName === switchVariable) || formData.variables?.find(v => v.fixupName === switchVariable)
     
     // Get effective case value (including UI defaults)
     const effectiveCaseValue = getEffectiveCaseValue(block, fullVariableData)
@@ -509,6 +600,32 @@ const validateAddOverlayBlock = (block, formData = {}) => {
                 type: 'warning',
                 message: 'Selected overlay instance does not exist in the current package',
                 field: 'overlayName'
+            })
+        }
+    }
+    
+    return errors
+}
+
+const validateAddGlobalEntBlock = (block, formData = {}) => {
+    const errors = []
+    
+    if (!block.instanceName || block.instanceName.trim() === '') {
+        errors.push({
+            type: 'error',
+            message: 'Add Global Instance block must have an instance selected',
+            field: 'instanceName'
+        })
+    } else if (formData.instances) {
+        // Check if the instance actually exists
+        const instanceExists = Object.values(formData.instances).some(instance => 
+            !instance._toRemove && instance.Name === block.instanceName
+        )
+        if (!instanceExists) {
+            errors.push({
+                type: 'warning',
+                message: 'Selected instance does not exist in the current package',
+                field: 'instanceName'
             })
         }
     }
@@ -776,7 +893,11 @@ function IfBlock({ block, onUpdateProperty, availableVariables, formData }) {
                                 {availableVariables.map((variable) => (
                                     <MenuItem key={variable.fixupName} value={variable.fixupName}>
                                         <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
-                                            <Code fontSize="small" />
+                                            {variable.isSystemVariable ? (
+                                                <Hive fontSize="small" sx={{ color: "#FFC107" }} />
+                                            ) : (
+                                                <Code fontSize="small" />
+                                            )}
                                             {variable.displayName}
                                         </Box>
                                     </MenuItem>
@@ -811,7 +932,7 @@ function IfBlock({ block, onUpdateProperty, availableVariables, formData }) {
                             >
                                 {(() => {
                                     const selectedVariable = availableVariables.find(v => v.fixupName === block.variable);
-                                    const fullVariableData = formData.variables?.find(v => v.fixupName === block.variable);
+                                    const fullVariableData = availableVariables.find(v => v.fixupName === block.variable) || formData.variables?.find(v => v.fixupName === block.variable);
                                     
                                     // For boolean and enum types, only show == and !=
                                     if (fullVariableData?.type === "boolean" || fullVariableData?.type === "enum") {
@@ -875,7 +996,7 @@ function IfBlock({ block, onUpdateProperty, availableVariables, formData }) {
                             }
 
                             // Find the full variable data from formData to get type and enum values
-                            const fullVariableData = formData.variables?.find(v => v.fixupName === block.variable);
+                            const fullVariableData = availableVariables.find(v => v.fixupName === block.variable) || formData.variables?.find(v => v.fixupName === block.variable);
                             
                             if (fullVariableData?.type === "boolean") {
                                 return (
@@ -1070,6 +1191,111 @@ function AddOverlayBlock({ block, onUpdateProperty, availableInstances, editingN
                     ))}
                 </Select>
             </FormControl>
+            </Box>
+        </Box>
+    )
+}
+
+function AddGlobalInstanceBlock({ block, onUpdateProperty, availableInstances, editingNames }) {
+    return (
+        <Box sx={{ p: 2 }}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Add Global Instance
+            </Typography>
+            <Box sx={{ mt: 2 }}>
+                <FormControl fullWidth size="small">
+                <InputLabel>Instance</InputLabel>
+                <Select
+                    value={block.instanceName || ""}
+                    onChange={(e) => onUpdateProperty('instanceName', e.target.value)}
+                    label="Instance"
+                    sx={{ 
+                        "& .MuiOutlinedInput-root": {
+                            height: 40,
+                            minHeight: 40,
+                            maxHeight: 40
+                        },
+                        "& .MuiSelect-select": {
+                            height: "20px !important",
+                            lineHeight: "20px !important",
+                            paddingTop: "10px !important",
+                            paddingBottom: "10px !important",
+                            minWidth: "150px",
+                            display: "flex",
+                            alignItems: "center"
+                        }
+                    }}
+                >
+                    {availableInstances.map((instance, index) => (
+                        <MenuItem key={index} value={instance.Name}>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
+                                <Add fontSize="small" />
+                                <Typography variant="body2">
+                                    {editingNames[instance.index] !== undefined ? editingNames[instance.index] : (instance.displayName || `Instance ${index}`)}
+                                </Typography>
+                            </Box>
+                        </MenuItem>
+                    ))}
+                </Select>
+                </FormControl>
+            </Box>
+        </Box>
+    )
+}
+
+function IfHasBlock({ block, onUpdateProperty }) {
+    return (
+        <Box sx={{ p: 2 }}>
+            <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    If Global Block
+                </Typography>
+                <Box sx={{ mt: 2 }}>
+                    <TextField
+                        fullWidth
+                        size="small"
+                        label="Global Variable Value"
+                        placeholder="e.g., CLEAN, RETRO, CAVE_JOHNSON"
+                        value={block.hasValue || ""}
+                        onChange={(e) => onUpdateProperty('hasValue', e.target.value)}
+                        sx={{ 
+                            "& .MuiOutlinedInput-root": {
+                                height: 40,
+                                minHeight: 40,
+                                maxHeight: 40
+                            }
+                        }}
+                    />
+                </Box>
+            </Box>
+        </Box>
+    )
+}
+
+function IfHasElseBlock({ block, onUpdateProperty }) {
+    return (
+        <Box sx={{ p: 2 }}>
+            <Box sx={{ mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                    If Global Else Block
+                </Typography>
+                <Box sx={{ mt: 2 }}>
+                    <TextField
+                        fullWidth
+                        size="small"
+                        label="Global Variable Value"
+                        placeholder="e.g., CLEAN, RETRO, CAVE_JOHNSON"
+                        value={block.hasValue || ""}
+                        onChange={(e) => onUpdateProperty('hasValue', e.target.value)}
+                        sx={{ 
+                            "& .MuiOutlinedInput-root": {
+                                height: 40,
+                                minHeight: 40,
+                                maxHeight: 40
+                            }
+                        }}
+                    />
+                </Box>
             </Box>
         </Box>
     )
@@ -1346,11 +1572,15 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
         switch (blockType) {
             case 'if': return <AccountTree fontSize="small" />
             case 'switchCase': return <Category fontSize="small" />
+            case 'switchGlobal': return <Language fontSize="small" />
             case 'case': return <Code fontSize="small" />
             case 'changeInstance': return <SwapHoriz fontSize="small" />
             case 'addOverlay': return <AddCircleOutline fontSize="small" />
+            case 'addGlobalEnt': return <Add fontSize="small" />
             case 'test': return <Functions fontSize="small" />
             case 'ifElse': return <AccountTree fontSize="small" />
+            case 'ifHas': return <Hive fontSize="small" />
+            case 'ifHasElse': return <Hive fontSize="small" />
             case 'mapInstVar': return <SwapVert fontSize="small" />
             case 'offsetInstance': return <OpenWith fontSize="small" />
             case 'debug': return <BugReport fontSize="small" />
@@ -1361,16 +1591,20 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
     const getBlockColor = (blockType) => {
         // Logic blocks use orange color family
         const logicColors = {
-            'if': '#FF9800',           // Orange - IF logic
+            'if': '#FF9800',           // Orange - If logic
             'switchCase': '#FF9800',   // Orange - Switch logic  
+            'switchGlobal': '#FFC107', // Amber - Switch Global logic (matches If Global)
             'case': '#E65100',         // Dark Orange - Case logic
             'ifElse': '#FF9800',       // Orange - If-Else logic
+            'ifHas': '#FFC107',        // Amber - If Global logic (global style/voice)
+            'ifHasElse': '#FFC107',    // Amber - If Global Else logic (global style/voice)
         }
         
         // Action/Result blocks use purple color family
         const actionColors = {
             'changeInstance': '#9C27B0',    // Purple - Change action
             'addOverlay': '#9C27B0',        // Purple - Add action
+            'addGlobalEnt': '#9C27B0',      // Purple - Add global entity action
             'mapInstVar': '#9C27B0',        // Purple - Map action
             'offsetInstance': '#9C27B0',    // Purple - Offset action
             'debug': '#9C27B0',             // Purple - Debug action
@@ -1462,6 +1696,16 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                     />
                 )
 
+            case 'addGlobalEnt':
+                return (
+                    <AddGlobalInstanceBlock 
+                        block={block}
+                        onUpdateProperty={handleUpdateProperty}
+                        availableInstances={availableInstances}
+                        editingNames={editingNames}
+                    />
+                )
+
             case 'offsetInstance':
                 return (
                     <OffsetInstanceBlock 
@@ -1502,7 +1746,7 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                                         // Find the parent switch block to get the variable type
                                         const parentSwitch = findParentSwitch(block.id, blocks)
                                         const switchVariable = parentSwitch?.variable
-                                        const fullVariableData = formData.variables?.find(v => v.fixupName === switchVariable)
+                                        const fullVariableData = availableVariables.find(v => v.fixupName === switchVariable) || formData.variables?.find(v => v.fixupName === switchVariable)
                                         
                                         if (!switchVariable) {
                                             return (
@@ -1513,6 +1757,11 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                                                     value={block.value || ""}
                                                     onChange={(e) => handleUpdateProperty('value', e.target.value)}
                                                     placeholder="Select variable in parent switch first"
+                                                    sx={{ 
+                                                        "& .MuiOutlinedInput-root": {
+                                                            minWidth: "200px"
+                                                        }
+                                                    }}
                                                 />
                                             );
                                         }
@@ -1525,6 +1774,11 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                                                         value={block.value || "1"}
                                                         onChange={(e) => handleUpdateProperty('value', e.target.value)}
                                                         label="Case Value"
+                                                        sx={{ 
+                                                            "& .MuiOutlinedInput-root": {
+                                                                minWidth: "200px"
+                                                            }
+                                                        }}
                                                     >
                                                         <MenuItem value="1">True</MenuItem>
                                                         <MenuItem value="0">False</MenuItem>
@@ -1539,6 +1793,11 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                                                         value={block.value || Object.keys(fullVariableData.enumValues)[0]}
                                                         onChange={(e) => handleUpdateProperty('value', e.target.value)}
                                                         label="Case Value"
+                                                        sx={{ 
+                                                            "& .MuiOutlinedInput-root": {
+                                                                minWidth: "200px"
+                                                            }
+                                                        }}
                                                     >
                                                         {Object.entries(fullVariableData.enumValues).map(([value, label]) => (
                                                             <MenuItem key={value} value={value}>
@@ -1560,6 +1819,11 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                                                     inputProps={{
                                                         min: fullVariableData?.type === "number" ? 0 : undefined,
                                                         step: fullVariableData?.type === "number" ? 1 : undefined,
+                                                    }}
+                                                    sx={{ 
+                                                        "& .MuiOutlinedInput-root": {
+                                                            minWidth: "200px"
+                                                        }
                                                     }}
                                                 />
                                             );
@@ -1625,7 +1889,11 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                                     {availableVariables.map((variable, index) => (
                                         <MenuItem key={index} value={variable.fixupName}>
                                             <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
-                                                <Functions fontSize="small" />
+                                                {variable.isSystemVariable ? (
+                                                    <Hive fontSize="small" sx={{ color: "#FFC107" }} />
+                                                ) : (
+                                                    <Functions fontSize="small" />
+                                                )}
                                                 <Typography variant="body2">
                                                     {variable.displayName}
                                                 </Typography>
@@ -1634,6 +1902,47 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                                     ))}
                                 </Select>
                             </FormControl>
+                        </Box>
+                        
+                        <Box sx={{ mt: 2 }}>
+                            <DroppableZone
+                                id={`${block.id}-cases`}
+                                isEmpty={!block.cases || block.cases.length === 0}
+                                label="Drop case blocks here (you can add multiple)"
+                            >
+                                {block.cases && block.cases.map((caseBlock) => (
+                                    <SortableBlock
+                                        key={caseBlock.id}
+                                        block={caseBlock}
+                                        onUpdateBlock={onUpdateBlock}
+                                        onDeleteBlock={onDeleteBlock}
+                                        onAddChildBlock={onAddChildBlock}
+                                        availableInstances={availableInstances}
+                                        availableVariables={availableVariables}
+                                        formData={formData}
+                                        editingNames={editingNames}
+                                        blocks={blocks}
+                                        depth={depth + 1}
+                                    />
+                                ))}
+                            </DroppableZone>
+                        </Box>
+                    </Box>
+                )
+
+            case 'switchGlobal':
+                return (
+                    <Box sx={{ p: 2 }}>
+                        <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 2 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                                SWITCH GLOBAL
+                            </Typography>
+                            <Chip 
+                                label={`${block.cases?.length || 0} cases`} 
+                                size="small" 
+                                color="primary"
+                                sx={{ backgroundColor: "#FFC107", color: "#000" }}
+                            />
                         </Box>
                         
                         <Box sx={{ mt: 2 }}>
@@ -1699,7 +2008,11 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                                             {availableVariables.map((variable) => (
                                                 <MenuItem key={variable.fixupName} value={variable.fixupName}>
                                                     <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
-                                                        <Code fontSize="small" />
+                                                        {variable.isSystemVariable ? (
+                                                            <Hive fontSize="small" sx={{ color: "#FFC107" }} />
+                                                        ) : (
+                                                            <Code fontSize="small" />
+                                                        )}
                                                         {variable.displayName}
                                                     </Box>
                                                 </MenuItem>
@@ -1734,7 +2047,7 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                                         >
                                             {(() => {
                                                 const selectedVariable = availableVariables.find(v => v.fixupName === block.variable);
-                                                const fullVariableData = formData.variables?.find(v => v.fixupName === block.variable);
+                                                const fullVariableData = availableVariables.find(v => v.fixupName === block.variable) || formData.variables?.find(v => v.fixupName === block.variable);
                                                 
                                                 // For boolean and enum types, only show == and !=
                                                 if (fullVariableData?.type === "boolean" || fullVariableData?.type === "enum") {
@@ -1798,7 +2111,7 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                                         }
 
                                         // Find the full variable data from formData to get type and enum values
-                                        const fullVariableData = formData.variables?.find(v => v.fixupName === block.variable);
+                                        const fullVariableData = availableVariables.find(v => v.fixupName === block.variable) || formData.variables?.find(v => v.fixupName === block.variable);
                                         
                                         if (fullVariableData?.type === "boolean") {
                                             return (
@@ -1959,6 +2272,147 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                             </DroppableZone>
                         </Box>
                     </Box>
+                )
+
+            case 'ifHas':
+                return (
+                    <>
+                        <IfHasBlock 
+                            block={block}
+                            onUpdateProperty={handleUpdateProperty}
+                        />
+                        {/* THEN Section */}
+                        <Box sx={{ p: 2, pt: 0 }}>
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <CheckCircle fontSize="small" />
+                                Actions ({block.thenBlocks?.length || 0})
+                                <Chip 
+                                    label="Multiple actions allowed" 
+                                    size="small" 
+                                    variant="outlined" 
+                                    sx={{ 
+                                        ml: 1, 
+                                        fontSize: '0.7rem',
+                                        backgroundColor: 'rgba(210, 176, 25, 0.1)',
+                                        borderColor: '#d2b019ff',
+                                        color: '#d2b019ff'
+                                    }}
+                                />
+                            </Typography>
+                            <DroppableZone
+                                id={`${block.id}-then`}
+                                isEmpty={!block.thenBlocks || block.thenBlocks.length === 0}
+                                label="Drop action blocks here (you can add multiple)"
+                            >
+                                {block.thenBlocks && block.thenBlocks.map((childBlock) => (
+                                    <SortableBlock
+                                        key={childBlock.id}
+                                        block={childBlock}
+                                        onUpdateBlock={onUpdateBlock}
+                                        onDeleteBlock={onDeleteBlock}
+                                        onAddChildBlock={onAddChildBlock}
+                                        availableInstances={availableInstances}
+                                        availableVariables={availableVariables}
+                                        formData={formData}
+                                        editingNames={editingNames}
+                                        blocks={blocks}
+                                        depth={depth + 1}
+                                    />
+                                ))}
+                            </DroppableZone>
+                        </Box>
+                    </>
+                )
+
+            case 'ifHasElse':
+                return (
+                    <>
+                        <IfHasElseBlock 
+                            block={block}
+                            onUpdateProperty={handleUpdateProperty}
+                        />
+                        {/* THEN Section */}
+                        <Box sx={{ p: 2, pt: 0 }}>
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <CheckCircle fontSize="small" />
+                                Actions ({block.thenBlocks?.length || 0})
+                                <Chip 
+                                    label="Multiple actions allowed" 
+                                    size="small" 
+                                    variant="outlined" 
+                                    sx={{ 
+                                        ml: 1, 
+                                        fontSize: '0.7rem',
+                                        backgroundColor: 'rgba(210, 176, 25, 0.1)',
+                                        borderColor: '#d2b019ff',
+                                        color: '#d2b019ff'
+                                    }}
+                                />
+                            </Typography>
+                            <DroppableZone
+                                id={`${block.id}-then`}
+                                isEmpty={!block.thenBlocks || block.thenBlocks.length === 0}
+                                label="Drop action blocks here (you can add multiple)"
+                            >
+                                {block.thenBlocks && block.thenBlocks.map((childBlock) => (
+                                    <SortableBlock
+                                        key={childBlock.id}
+                                        block={childBlock}
+                                        onUpdateBlock={onUpdateBlock}
+                                        onDeleteBlock={onDeleteBlock}
+                                        onAddChildBlock={onAddChildBlock}
+                                        availableInstances={availableInstances}
+                                        availableVariables={availableVariables}
+                                        formData={formData}
+                                        editingNames={editingNames}
+                                        blocks={blocks}
+                                        depth={depth + 1}
+                                    />
+                                ))}
+                            </DroppableZone>
+                        </Box>
+                        
+                        {/* ELSE Section */}
+                        <Box sx={{ p: 2, pt: 0 }}>
+                            <Typography variant="subtitle2" color="text.secondary" gutterBottom sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                                <Cancel fontSize="small" />
+                                Else Actions ({block.elseBlocks?.length || 0})
+                                <Chip 
+                                    label="Multiple actions allowed" 
+                                    size="small" 
+                                    variant="outlined" 
+                                    sx={{ 
+                                        ml: 1, 
+                                        fontSize: '0.7rem',
+                                        backgroundColor: 'rgba(210, 176, 25, 0.1)',
+                                        borderColor: '#d2b019ff',
+                                        color: '#d2b019ff'
+                                    }}
+                                />
+                            </Typography>
+                            <DroppableZone
+                                id={`${block.id}-else`}
+                                isEmpty={!block.elseBlocks || block.elseBlocks.length === 0}
+                                label="Drop action blocks here (you can add multiple)"
+                            >
+                                {block.elseBlocks && block.elseBlocks.map((childBlock) => (
+                                    <SortableBlock
+                                        key={childBlock.id}
+                                        block={childBlock}
+                                        onUpdateBlock={onUpdateBlock}
+                                        onDeleteBlock={onDeleteBlock}
+                                        onAddChildBlock={onAddChildBlock}
+                                        availableInstances={availableInstances}
+                                        availableVariables={availableVariables}
+                                        formData={formData}
+                                        editingNames={editingNames}
+                                        blocks={blocks}
+                                        depth={depth + 1}
+                                    />
+                                ))}
+                            </DroppableZone>
+                        </Box>
+                    </>
                 )
 
             case 'mapInstVar':
@@ -2136,38 +2590,107 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                     <ErrorBadge errors={blockErrors} size="small" />
                 )}
                 
-                                 <Box
-                     {...attributes}
-                     {...listeners}
-                     sx={{
-                         cursor: isDragging ? "grabbing" : "grab",
-                         display: "flex",
-                         alignItems: "center",
-                         color: "#888",
-                         backgroundColor: "#3a3a3a",
-                         borderRadius: 1,
-                         p: 0.5,
-                         "&:hover": {
-                             backgroundColor: "#555",
-                         },
-                     }}
-                 >
+                <Box
+                    {...attributes}
+                    {...listeners}
+                    sx={{
+                        cursor: isDragging ? "grabbing" : "grab",
+                        display: "flex",
+                        alignItems: "center",
+                        color: "#888",
+                        backgroundColor: "#3a3a3a",
+                        borderRadius: 1,
+                        p: 0.5,
+                        "&:hover": {
+                            backgroundColor: "#555",
+                        },
+                    }}
+                >
                     <DragIndicator fontSize="small" />
                 </Box>
 
-                                 <Tooltip title="Delete this block">
-                     <IconButton
-                         size="small"
-                         color="error"
-                         sx={{ 
-                             backgroundColor: "#3a3a3a",
-                             "&:hover": {
-                                 backgroundColor: "#d32f2f",
-                                 color: "#fff",
-                             }
-                         }}
-                         onClick={() => onDeleteBlock(block.id)}
-                     >
+                <Tooltip title="Copy this block">
+                    <IconButton
+                        size="small"
+                        sx={{ 
+                            backgroundColor: "#3a3a3a",
+                            color: "#4CAF50",
+                            "&:hover": {
+                                backgroundColor: "#4CAF50",
+                                color: "#fff",
+                            }
+                        }}
+                        onClick={() => handleCopyBlock(block.id)}
+                    >
+                        <ContentCopy fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+
+                <Tooltip title="Cut this block">
+                    <IconButton
+                        size="small"
+                        sx={{ 
+                            backgroundColor: "#3a3a3a",
+                            color: "#FF9800",
+                            "&:hover": {
+                                backgroundColor: "#FF9800",
+                                color: "#fff",
+                            }
+                        }}
+                        onClick={() => handleCutBlock(block.id)}
+                    >
+                        <ContentCut fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+
+                {copiedBlock && (
+                    <Tooltip title={`Paste ${isCut ? 'cut' : 'copied'} block here`}>
+                        <IconButton
+                            size="small"
+                            sx={{ 
+                                backgroundColor: "#3a3a3a",
+                                color: "#9C27B0",
+                                "&:hover": {
+                                    backgroundColor: "#9C27B0",
+                                    color: "#fff",
+                                }
+                            }}
+                            onClick={() => handlePasteBlock(block.id, 'then')}
+                        >
+                            <ContentPaste fontSize="small" />
+                        </IconButton>
+                    </Tooltip>
+                )}
+
+                <Tooltip title={BLOCK_DEFINITIONS[block.type]?.description || "No description available"}>
+                    <IconButton
+                        size="small"
+                        sx={{ 
+                            backgroundColor: "#3a3a3a",
+                            color: "#2196F3",
+                            "&:hover": {
+                                backgroundColor: "#2196F3",
+                                color: "#fff",
+                            }
+                        }}
+                    >
+                        <HelpOutline fontSize="small" />
+                    </IconButton>
+                </Tooltip>
+
+                <Tooltip title="Delete this block">
+                    <IconButton
+                        size="small"
+                        color="error"
+                        sx={{ 
+                            backgroundColor: "#3a3a3a",
+                            "&:hover": {
+                                backgroundColor: "#d32f2f",
+                                color: "#fff",
+                            }
+                        }}
+                        onClick={() => onDeleteBlock(block.id)}
+                    >
                         <Delete fontSize="small" />
                     </IconButton>
                 </Tooltip>
@@ -2183,68 +2706,95 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
 // Block definitions for the modular system
 const BLOCK_DEFINITIONS = {
     if: {
-        displayName: "IF Block",
-        description: "Conditional logic block - drag action blocks inside",
+        displayName: "If Block",
+        description: "Execute actions when a variable meets a specific condition (e.g., if myVariable == 1, then do something)",
         category: "Logic",
         canContainChildren: true,
         childContainers: ['thenBlocks']
     },
-    changeInstance: {
-        displayName: "Change Instance",
-        description: "Change the current instance file",
-        category: "Actions",
-        canContainChildren: false
+    ifElse: {
+        displayName: 'If Else Block',
+        description: 'Execute different actions based on whether a condition is true or false (if-then-else logic)',
+        category: 'Logic',
+        canContainChildren: true,
+        childContainers: ['thenBlocks', 'elseBlocks']
     },
-    addOverlay: {
-        displayName: "Add Overlay",
-        description: "Add an overlay instance on top",
-        category: "Actions", 
-        canContainChildren: false
+    ifHas: {
+        displayName: 'If Global Block',
+        description: 'Check if the current BEE2 style or voice matches a specific value (e.g., CLEAN, RETRO, CAVE_JOHNSON)',
+        category: 'Logic',
+        canContainChildren: true,
+        childContainers: ['thenBlocks']
     },
-    test: {
-        displayName: "Test Block",
-        description: "Empty test block for development",
-        category: "Test",
-        canContainChildren: false
+    ifHasElse: {
+        displayName: 'If Global Else Block',
+        description: 'Check BEE2 style/voice with fallback actions (e.g., if style is CLEAN do X, otherwise do Y)',
+        category: 'Logic',
+        canContainChildren: true,
+        childContainers: ['thenBlocks', 'elseBlocks']
     },
     switchCase: {
         displayName: "Switch Case",
-        description: "Handle multiple conditions with different outcomes",
+        description: "Compare a variable against multiple values and execute different actions for each match",
+        category: "Logic",
+        canContainChildren: true,
+        childContainers: ['cases']
+    },
+    switchGlobal: {
+        displayName: "Switch Global",
+        description: "Compare BEE2 global variables (style/voice) against multiple values (e.g., CLEAN → do A, RETRO → do B)",
         category: "Logic",
         canContainChildren: true,
         childContainers: ['cases']
     },
     case: {
         displayName: "Case",
-        description: "Individual case in a switch statement",
+        description: "Define a specific value to match in a switch statement and the actions to execute when matched",
         category: "Logic",
         canContainChildren: true,
         childContainers: ['thenBlocks']
     },
-    ifElse: {
-        displayName: 'If-Else',
-        description: 'Conditional logic with then and else branches',
-        category: 'Logic',
-        canContainChildren: true,
-        childContainers: ['thenBlocks', 'elseBlocks']
+    changeInstance: {
+        displayName: "Change Instance",
+        description: "Replace the current map instance with a different VMF file (e.g., change door.vmf to large_door.vmf)",
+        category: "Actions",
+        canContainChildren: false
+    },
+    addOverlay: {
+        displayName: "Add Overlay",
+        description: "Add an additional instance file on top of the current one (e.g., add decorations or effects)",
+        category: "Actions", 
+        canContainChildren: false
+    },
+    addGlobalEnt: {
+        displayName: "Add Global Instance",
+        description: "Add a global instance to the map that affects the entire level (e.g., add global lighting or scripts)",
+        category: "Actions",
+        canContainChildren: false
+    },
+    test: {
+        displayName: "Test Block",
+        description: "Empty placeholder block for testing and development purposes",
+        category: "Test",
+        canContainChildren: false
     },
     mapInstVar: {
         displayName: 'Map Instance Variable',
-        description: 'Maps one variable to another with value mappings',
+        description: 'Transform one variable into another with custom value mappings (e.g., convert number to text)',
         category: 'Variables',
         canContainChildren: false,
         childContainers: []
     },
     offsetInstance: {
         displayName: 'Offset Instance',
-        description: 'Offset the instance position',
+        description: 'Move the instance position by X Y Z coordinates (e.g., shift 64 units up: 0 0 64)',
         category: 'Actions',
         canContainChildren: false,
         childContainers: []
     },
     debug: {
         displayName: 'Debug Output',
-        description: 'Output debug messages with variable support',
+        description: 'Print debug messages to console with variable values for troubleshooting your conditions',
         category: 'Actions',
         canContainChildren: false,
         childContainers: []
@@ -2256,6 +2806,152 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
     const [blocks, setBlocks] = useState([])
     const [selectedCategory, setSelectedCategory] = useState("Logic")
     const [activeId, setActiveId] = useState(null)
+    const [copiedBlock, setCopiedBlock] = useState(null)
+    const [isCut, setIsCut] = useState(false)
+    
+    // Generate unique ID for blocks
+    const generateUniqueId = () => {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2)
+    }
+
+    // Deep clone a block with new IDs
+    const cloneBlockWithNewIds = (block) => {
+        const newBlock = {
+            ...block,
+            id: generateUniqueId()
+        }
+
+        // Clone child containers
+        if (BLOCK_DEFINITIONS[block.type]?.canContainChildren) {
+            const childContainers = BLOCK_DEFINITIONS[block.type].childContainers || []
+            for (const container of childContainers) {
+                if (block[container] && Array.isArray(block[container])) {
+                    newBlock[container] = block[container].map(childBlock => cloneBlockWithNewIds(childBlock))
+                }
+            }
+        }
+
+        return newBlock
+    }
+
+    // Helper function to find a block recursively
+    const findBlockRecursive = (blockList, blockId) => {
+        for (const block of blockList) {
+            if (block.id === blockId) {
+                return block
+            }
+            
+            // Check child containers
+            if (BLOCK_DEFINITIONS[block.type]?.canContainChildren) {
+                const childContainers = BLOCK_DEFINITIONS[block.type].childContainers || []
+                for (const container of childContainers) {
+                    if (block[container] && Array.isArray(block[container])) {
+                        const found = findBlockRecursive(block[container], blockId)
+                        if (found) return found
+                    }
+                }
+            }
+        }
+        return null
+    }
+
+    // Helper function to delete a block recursively
+    const deleteBlockRecursive = (blockList, blockId) => {
+        return blockList.filter(block => {
+            if (block.id === blockId) return false
+            
+            // Also check child containers
+            if (BLOCK_DEFINITIONS[block.type]?.canContainChildren) {
+                const childContainers = BLOCK_DEFINITIONS[block.type].childContainers || []
+                for (const container of childContainers) {
+                    if (block[container] && Array.isArray(block[container])) {
+                        block[container] = deleteBlockRecursive(block[container], blockId)
+                    }
+                }
+            }
+            return true
+        })
+    }
+
+    // Copy block
+    const handleCopyBlock = (blockId) => {
+        const blockToCopy = findBlockRecursive(blocks, blockId)
+        if (blockToCopy) {
+            setCopiedBlock(blockToCopy)
+            setIsCut(false)
+        }
+    }
+
+    // Cut block
+    const handleCutBlock = (blockId) => {
+        const blockToCut = findBlockRecursive(blocks, blockId)
+        if (blockToCut) {
+            setCopiedBlock(blockToCut)
+            setIsCut(true)
+            // Don't actually remove the block yet - wait for paste
+        }
+    }
+
+    // Paste block
+    const handlePasteBlock = (targetBlockId, containerType) => {
+        if (!copiedBlock) return
+
+        const clonedBlock = cloneBlockWithNewIds(copiedBlock)
+
+        // If it was cut, remove the original
+        let updatedBlocks = blocks
+        if (isCut) {
+            updatedBlocks = deleteBlockRecursive(blocks, copiedBlock.id)
+            setIsCut(false)
+            setCopiedBlock(null)
+        }
+
+        // Add the cloned block to the target
+        const addBlockToContainer = (blockList, blockToAdd) => {
+            return blockList.map(block => {
+                if (block.id === targetBlockId) {
+                    if (containerType === 'then') {
+                        return {
+                            ...block,
+                            thenBlocks: [...(block.thenBlocks || []), blockToAdd]
+                        }
+                    } else if (containerType === 'else') {
+                        return {
+                            ...block,
+                            elseBlocks: [...(block.elseBlocks || []), blockToAdd]
+                        }
+                    } else if (containerType === 'cases') {
+                        return {
+                            ...block,
+                            cases: [...(block.cases || []), blockToAdd]
+                        }
+                    }
+                }
+                
+                // Check child containers
+                if (BLOCK_DEFINITIONS[block.type]?.canContainChildren) {
+                    const childContainers = BLOCK_DEFINITIONS[block.type].childContainers || []
+                    for (const container of childContainers) {
+                        if (block[container]) {
+                            block[container] = addBlockToContainer(block[container], blockToAdd)
+                        }
+                    }
+                }
+                return block
+            })
+        }
+
+        // If no target specified, add to root
+        if (!targetBlockId) {
+            updatedBlocks = [...updatedBlocks, clonedBlock]
+        } else {
+            updatedBlocks = addBlockToContainer(updatedBlocks, clonedBlock)
+        }
+
+        setBlocks(updatedBlocks)
+        console.log('🔧 Conditions JSON:', JSON.stringify(updatedBlocks, null, 2))
+        onUpdateConditions(updatedBlocks)
+    }
     
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -2279,19 +2975,83 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
               }))
         : []
 
+    // BEE2 system variables - these are built-in and always available
+    const bee2SystemVariables = [
+        {
+            displayName: "Rotation",
+            fixupName: "$rotation",
+            type: "number",
+            description: "Rotation of the item in degrees",
+            isSystemVariable: true
+        },
+        {
+            displayName: "Angle", 
+            fixupName: "$angle",
+            type: "number",
+            description: "Simplified rotation angle",
+            isSystemVariable: true
+        },
+        {
+            displayName: "Is Coop",
+            fixupName: "$is_coop", 
+            type: "boolean",
+            description: "True in cooperative maps",
+            isSystemVariable: true
+        },
+        {
+            displayName: "Is Preview",
+            fixupName: "$is_preview",
+            type: "boolean", 
+            description: "True if preview mode is active (only when testing)",
+            isSystemVariable: true
+        },
+        {
+            displayName: "Portal Gun On/Off",
+            fixupName: "$portalgun_onoff",
+            type: "boolean",
+            description: "Tells compiler to add portalgun manager script",
+            isSystemVariable: true
+        },
+        {
+            displayName: "Needs Portal Manager",
+            fixupName: "$needs_portalman",
+            type: "boolean",
+            description: "Forces portal manager logic (even in coop)",
+            isSystemVariable: true
+        },
+        {
+            displayName: "Dual Portal",
+            fixupName: "$dual_portal", 
+            type: "boolean",
+            description: "True if the player gets both portals",
+            isSystemVariable: true
+        }
+    ]
+
     // Get available variables from formData (user-added variables only)
-    const availableVariables = formData.variables ? 
+    const userVariables = formData.variables ? 
         (Array.isArray(formData.variables) ? 
             formData.variables.map(variable => ({
                 displayName: variable.displayName || variable.fixupName,
-                fixupName: variable.fixupName
+                fixupName: variable.fixupName,
+                type: variable.type,
+                enumValues: variable.enumValues,
+                description: variable.description,
+                isSystemVariable: false
             })) : 
             // If it's an object, convert to array
             Object.values(formData.variables).map(variable => ({
                 displayName: variable.displayName || variable.fixupName,
-                fixupName: variable.fixupName
+                fixupName: variable.fixupName,
+                type: variable.type,
+                enumValues: variable.enumValues,
+                description: variable.description,
+                isSystemVariable: false
             }))
         ) : []
+
+    // Combine user variables with BEE2 system variables (BEE2 variables come last)
+    const availableVariables = [...userVariables, ...bee2SystemVariables]
 
     useEffect(() => {
         console.log('Conditions useEffect triggered:', {
@@ -2338,6 +3098,7 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
         
         const updatedBlocks = [...blocks, newBlock]
         setBlocks(updatedBlocks)
+        console.log('🔧 Conditions JSON:', JSON.stringify(updatedBlocks, null, 2))
         onUpdateConditions(updatedBlocks)
         setAddDialogOpen(false)
     }
@@ -2362,6 +3123,7 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
 
         const updatedBlocks = deleteBlockRecursive(blocks)
         setBlocks(updatedBlocks)
+        console.log('🔧 Conditions JSON:', JSON.stringify(updatedBlocks, null, 2))
         onUpdateConditions(updatedBlocks)
     }
 
@@ -2387,6 +3149,7 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
 
         const updatedBlocks = updateBlockRecursive(blocks)
         setBlocks(updatedBlocks)
+        console.log('🔧 Conditions JSON:', JSON.stringify(updatedBlocks, null, 2))
         onUpdateConditions(updatedBlocks)
     }
 
@@ -2491,6 +3254,7 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
                 // Then add it to the target block
                 const updatedBlocks = addBlockToContainer(blocksCopy, draggedBlock)
                 setBlocks(updatedBlocks)
+                console.log('🔧 Conditions JSON:', JSON.stringify(updatedBlocks, null, 2))
                 onUpdateConditions(updatedBlocks)
             }
         }
@@ -2502,6 +3266,7 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
             if (oldIndex !== -1 && newIndex !== -1) {
                 const updatedBlocks = arrayMove(blocks, oldIndex, newIndex)
                 setBlocks(updatedBlocks)
+                console.log('🔧 Conditions JSON:', JSON.stringify(updatedBlocks, null, 2))
                 onUpdateConditions(updatedBlocks)
             }
         }
@@ -2581,17 +3346,32 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
 
         // Helper function to find variable by name
         const findVariableByName = (varName) => {
-            if (!formData.variables || !Array.isArray(formData.variables)) {
-                return null
+            // First check BEE2 system variables
+            const bee2SystemVariables = [
+                { displayName: "Rotation", fixupName: "$rotation", type: "number" },
+                { displayName: "Angle", fixupName: "$angle", type: "number" },
+                { displayName: "Is Coop", fixupName: "$is_coop", type: "boolean" },
+                { displayName: "Is Preview", fixupName: "$is_preview", type: "boolean" },
+                { displayName: "Portal Gun On/Off", fixupName: "$portalgun_onoff", type: "boolean" },
+                { displayName: "Needs Portal Manager", fixupName: "$needs_portalman", type: "boolean" },
+                { displayName: "Dual Portal", fixupName: "$dual_portal", type: "boolean" }
+            ]
+            
+            // Try to find in BEE2 system variables first
+            const withDollar = `$${varName}`
+            let foundVariable = bee2SystemVariables.find(variable => variable.fixupName === withDollar)
+            
+            if (!foundVariable) {
+                foundVariable = bee2SystemVariables.find(variable => variable.fixupName === varName)
             }
             
-            // Try to find by fixupName with $ prefix
-            const withDollar = `$${varName}`
-            let foundVariable = formData.variables.find(variable => variable.fixupName === withDollar)
-            
-            // If not found with $, try without $ (in case the varName already has it)
-            if (!foundVariable) {
-                foundVariable = formData.variables.find(variable => variable.fixupName === varName)
+            // If not found in system variables, check user variables
+            if (!foundVariable && formData.variables && Array.isArray(formData.variables)) {
+                foundVariable = formData.variables.find(variable => variable.fixupName === withDollar)
+                
+                if (!foundVariable) {
+                    foundVariable = formData.variables.find(variable => variable.fixupName === varName)
+                }
             }
             
             return foundVariable
