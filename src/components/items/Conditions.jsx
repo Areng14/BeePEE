@@ -33,6 +33,7 @@ import {
     Info,
     CheckCircle,
     Error,
+    Warning,
     Category,
     Functions,
     AccountTree,
@@ -47,6 +48,8 @@ import {
 import {
     DndContext,
     closestCenter,
+    pointerWithin,
+    rectIntersection,
     KeyboardSensor,
     PointerSensor,
     useSensor,
@@ -65,6 +68,610 @@ import {
 } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 
+// Block Validation Functions
+const validateBlock = (block, allBlocks = [], availableVariables = [], formData = {}) => {
+    const errors = []
+    
+    switch (block.type) {
+        case 'if':
+            return validateIfBlock(block, availableVariables, formData)
+        case 'ifElse':
+            return validateIfElseBlock(block, availableVariables, formData)
+        case 'switchCase':
+            return validateSwitchBlock(block, availableVariables, formData)
+        case 'case':
+            return validateCaseBlock(block, allBlocks, formData)
+        case 'changeInstance':
+            return validateChangeInstanceBlock(block, formData)
+        case 'addOverlay':
+            return validateAddOverlayBlock(block, formData)
+        case 'offsetInstance':
+            return validateOffsetInstanceBlock(block)
+        case 'debug':
+            return validateDebugBlock(block, availableVariables)
+        default:
+            return []
+    }
+}
+
+const validateIfBlock = (block, availableVariables = [], formData = {}) => {
+    const errors = []
+    
+    if (!block.variable || block.variable.trim() === '') {
+        errors.push({
+            type: 'error',
+            message: 'IF condition must have a variable selected',
+            field: 'variable'
+        })
+        return errors // If no variable, can't validate other fields properly
+    }
+    
+    // Find variable data to understand expected defaults
+    const selectedVariable = availableVariables.find(v => v.fixupName === block.variable)
+    const fullVariableData = formData.variables?.find(v => v.fixupName === block.variable)
+    
+    // Get effective values (including UI defaults)
+    const effectiveOperator = block.operator || '==' // UI default
+    const effectiveValue = getEffectiveValue(block, fullVariableData)
+    
+    // Validate operator - account for defaults and variable type compatibility
+    if (effectiveOperator) {
+        const validOperators = getValidOperatorsForVariable(fullVariableData)
+        if (!validOperators.includes(effectiveOperator)) {
+            errors.push({
+                type: 'warning',
+                message: `Operator "${effectiveOperator}" may not be valid for this variable type`,
+                field: 'operator'
+            })
+        }
+    }
+    
+    // Validate value - account for UI defaults and type requirements
+    if (effectiveValue === null || effectiveValue === undefined) {
+        errors.push({
+            type: 'error',
+            message: 'IF condition must have a value specified',
+            field: 'value'
+        })
+    } else if (fullVariableData) {
+        // Type-specific value validation
+        if (fullVariableData.type === "boolean" && effectiveValue !== "0" && effectiveValue !== "1") {
+            errors.push({
+                type: 'warning',
+                message: `Boolean variable should have value "0" (False) or "1" (True), not "${effectiveValue}"`,
+                field: 'value'
+            })
+        } else if (fullVariableData.type === "enum" && fullVariableData.enumValues) {
+            const validEnumValues = Object.keys(fullVariableData.enumValues)
+            if (!validEnumValues.includes(effectiveValue.toString())) {
+                errors.push({
+                    type: 'warning',
+                    message: `Value "${effectiveValue}" is not a valid option for this enum variable`,
+                    field: 'value'
+                })
+            }
+        } else if (fullVariableData.type === "number") {
+            const numValue = parseFloat(effectiveValue)
+            if (isNaN(numValue)) {
+                errors.push({
+                    type: 'warning',
+                    message: `Value "${effectiveValue}" should be a number for numeric variables`,
+                    field: 'value'
+                })
+            }
+        }
+    }
+    
+    if (!block.thenBlocks || block.thenBlocks.length === 0) {
+        errors.push({
+            type: 'warning',
+            message: 'IF block has no actions defined - it will not do anything',
+            field: 'thenBlocks'
+        })
+    }
+    
+    return errors
+}
+
+const validateIfElseBlock = (block, availableVariables = [], formData = {}) => {
+    const errors = []
+    
+    if (!block.variable || block.variable.trim() === '') {
+        errors.push({
+            type: 'error',
+            message: 'If-Else condition must have a variable selected',
+            field: 'variable'
+        })
+        return errors // If no variable, can't validate other fields properly
+    }
+    
+    // Find variable data to understand expected defaults
+    const selectedVariable = availableVariables.find(v => v.fixupName === block.variable)
+    const fullVariableData = formData.variables?.find(v => v.fixupName === block.variable)
+    
+    // Get effective values (including UI defaults)
+    const effectiveOperator = block.operator || '==' // UI default
+    const effectiveValue = getEffectiveValue(block, fullVariableData)
+    
+    // Validate operator - account for defaults and variable type compatibility
+    if (effectiveOperator) {
+        const validOperators = getValidOperatorsForVariable(fullVariableData)
+        if (!validOperators.includes(effectiveOperator)) {
+            errors.push({
+                type: 'warning',
+                message: `Operator "${effectiveOperator}" may not be valid for this variable type`,
+                field: 'operator'
+            })
+        }
+    }
+    
+    // Validate value - account for UI defaults and type requirements
+    if (effectiveValue === null || effectiveValue === undefined) {
+        errors.push({
+            type: 'error',
+            message: 'If-Else condition must have a value specified',
+            field: 'value'
+        })
+    } else if (fullVariableData) {
+        // Type-specific value validation
+        if (fullVariableData.type === "boolean" && effectiveValue !== "0" && effectiveValue !== "1") {
+            errors.push({
+                type: 'warning',
+                message: `Boolean variable should have value "0" (False) or "1" (True), not "${effectiveValue}"`,
+                field: 'value'
+            })
+        } else if (fullVariableData.type === "enum" && fullVariableData.enumValues) {
+            const validEnumValues = Object.keys(fullVariableData.enumValues)
+            if (!validEnumValues.includes(effectiveValue.toString())) {
+                errors.push({
+                    type: 'warning',
+                    message: `Value "${effectiveValue}" is not a valid option for this enum variable`,
+                    field: 'value'
+                })
+            }
+        } else if (fullVariableData.type === "number") {
+            const numValue = parseFloat(effectiveValue)
+            if (isNaN(numValue)) {
+                errors.push({
+                    type: 'warning',
+                    message: `Value "${effectiveValue}" should be a number for numeric variables`,
+                    field: 'value'
+                })
+            }
+        }
+    }
+    
+    // Validate THEN blocks
+    if (!block.thenBlocks || block.thenBlocks.length === 0) {
+        errors.push({
+            type: 'warning',
+            message: 'If-Else block has no THEN actions defined',
+            field: 'thenBlocks'
+        })
+    }
+    
+    // Validate ELSE blocks
+    if (!block.elseBlocks || block.elseBlocks.length === 0) {
+        errors.push({
+            type: 'warning',
+            message: 'If-Else block has no ELSE actions defined',
+            field: 'elseBlocks'
+        })
+    }
+    
+    return errors
+}
+
+// Helper function to get the effective value (including UI defaults)
+const getEffectiveValue = (block, fullVariableData) => {
+    // If block has explicit value, use it
+    if (block.value !== undefined && block.value !== null && block.value.toString().trim() !== '') {
+        return block.value
+    }
+    
+    // Apply UI defaults based on variable type (matching component behavior)
+    if (fullVariableData?.type === "boolean") {
+        return "1" // Default to True
+    } else if (fullVariableData?.type === "enum" && fullVariableData?.enumValues) {
+        const enumKeys = Object.keys(fullVariableData.enumValues)
+        return enumKeys.length > 0 ? enumKeys[0] : null // Default to first enum value
+    }
+    
+    // For other types or when no variable selected, no default
+    return null
+}
+
+// Helper function to get the effective case value (including UI defaults for case blocks)
+const getEffectiveCaseValue = (block, fullVariableData) => {
+    // If block has explicit value, use it
+    if (block.value !== undefined && block.value !== null && block.value.toString().trim() !== '') {
+        return block.value
+    }
+    
+    // Apply UI defaults based on parent switch variable type (matching case component behavior)
+    if (fullVariableData?.type === "boolean") {
+        return "1" // Default to True (matching the case component default)
+    } else if (fullVariableData?.type === "enum" && fullVariableData?.enumValues) {
+        const enumKeys = Object.keys(fullVariableData.enumValues)
+        return enumKeys.length > 0 ? enumKeys[0] : null // Default to first enum value
+    }
+    
+    // For other types or when no parent switch variable selected, no default
+    return null
+}
+
+// Helper function to get valid operators for a variable type
+const getValidOperatorsForVariable = (variableData) => {
+    if (!variableData) {
+        return ['==', '!='] // Default operators when no variable type is known
+    }
+    
+    if (variableData.type === "boolean" || variableData.type === "enum") {
+        return ['==', '!=']
+    }
+    
+    if (variableData.type === "number") {
+        return ['==', '!=', '>', '<', '>=', '<=']
+    }
+    
+    return ['==', '!='] // Default fallback
+}
+
+const validateSwitchBlock = (block, availableVariables = [], formData = {}) => {
+    const errors = []
+    
+    if (!block.variable || block.variable.trim() === '') {
+        errors.push({
+            type: 'error',
+            message: 'Switch block must have a variable selected',
+            field: 'variable'
+        })
+        return errors // If no variable, can't validate cases properly
+    }
+    
+    // Find variable data to understand expected case values
+    const fullVariableData = formData.variables?.find(v => v.fixupName === block.variable)
+    
+    if (!block.cases || block.cases.length === 0) {
+        errors.push({
+            type: 'error',
+            message: 'Switch block must have at least one case',
+            field: 'cases'
+        })
+    } else {
+        // Check for duplicate case values
+        const caseValues = block.cases.map(c => c.value).filter(v => v !== undefined && v !== null && v.toString().trim() !== '')
+        const duplicates = caseValues.filter((value, index) => caseValues.indexOf(value) !== index)
+        if (duplicates.length > 0) {
+            errors.push({
+                type: 'warning',
+                message: `Duplicate case values found: ${[...new Set(duplicates)].join(', ')}`,
+                field: 'cases'
+            })
+        }
+        
+        // For enum variables, warn if cases don't match enum values
+        if (fullVariableData?.type === "enum" && fullVariableData?.enumValues) {
+            const validEnumValues = Object.keys(fullVariableData.enumValues)
+            const invalidCaseValues = caseValues.filter(value => !validEnumValues.includes(value))
+            if (invalidCaseValues.length > 0) {
+                errors.push({
+                    type: 'warning',
+                    message: `Case values don't match enum options: ${invalidCaseValues.join(', ')}`,
+                    field: 'cases'
+                })
+            }
+        }
+        
+        // For boolean variables, warn about invalid case values
+        if (fullVariableData?.type === "boolean") {
+            const invalidBooleanValues = caseValues.filter(value => value !== "0" && value !== "1")
+            if (invalidBooleanValues.length > 0) {
+                errors.push({
+                    type: 'warning',
+                    message: `Boolean variable should only have case values "0" (False) or "1" (True), found: ${invalidBooleanValues.join(', ')}`,
+                    field: 'cases'
+                })
+            }
+        }
+    }
+    
+    return errors
+}
+
+const validateCaseBlock = (block, allBlocks = [], formData = {}) => {
+    const errors = []
+    
+    // Find the parent switch to understand expected value types
+    const findParentSwitch = (caseBlockId, blockList) => {
+        const searchInBlock = (blocks) => {
+            for (const searchBlock of blocks) {
+                if (searchBlock.type === 'switchCase' && searchBlock.cases) {
+                    const hasCase = searchBlock.cases.some(caseBlock => caseBlock.id === caseBlockId)
+                    if (hasCase) {
+                        return searchBlock
+                    }
+                }
+                
+                // Check child containers recursively
+                if (BLOCK_DEFINITIONS[searchBlock.type]?.canContainChildren) {
+                    const childContainers = BLOCK_DEFINITIONS[searchBlock.type].childContainers || []
+                    for (const container of childContainers) {
+                        if (searchBlock[container] && Array.isArray(searchBlock[container])) {
+                            const found = searchInBlock(searchBlock[container])
+                            if (found) return found
+                        }
+                    }
+                }
+            }
+            return null
+        }
+        
+        return searchInBlock(blockList)
+    }
+    
+    const parentSwitch = findParentSwitch(block.id, allBlocks)
+    const switchVariable = parentSwitch?.variable
+    const fullVariableData = formData.variables?.find(v => v.fixupName === switchVariable)
+    
+    // Get effective case value (including UI defaults)
+    const effectiveCaseValue = getEffectiveCaseValue(block, fullVariableData)
+    
+    if (effectiveCaseValue === null || effectiveCaseValue === undefined) {
+        // Truly empty case value - can be intentional (default case)
+        errors.push({
+            type: 'warning',
+            message: 'Case has no value - this will act as a default case',
+            field: 'value'
+        })
+    } else if (fullVariableData) {
+        // Validate that case value is appropriate for the variable type
+        if (fullVariableData.type === "boolean" && effectiveCaseValue !== "0" && effectiveCaseValue !== "1") {
+            errors.push({
+                type: 'warning',
+                message: `Boolean case should be "0" (False) or "1" (True), not "${effectiveCaseValue}"`,
+                field: 'value'
+            })
+        } else if (fullVariableData.type === "enum" && fullVariableData.enumValues) {
+            const validEnumValues = Object.keys(fullVariableData.enumValues)
+            if (!validEnumValues.includes(effectiveCaseValue.toString())) {
+                errors.push({
+                    type: 'warning',
+                    message: `Case value "${effectiveCaseValue}" is not a valid option for this enum variable`,
+                    field: 'value'
+                })
+            }
+        } else if (fullVariableData.type === "number") {
+            const numValue = parseFloat(effectiveCaseValue)
+            if (isNaN(numValue)) {
+                errors.push({
+                    type: 'warning',
+                    message: `Case value "${effectiveCaseValue}" should be a number for numeric variables`,
+                    field: 'value'
+                })
+            }
+        }
+    }
+    
+    if (!block.thenBlocks || block.thenBlocks.length === 0) {
+        errors.push({
+            type: 'warning',
+            message: 'Case has no actions defined - it will not do anything',
+            field: 'thenBlocks'
+        })
+    }
+    
+    return errors
+}
+
+const validateChangeInstanceBlock = (block, formData = {}) => {
+    const errors = []
+    
+    if (!block.instanceName || block.instanceName.trim() === '') {
+        errors.push({
+            type: 'error',
+            message: 'Change Instance block must have an instance selected',
+            field: 'instanceName'
+        })
+    } else if (formData.instances) {
+        // Check if the instance actually exists
+        const instanceExists = Object.values(formData.instances).some(instance => 
+            !instance._toRemove && instance.Name === block.instanceName
+        )
+        if (!instanceExists) {
+            errors.push({
+                type: 'warning',
+                message: 'Selected instance does not exist in the current package',
+                field: 'instanceName'
+            })
+        }
+    }
+    
+    return errors
+}
+
+const validateAddOverlayBlock = (block, formData = {}) => {
+    const errors = []
+    
+    if (!block.overlayName || block.overlayName.trim() === '') {
+        errors.push({
+            type: 'error',
+            message: 'Add Overlay block must have an overlay selected',
+            field: 'overlayName'
+        })
+    } else if (formData.instances) {
+        // Check if the overlay instance exists
+        const instanceExists = Object.values(formData.instances).some(instance => 
+            !instance._toRemove && instance.Name === block.overlayName
+        )
+        if (!instanceExists) {
+            errors.push({
+                type: 'warning',
+                message: 'Selected overlay instance does not exist in the current package',
+                field: 'overlayName'
+            })
+        }
+    }
+    
+    return errors
+}
+
+const validateOffsetInstanceBlock = (block) => {
+    const errors = []
+    
+    // Get effective offset value (component defaults to "0 0 0")
+    const offsetValue = block.offset || "0 0 0"
+    
+    if (!offsetValue || offsetValue.toString().trim() === '') {
+        errors.push({
+            type: 'error',
+            message: 'Offset Instance block must have an offset value',
+            field: 'offset'
+        })
+    } else {
+        // Validate X Y Z coordinate format (e.g., "0 0 0", "10 -5 3.5")
+        const parts = offsetValue.toString().trim().split(/\s+/)
+        
+        if (parts.length !== 3) {
+            errors.push({
+                type: 'warning',
+                message: 'Offset should have 3 coordinates (X Y Z), e.g., "0 0 0"',
+                field: 'offset'
+            })
+        } else {
+            // Validate each coordinate is a valid number
+            const invalidCoords = []
+            parts.forEach((part, index) => {
+                const coord = parseFloat(part)
+                if (isNaN(coord)) {
+                    invalidCoords.push(['X', 'Y', 'Z'][index])
+                }
+            })
+            
+            if (invalidCoords.length > 0) {
+                errors.push({
+                    type: 'error',
+                    message: `Invalid coordinate values for ${invalidCoords.join(', ')}. Each coordinate must be a number.`,
+                    field: 'offset'
+                })
+            }
+        }
+    }
+    
+    return errors
+}
+
+const validateDebugBlock = (block, availableVariables = []) => {
+    const errors = []
+    
+    if (!block.message || block.message.trim() === '') {
+        errors.push({
+            type: 'warning',
+            message: 'Debug block has no message - consider adding one for better debugging',
+            field: 'message'
+        })
+    }
+    
+    return errors
+}
+
+// Get all validation errors for a list of blocks recursively
+const getAllBlockErrors = (blocks = [], allBlocks = [], availableVariables = [], formData = {}) => {
+    let allErrors = []
+    
+    blocks.forEach(block => {
+        const blockErrors = validateBlock(block, allBlocks, availableVariables, formData)
+        if (blockErrors.length > 0) {
+            allErrors.push({
+                blockId: block.id,
+                blockType: block.type,
+                blockName: block.displayName || block.type,
+                errors: blockErrors
+            })
+        }
+        
+        // Check child blocks recursively
+        if (BLOCK_DEFINITIONS[block.type]?.canContainChildren) {
+            const childContainers = BLOCK_DEFINITIONS[block.type].childContainers || []
+            childContainers.forEach(container => {
+                if (block[container] && Array.isArray(block[container])) {
+                    const childErrors = getAllBlockErrors(block[container], allBlocks, availableVariables, formData)
+                    allErrors = allErrors.concat(childErrors)
+                }
+            })
+        }
+    })
+    
+    return allErrors
+}
+
+// Error Badge Component
+function ErrorBadge({ errors = [], size = "small" }) {
+    if (errors.length === 0) return null
+    
+    const errorCount = errors.filter(e => e.type === 'error').length
+    const warningCount = errors.filter(e => e.type === 'warning').length
+    
+    if (errorCount === 0 && warningCount === 0) return null
+    
+    const primaryError = errorCount > 0 ? 'error' : 'warning'
+    const primaryCount = errorCount > 0 ? errorCount : warningCount
+    
+    return (
+        <Tooltip 
+            title={
+                <Box>
+                    {errorCount > 0 && (
+                        <Typography variant="body2" color="error.main">
+                            {errorCount} Error{errorCount !== 1 ? 's' : ''}
+                        </Typography>
+                    )}
+                    {warningCount > 0 && (
+                        <Typography variant="body2" color="warning.main">
+                            {warningCount} Warning{warningCount !== 1 ? 's' : ''}
+                        </Typography>
+                    )}
+                    <Box sx={{ mt: 1 }}>
+                        {errors.slice(0, 3).map((error, index) => (
+                            <Typography key={index} variant="caption" display="block">
+                                • {error.message}
+                            </Typography>
+                        ))}
+                        {errors.length > 3 && (
+                            <Typography variant="caption" color="text.secondary">
+                                ... and {errors.length - 3} more
+                            </Typography>
+                        )}
+                    </Box>
+                </Box>
+            }
+            arrow
+        >
+            <Chip
+                icon={primaryError === 'error' ? <Error fontSize="small" /> : <Warning fontSize="small" />}
+                label={primaryCount}
+                size="small"
+                color={primaryError}
+                variant="filled"
+                sx={{ 
+                    height: 28, // Slightly smaller to match other small elements
+                    fontSize: '0.7rem',
+                    fontWeight: 'bold',
+                    minWidth: 32, // More compact width
+                    '& .MuiChip-icon': {
+                        fontSize: '14px', // Smaller icon
+                        marginLeft: '4px',
+                        marginRight: '-2px',
+                    },
+                    '& .MuiChip-label': {
+                        px: 0.5, // Tighter padding for compact appearance
+                    }
+                }}
+            />
+        </Tooltip>
+    )
+}
+
 // Droppable Zone Component for nested blocks
 function DroppableZone({ id, children, isEmpty = false, label = "Drop blocks here" }) {
     const { isOver, setNodeRef } = useDroppable({
@@ -78,18 +685,39 @@ function DroppableZone({ id, children, isEmpty = false, label = "Drop blocks her
             ref={setNodeRef}
             sx={{
                 minHeight: isEmpty ? 120 : "auto",
-                border: "4px dashed",
-                borderColor: isEmpty ? (isOver ? "#d2b019ff" : "#555") : "transparent",
-                borderRadius: 2,
-                p: isEmpty ? 5 : 2,
-                backgroundColor: isEmpty ? (isOver ? "rgba(210, 176, 25, 0.1)" : "#2a2d30") : "transparent",
-                transition: "all 0.3s ease-in-out",
-                transform: isOver ? "scale(1.05)" : "scale(1)",
-                boxShadow: isOver ? "0 8px 25px rgba(210, 176, 25, 0.2)" : "none",
+                border: isEmpty 
+                    ? "2px dashed"
+                    : isOver 
+                        ? "2px dashed"
+                        : "1px solid rgba(255, 255, 255, 0.08)", // Subtle border for non-empty zones
+                borderColor: isEmpty 
+                    ? (isOver ? "#d2b019ff" : "#555") 
+                    : isOver 
+                        ? "#d2b019ff"
+                        : "rgba(255, 255, 255, 0.08)",
+                borderRadius: 3,
+                p: isEmpty ? 4 : 3, // More generous padding for better visual separation
+                backgroundColor: isEmpty 
+                    ? (isOver ? "rgba(210, 176, 25, 0.1)" : "rgba(42, 45, 48, 0.3)") 
+                    : isOver 
+                        ? "rgba(210, 176, 25, 0.05)"
+                        : "rgba(255, 255, 255, 0.02)", // Very subtle background for non-empty
+                transition: "all 0.2s ease-out",
+                transform: isOver ? "scale(1.03)" : "scale(1)", // Slightly more pronounced for better feedback
+                boxShadow: isOver 
+                    ? "0 4px 15px rgba(210, 176, 25, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1)" 
+                    : isEmpty
+                        ? "inset 0 1px 0 rgba(255, 255, 255, 0.05)"
+                        : "inset 0 1px 0 rgba(255, 255, 255, 0.02)",
                 "&:hover": {
-                    borderColor: isEmpty ? "#d2b019ff" : "transparent",
-                    backgroundColor: isEmpty ? "rgba(210, 176, 25, 0.05)" : "transparent",
+                    borderColor: isEmpty 
+                        ? "#d2b019ff" 
+                        : "rgba(210, 176, 25, 0.3)",
+                    backgroundColor: isEmpty 
+                        ? "rgba(210, 176, 25, 0.08)" 
+                        : "rgba(210, 176, 25, 0.02)",
                 },
+                // Removed circle outline - was too distracting
             }}
         >
             {isEmpty ? (
@@ -667,6 +1295,11 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
         isDragging,
     } = useSortable({ id: block.id })
 
+    // Get validation errors for this block
+    const blockErrors = validateBlock(block, blocks, availableVariables, formData)
+    const hasErrors = blockErrors.length > 0
+    const hasErrorType = blockErrors.some(e => e.type === 'error')
+
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
@@ -1033,8 +1666,242 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                 return (
                     <Box sx={{ p: 2 }}>
                         <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                            If-Else Condition: {block.condition || "No condition set"}
+                            If-Else Condition
                         </Typography>
+                        
+                        {/* If-Else Condition Configuration - Same as IF Block */}
+                        <Box sx={{ mt: 2, mb: 3 }}>
+                            <Grid container spacing={2} alignItems="center">
+                                <Grid xs={4}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Variable</InputLabel>
+                                        <Select
+                                            value={block.variable || ""}
+                                            onChange={(e) => handleUpdateProperty('variable', e.target.value)}
+                                            label="Variable"
+                                            sx={{ 
+                                                "& .MuiOutlinedInput-root": {
+                                                    height: 40,
+                                                    minHeight: 40,
+                                                    maxHeight: 40
+                                                },
+                                                "& .MuiSelect-select": {
+                                                    height: "20px !important",
+                                                    lineHeight: "20px !important",
+                                                    paddingTop: "10px !important",
+                                                    paddingBottom: "10px !important",
+                                                    minWidth: "120px",
+                                                    display: "flex",
+                                                    alignItems: "center"
+                                                }
+                                            }}
+                                        >
+                                            {availableVariables.map((variable) => (
+                                                <MenuItem key={variable.fixupName} value={variable.fixupName}>
+                                                    <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
+                                                        <Code fontSize="small" />
+                                                        {variable.displayName}
+                                                    </Box>
+                                                </MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid xs={4}>
+                                    <FormControl fullWidth size="small">
+                                        <InputLabel>Operator</InputLabel>
+                                        <Select
+                                            value={block.operator || "=="}
+                                            onChange={(e) => handleUpdateProperty('operator', e.target.value)}
+                                            label="Operator"
+                                            sx={{ 
+                                                "& .MuiOutlinedInput-root": {
+                                                    height: 40,
+                                                    minHeight: 40,
+                                                    maxHeight: 40
+                                                },
+                                                "& .MuiSelect-select": {
+                                                    height: "20px !important",
+                                                    lineHeight: "20px !important",
+                                                    paddingTop: "10px !important",
+                                                    paddingBottom: "10px !important",
+                                                    minWidth: "80px",
+                                                    display: "flex",
+                                                    alignItems: "center",
+                                                    justifyContent: "center"
+                                                }
+                                            }}
+                                        >
+                                            {(() => {
+                                                const selectedVariable = availableVariables.find(v => v.fixupName === block.variable);
+                                                const fullVariableData = formData.variables?.find(v => v.fixupName === block.variable);
+                                                
+                                                // For boolean and enum types, only show == and !=
+                                                if (fullVariableData?.type === "boolean" || fullVariableData?.type === "enum") {
+                                                    return [
+                                                        <MenuItem key="eq" value="==">=</MenuItem>,
+                                                        <MenuItem key="ne" value="!=">!=</MenuItem>
+                                                    ];
+                                                }
+                                                
+                                                // For number types, show all operators
+                                                if (fullVariableData?.type === "number") {
+                                                    return [
+                                                        <MenuItem key="eq" value="==">=</MenuItem>,
+                                                        <MenuItem key="ne" value="!=">!=</MenuItem>,
+                                                        <MenuItem key="gt" value=">">&gt;</MenuItem>,
+                                                        <MenuItem key="lt" value="<">&lt;</MenuItem>,
+                                                        <MenuItem key="gte" value=">=">&gt;=</MenuItem>,
+                                                        <MenuItem key="lte" value="<=">&lt;=</MenuItem>
+                                                    ];
+                                                }
+                                                
+                                                // Default fallback - show basic operators when no variable is selected
+                                                return [
+                                                    <MenuItem key="eq" value="==">=</MenuItem>,
+                                                    <MenuItem key="ne" value="!=">!=</MenuItem>
+                                                ];
+                                            })()}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid xs={4}>
+                                    {/* Dynamic value field based on variable type */}
+                                    {(() => {
+                                        const selectedVariable = availableVariables.find(v => v.fixupName === block.variable);
+                                        if (!selectedVariable) {
+                                            return (
+                                                <TextField
+                                                    fullWidth
+                                                    size="small"
+                                                    label="Value"
+                                                    value={block.value || ""}
+                                                    onChange={(e) => handleUpdateProperty('value', e.target.value)}
+                                                    sx={{ 
+                                                        "& .MuiOutlinedInput-root": {
+                                                            height: 40,
+                                                            minHeight: 40,
+                                                            maxHeight: 40
+                                                        },
+                                                        "& .MuiInputBase-input": {
+                                                            height: "20px !important",
+                                                            lineHeight: "20px !important",
+                                                            paddingTop: "10px !important",
+                                                            paddingBottom: "10px !important",
+                                                            minWidth: "100px",
+                                                            display: "flex",
+                                                            alignItems: "center"
+                                                        }
+                                                    }}
+                                                />
+                                            );
+                                        }
+
+                                        // Find the full variable data from formData to get type and enum values
+                                        const fullVariableData = formData.variables?.find(v => v.fixupName === block.variable);
+                                        
+                                        if (fullVariableData?.type === "boolean") {
+                                            return (
+                                                <FormControl fullWidth size="small">
+                                                    <InputLabel>Value</InputLabel>
+                                                    <Select
+                                                        value={block.value || "1"}
+                                                        onChange={(e) => handleUpdateProperty('value', e.target.value)}
+                                                        label="Value"
+                                                        sx={{ 
+                                                            "& .MuiOutlinedInput-root": {
+                                                                height: 40,
+                                                                minHeight: 40,
+                                                                maxHeight: 40
+                                                            },
+                                                            "& .MuiSelect-select": {
+                                                                height: "20px !important",
+                                                                lineHeight: "20px !important",
+                                                                paddingTop: "10px !important",
+                                                                paddingBottom: "10px !important",
+                                                                minWidth: "100px",
+                                                                display: "flex",
+                                                                alignItems: "center"
+                                                            }
+                                                        }}
+                                                    >
+                                                        <MenuItem value="1">True</MenuItem>
+                                                        <MenuItem value="0">False</MenuItem>
+                                                    </Select>
+                                                </FormControl>
+                                            );
+                                        } else if (fullVariableData?.type === "enum" && fullVariableData?.enumValues) {
+                                            return (
+                                                <FormControl fullWidth size="small">
+                                                    <InputLabel>Value</InputLabel>
+                                                    <Select
+                                                        value={block.value || Object.keys(fullVariableData.enumValues)[0]}
+                                                        onChange={(e) => handleUpdateProperty('value', e.target.value)}
+                                                        label="Value"
+                                                        sx={{ 
+                                                            "& .MuiOutlinedInput-root": {
+                                                                height: 40,
+                                                                minHeight: 40,
+                                                                maxHeight: 40
+                                                            },
+                                                            "& .MuiSelect-select": {
+                                                                height: "20px !important",
+                                                                lineHeight: "20px !important",
+                                                                paddingTop: "10px !important",
+                                                                paddingBottom: "10px !important",
+                                                                minWidth: "100px",
+                                                                display: "flex",
+                                                                alignItems: "center"
+                                                            }
+                                                        }}
+                                                    >
+                                                        {Object.entries(fullVariableData.enumValues).map(([key, value]) => (
+                                                            <MenuItem key={key} value={key}>
+                                                                <Box sx={{ display: "flex", alignItems: "center", gap: 1, py: 0.5 }}>
+                                                                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                                                        {key}
+                                                                    </Typography>
+                                                                    <Typography variant="caption" color="text.secondary">
+                                                                        ({value})
+                                                                    </Typography>
+                                                                </Box>
+                                                            </MenuItem>
+                                                        ))}
+                                                    </Select>
+                                                </FormControl>
+                                            );
+                                        } else {
+                                            return (
+                                                <TextField
+                                                    fullWidth
+                                                    size="small"
+                                                    label="Value"
+                                                    type={fullVariableData?.type === "number" ? "number" : "text"}
+                                                    value={block.value || ""}
+                                                    onChange={(e) => handleUpdateProperty('value', e.target.value)}
+                                                    sx={{ 
+                                                        "& .MuiOutlinedInput-root": {
+                                                            height: 40,
+                                                            minHeight: 40,
+                                                            maxHeight: 40
+                                                        },
+                                                        "& .MuiInputBase-input": {
+                                                            height: "20px !important",
+                                                            lineHeight: "20px !important",
+                                                            paddingTop: "10px !important",
+                                                            paddingBottom: "10px !important",
+                                                            minWidth: "100px",
+                                                            display: "flex",
+                                                            alignItems: "center"
+                                                        }
+                                                    }}
+                                                />
+                                            );
+                                        }
+                                    })()}
+                                </Grid>
+                            </Grid>
+                        </Box>
                         
                         {/* Then Blocks */}
                         <Box sx={{ mt: 2 }}>
@@ -1127,28 +1994,132 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
         }
     }
 
+    // Get background color based on nesting depth and block type
+    const getNestedBackgroundColor = () => {
+        if (hasErrors) {
+            return hasErrorType ? "#2d1b1b" : "#2d2a1b"
+        }
+        
+        // Different background shades for nesting levels
+        const baseColors = {
+            0: "#2a2d30", // Top level - darkest
+            1: "#2e3136", // First nested - slightly lighter
+            2: "#32353a", // Second nested - even lighter  
+            3: "#36393e", // Third nested - lightest
+        }
+        
+        return baseColors[Math.min(depth, 3)] || baseColors[3]
+    }
+
+    const getHoverBackgroundColor = () => {
+        if (hasErrors) {
+            return hasErrorType ? "#3d2b2b" : "#3d3a2b"
+        }
+        
+        const hoverColors = {
+            0: "#323639",
+            1: "#363a3f", 
+            2: "#3a3e43",
+            3: "#3e4247",
+        }
+        
+        return hoverColors[Math.min(depth, 3)] || hoverColors[3]
+    }
+
     return (
+        <Box
+            sx={{
+                // Add visual connection lines for nested blocks
+                ...(depth > 0 && {
+                    position: "relative",
+                    "&::before": {
+                        content: '""',
+                        position: "absolute",
+                        left: -4,
+                        top: 0,
+                        width: 2,
+                        height: "100%",
+                        backgroundColor: "rgba(255, 255, 255, 0.1)",
+                        borderRadius: 1,
+                    }
+                })
+            }}
+        >
                  <Paper
              ref={setNodeRef}
              style={style}
-             elevation={isDragging ? 4 : 1}
+             elevation={isDragging ? 6 : (depth === 0 ? 2 : 1)}
              sx={{
-                 backgroundColor: "#2a2d30",
-                 borderLeft: `4px solid ${getBlockColor(block.type)}`,
+                 backgroundColor: getNestedBackgroundColor(),
+                 borderLeft: hasErrors 
+                     ? `4px solid ${hasErrorType ? "#f44336" : "#ff9800"}`
+                     : `4px solid ${getBlockColor(block.type)}`,
                  borderRadius: 2,
                  cursor: isDragging ? "grabbing" : "auto",
-                 mb: depth === 0 ? 2 : 1,
-                 ml: depth * 2, // Indent nested blocks
+                 mb: depth === 0 ? 3 : 2, // More spacing between blocks
+                 ml: depth * 3, // Increased indentation for better visual hierarchy
+                 mr: depth > 0 ? 2 : 0, // Add right margin for nested blocks
                  transition: "all 0.2s ease-in-out",
                  "&:hover": {
-                     elevation: 2,
+                     elevation: depth === 0 ? 4 : 2,
                      borderLeftWidth: 6,
-                     backgroundColor: "#323639",
+                     backgroundColor: getHoverBackgroundColor(),
+                     transform: "translateX(2px)", // Subtle shift on hover
                  },
                  position: "relative",
                  overflow: "hidden",
+                 // Add subtle inner shadow for depth
+                 ...(depth > 0 && {
+                     boxShadow: "inset 0 1px 2px rgba(0, 0, 0, 0.2)",
+                 }),
+                 // Enhanced error styling
+                 ...(hasErrors && {
+                     boxShadow: `
+                         ${depth > 0 ? "inset 0 1px 2px rgba(0, 0, 0, 0.2)," : ""}
+                         0 0 0 1px ${hasErrorType ? "rgba(244, 67, 54, 0.4)" : "rgba(255, 152, 0, 0.4)"},
+                         0 2px 8px ${hasErrorType ? "rgba(244, 67, 54, 0.2)" : "rgba(255, 152, 0, 0.2)"}
+                     `,
+                 }),
              }}
          >
+            {/* Depth indicator for nested blocks */}
+            {depth > 0 && (
+                <Box
+                    sx={{
+                        position: "absolute",
+                        top: 4,
+                        left: 8,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.5,
+                        zIndex: 5,
+                        opacity: 0.6,
+                    }}
+                >
+                    {Array.from({ length: depth }, (_, i) => (
+                        <Box
+                            key={i}
+                            sx={{
+                                width: 6,
+                                height: 6,
+                                borderRadius: "50%",
+                                backgroundColor: "rgba(255, 255, 255, 0.3)",
+                            }}
+                        />
+                    ))}
+                    <Typography 
+                        variant="caption" 
+                        sx={{ 
+                            fontSize: '0.6rem', 
+                            color: 'rgba(255, 255, 255, 0.4)',
+                            fontWeight: 500,
+                        }}
+                    >
+                        Level {depth}
+                    </Typography>
+                </Box>
+            )}
+
             {/* Block controls */}
             <Box
                 sx={{
@@ -1160,6 +2131,11 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
                     zIndex: 10,
                 }}
             >
+                {/* Error Badge */}
+                {hasErrors && (
+                    <ErrorBadge errors={blockErrors} size="small" />
+                )}
+                
                                  <Box
                      {...attributes}
                      {...listeners}
@@ -1200,6 +2176,7 @@ function SortableBlock({ block, onUpdateBlock, onDeleteBlock, onAddChildBlock, a
             {/* Content */}
             {renderBlockContent()}
         </Paper>
+        </Box>
     )
 }
 
@@ -1281,7 +2258,12 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
     const [activeId, setActiveId] = useState(null)
     
     const sensors = useSensors(
-        useSensor(PointerSensor),
+        useSensor(PointerSensor, {
+            // Reduce activation delay for more responsive dragging
+            activationConstraint: {
+                distance: 8, // Only start dragging after moving 8px
+            }
+        }),
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
         })
@@ -1426,11 +2408,16 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
 
         console.log('Drag end:', { active: active?.id, over: over?.id })
 
-        // Check if we're dropping into a droppable zone (IF block or Switch case container)
-        if (over.id && (over.id.includes('-then') || over.id.includes('-cases'))) {
-            const parentBlockId = over.id.replace('-then', '').replace('-cases', '')
+        // Check if we're dropping into a droppable zone (IF block, If-Else block, or Switch case container)
+        if (over.id && (over.id.includes('-then') || over.id.includes('-else') || over.id.includes('-cases'))) {
+            const parentBlockId = over.id.replace('-then', '').replace('-else', '').replace('-cases', '')
             const draggedBlockId = active.id
-            const containerType = over.id.includes('-then') ? 'then' : 'cases'
+            let containerType = 'then'
+            if (over.id.includes('-else')) {
+                containerType = 'else'
+            } else if (over.id.includes('-cases')) {
+                containerType = 'cases'
+            }
             
             console.log('Dropping into block:', { parentBlockId, draggedBlockId, containerType })
             
@@ -1467,6 +2454,11 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
                             return {
                                 ...block,
                                 thenBlocks: [...(block.thenBlocks || []), blockToAdd]
+                            }
+                        } else if (containerType === 'else') {
+                            return {
+                                ...block,
+                                elseBlocks: [...(block.elseBlocks || []), blockToAdd]
                             }
                         } else if (containerType === 'cases') {
                             return {
@@ -1957,52 +2949,108 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
 
     return (
         <Box>
-            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 3 }}>
-                <Box>
-                    <Typography variant="h5" sx={{ fontWeight: 600, mb: 0.5 }}>
-                Conditions
-            </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        Build nested conditional logic using draggable blocks
+            <Box
+                sx={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    mb: 2,
+                }}>
+                <Typography variant="h6">
+                    Conditions
                 </Typography>
-                <Box sx={{ display: "flex", gap: 2, alignItems: "center" }}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                        <Box sx={{ width: 12, height: 12, backgroundColor: '#2196F3', borderRadius: 1 }} />
-                        <Typography variant="caption" color="text.secondary">Logic</Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                        <Box sx={{ width: 12, height: 12, backgroundColor: '#4CAF50', borderRadius: 1 }} />
-                        <Typography variant="caption" color="text.secondary">Actions</Typography>
-                    </Box>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-                        <Box sx={{ width: 12, height: 12, backgroundColor: '#FFC107', borderRadius: 1 }} />
-                        <Typography variant="caption" color="text.secondary">Test</Typography>
-                    </Box>
-                </Box>
-                </Box>
                 <Button
                     variant="contained"
-                    size="large"
                     startIcon={<Add />}
-                    onClick={() => setAddDialogOpen(true)}
-                    sx={{ 
-                        px: 3,
-                        py: 1,
-                        background: "linear-gradient(135deg, #d2b019ff 0%, #e6c34d 100%)",
-                        "&:hover": {
-                            background: "linear-gradient(135deg, #b89415 0%, #d2b019ff 100%)",
-                        }
-                    }}
-                >
+                    onClick={() => setAddDialogOpen(true)}>
                     Add Block
                 </Button>
             </Box>
+
+            {/* Error Summary */}
+            {(() => {
+                const allErrors = getAllBlockErrors(blocks, blocks, availableVariables, formData)
+                if (allErrors.length === 0) return null
+                
+                const totalErrors = allErrors.reduce((sum, block) => sum + block.errors.filter(e => e.type === 'error').length, 0)
+                const totalWarnings = allErrors.reduce((sum, block) => sum + block.errors.filter(e => e.type === 'warning').length, 0)
+                
+                return (
+                    <Alert 
+                        severity={totalErrors > 0 ? "error" : "warning"} 
+                        sx={{ 
+                            mb: 3, 
+                            borderRadius: 2,
+                            "& .MuiAlert-message": {
+                                width: "100%"
+                            }
+                        }}
+                    >
+                        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+                            <Box>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                                    Configuration Issues Found
+                                </Typography>
+                                <Typography variant="body2">
+                                    {totalErrors > 0 && `${totalErrors} error${totalErrors !== 1 ? 's' : ''}`}
+                                    {totalErrors > 0 && totalWarnings > 0 && ', '}
+                                    {totalWarnings > 0 && `${totalWarnings} warning${totalWarnings !== 1 ? 's' : ''}`}
+                                    {' '}detected. Click on the error badges to see details.
+                                </Typography>
+                            </Box>
+                            <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
+                                {totalErrors > 0 && (
+                                    <Chip
+                                        icon={<Error fontSize="small" />}
+                                        label={`${totalErrors} Error${totalErrors !== 1 ? 's' : ''}`}
+                                        size="small"
+                                        color="error"
+                                        variant="filled"
+                                    />
+                                )}
+                                {totalWarnings > 0 && (
+                                    <Chip
+                                        icon={<Warning fontSize="small" />}
+                                        label={`${totalWarnings} Warning${totalWarnings !== 1 ? 's' : ''}`}
+                                        size="small"
+                                        color="warning"
+                                        variant="filled"
+                                    />
+                                )}
+                            </Box>
+                        </Box>
+                    </Alert>
+                )
+            })()}
 
             {/* Blocks List */}
             {blocks.length > 0 ? (
                 <DndContext
                     sensors={sensors}
-                    collisionDetection={closestCenter}
+                    collisionDetection={(args) => {
+                        // First, check if we're over a droppable zone (higher priority)
+                        const pointerIntersections = pointerWithin(args)
+                        const dropZoneIntersections = pointerIntersections.filter(intersection => {
+                            return intersection.id && (
+                                intersection.id.includes('-then') || 
+                                intersection.id.includes('-else') || 
+                                intersection.id.includes('-cases')
+                            )
+                        })
+                        
+                        if (dropZoneIntersections.length > 0) {
+                            return dropZoneIntersections
+                        }
+                        
+                        // Otherwise, use rectangle intersection for better responsiveness
+                        const rectIntersections = rectIntersection(args)
+                        if (rectIntersections.length > 0) {
+                            return rectIntersections
+                        }
+                        
+                        // Fallback to closest center
+                        return closestCenter(args)
+                    }}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                 >
@@ -2026,6 +3074,60 @@ function Conditions({ item, formData, onUpdateConditions, onImportConditions, ed
                             />
                         ))}
                     </SortableContext>
+                    
+                    {/* Drag Overlay for better visual feedback */}
+                    <DragOverlay>
+                        {activeId ? (
+                            <Box sx={{ 
+                                opacity: 0.8, 
+                                transform: "rotate(-2deg)",
+                                boxShadow: "0 8px 25px rgba(0, 0, 0, 0.4)",
+                                borderRadius: 2,
+                                border: "2px solid #d2b019ff",
+                                pointerEvents: "none"
+                            }}>
+                                {(() => {
+                                    // Find the active block
+                                    const findBlock = (blockList) => {
+                                        for (const block of blockList) {
+                                            if (block.id === activeId) return block
+                                            
+                                            // Check child containers
+                                            if (BLOCK_DEFINITIONS[block.type]?.canContainChildren) {
+                                                const childContainers = BLOCK_DEFINITIONS[block.type].childContainers || []
+                                                for (const container of childContainers) {
+                                                    if (block[container] && Array.isArray(block[container])) {
+                                                        const found = findBlock(block[container])
+                                                        if (found) return found
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        return null
+                                    }
+                                    
+                                    const activeBlock = findBlock(blocks)
+                                    return activeBlock ? (
+                                        <Paper sx={{ 
+                                            p: 2, 
+                                            backgroundColor: "#2a2d30",
+                                            borderLeft: `4px solid ${
+                                                activeBlock.type === 'if' || activeBlock.type === 'ifElse' || activeBlock.type === 'switchCase' 
+                                                    ? '#FF9800' 
+                                                    : activeBlock.type === 'case' 
+                                                        ? '#E65100'
+                                                        : '#9C27B0'
+                                            }`,
+                                        }}>
+                                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                {activeBlock.displayName || activeBlock.type}
+                                            </Typography>
+                                        </Paper>
+                                    ) : null
+                                })()}
+                            </Box>
+                        ) : null}
+                    </DragOverlay>
                 </DndContext>
             ) : (
                                  <Paper 
