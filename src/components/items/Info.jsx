@@ -6,14 +6,20 @@ import {
     IconButton,
     Button,
     InputAdornment,
+    Divider,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
 } from "@mui/material"
 import { Visibility, Edit, FolderOpen, Image } from "@mui/icons-material"
 import ReactMarkdown from "react-markdown"
 import { useState, useEffect } from "react"
 
-function BasicInfo({ item, formData, onUpdate }) {
+function Info({ item, formData, onUpdate }) {
     const [iconSrc, setIconSrc] = useState(null)
     const [isPreview, setIsPreview] = useState(false)
+    const [selectedInstanceKey, setSelectedInstanceKey] = useState("")
 
     useEffect(() => {
         // Load the icon when item changes or when staged icon changes
@@ -24,6 +30,21 @@ function BasicInfo({ item, formData, onUpdate }) {
             setIconSrc(null)
         }
     }, [item, formData.stagedIconPath])
+
+    // Keep selected instance in sync when instances list changes
+    useEffect(() => {
+        const entries = Object.entries(formData?.instances || {}).filter(
+            ([, inst]) => !inst?._toRemove,
+        )
+        if (entries.length === 0) {
+            setSelectedInstanceKey("")
+            return
+        }
+        setSelectedInstanceKey((prev) => {
+            const stillExists = entries.some(([key]) => key === prev)
+            return stillExists ? prev : entries[0][0]
+        })
+    }, [formData?.instances])
 
     // Get relative path from package root (show staged path if available)
     const getRelativeIconPath = () => {
@@ -41,9 +62,7 @@ function BasicInfo({ item, formData, onUpdate }) {
         const packagePath = item.packagePath
 
         if (fullIconPath.startsWith(packagePath)) {
-            return fullIconPath
-                .substring(packagePath.length)
-                .replace(/^[\\\/]/, "")
+            return fullIconPath.substring(packagePath.length).replace(/^[\\\/]/, "")
         }
 
         return iconPath // fallback to full path if something goes wrong
@@ -67,9 +86,7 @@ function BasicInfo({ item, formData, onUpdate }) {
         ),
         // Better list styling
         ul: ({ children }) => (
-            <Box
-                component="ul"
-                sx={{ pl: 2, mb: 1, "&:last-child": { mb: 0 } }}>
+            <Box component="ul" sx={{ pl: 2, mb: 1, "&:last-child": { mb: 0 } }}>
                 {children}
             </Box>
         ),
@@ -86,6 +103,26 @@ function BasicInfo({ item, formData, onUpdate }) {
         ),
     }
 
+    const instanceEntries = Object.entries(formData?.instances || {}).filter(
+        ([, inst]) => !inst?._toRemove,
+    )
+
+    const handleMakeModel = async () => {
+        if (!selectedInstanceKey) return
+        try {
+            if (typeof window.package?.makeModelFromInstance === "function") {
+                await window.package.makeModelFromInstance(
+                    item.id,
+                    selectedInstanceKey,
+                )
+            } else {
+                console.warn("makeModelFromInstance is not available on backend")
+            }
+        } catch (error) {
+            console.error("Failed to make model:", error)
+        }
+    }
+
     return (
         <Box>
             <Box
@@ -94,8 +131,9 @@ function BasicInfo({ item, formData, onUpdate }) {
                     justifyContent: "space-between",
                     alignItems: "center",
                     mb: 2,
-                }}>
-                <Typography variant="h6">Basic Information</Typography>
+                }}
+            >
+                <Typography variant="h6">Info</Typography>
             </Box>
 
             <Stack spacing={2} sx={{ height: "100%" }}>
@@ -131,18 +169,10 @@ function BasicInfo({ item, formData, onUpdate }) {
                                             const result =
                                                 await window.package.browseForIconFile()
                                             if (result.success) {
-                                                console.log(
-                                                    "Icon staged successfully",
-                                                )
+                                                console.log("Icon staged successfully")
                                                 // Stage the icon change
-                                                onUpdate(
-                                                    "stagedIconPath",
-                                                    result.filePath,
-                                                )
-                                                onUpdate(
-                                                    "stagedIconName",
-                                                    result.fileName,
-                                                )
+                                                onUpdate("stagedIconPath", result.filePath)
+                                                onUpdate("stagedIconName", result.fileName)
                                                 onUpdate(
                                                     "iconChanged",
                                                     true,
@@ -162,15 +192,15 @@ function BasicInfo({ item, formData, onUpdate }) {
                                         }
                                     }}
                                     title="Browse for Icon"
-                                    sx={{ mr: 0.5 }}>
+                                    sx={{ mr: 0.5 }}
+                                >
                                     <FolderOpen />
                                 </IconButton>
                                 <IconButton
                                     size="small"
                                     onClick={async () => {
                                         const iconToShow =
-                                            formData.stagedIconPath ||
-                                            item?.icon
+                                            formData.stagedIconPath || item?.icon
                                         if (iconToShow) {
                                             try {
                                                 await window.package.showIconPreview(
@@ -186,9 +216,8 @@ function BasicInfo({ item, formData, onUpdate }) {
                                         }
                                     }}
                                     title="View Icon"
-                                    disabled={
-                                        !formData.stagedIconPath && !item?.icon
-                                    }>
+                                    disabled={!formData.stagedIconPath && !item?.icon}
+                                >
                                     <Image />
                                 </IconButton>
                             </InputAdornment>
@@ -204,7 +233,8 @@ function BasicInfo({ item, formData, onUpdate }) {
                             alignItems: "center",
                             gap: 1,
                             mb: 1,
-                        }}>
+                        }}
+                    >
                         <Typography variant="body2" color="text.secondary">
                             Description
                         </Typography>
@@ -212,7 +242,8 @@ function BasicInfo({ item, formData, onUpdate }) {
                             size="small"
                             onClick={() => setIsPreview(!isPreview)}
                             sx={{ ml: "auto" }}
-                            title={isPreview ? "Edit" : "Preview"}>
+                            title={isPreview ? "Edit" : "Preview"}
+                        >
                             {isPreview ? <Edit /> : <Visibility />}
                         </IconButton>
                     </Box>
@@ -229,7 +260,8 @@ function BasicInfo({ item, formData, onUpdate }) {
                                 overflow: "auto",
                                 "& > *:first-of-type": { mt: 0 },
                                 "& > *:last-child": { mb: 0 },
-                            }}>
+                            }}
+                        >
                             <ReactMarkdown components={markdownComponents}>
                                 {processMarkdown(formData.description)}
                             </ReactMarkdown>
@@ -237,9 +269,7 @@ function BasicInfo({ item, formData, onUpdate }) {
                     ) : (
                         <TextField
                             value={formData.description}
-                            onChange={(e) =>
-                                onUpdate("description", e.target.value)
-                            }
+                            onChange={(e) => onUpdate("description", e.target.value)}
                             fullWidth
                             multiline
                             placeholder="Enter description...   Markdown formatting is supported"
@@ -253,9 +283,59 @@ function BasicInfo({ item, formData, onUpdate }) {
                         />
                     )}
                 </Box>
+
+                {/* Section divider */}
+                <Divider sx={{ my: 1 }} />
+
+                {/* Instance -> Model section */}
+                <Box>
+                    <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                        Instance Model
+                    </Typography>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                        <FormControl size="small" sx={{ minWidth: 180 }}>
+                            <InputLabel id="instance-select-label">Instance</InputLabel>
+                            <Select
+                                labelId="instance-select-label"
+                                label="Instance"
+                                value={selectedInstanceKey}
+                                onChange={(e) => setSelectedInstanceKey(e.target.value)}
+                            >
+                                {instanceEntries.length === 0 ? (
+                                    <MenuItem value="" disabled>
+                                        No instances
+                                    </MenuItem>
+                                ) : (
+                                    instanceEntries.map(([key, inst], idx) => {
+                                        const displayName =
+                                            inst.displayName || inst.Name || `Instance ${idx}`
+                                        return (
+                                            <MenuItem key={key} value={key}>
+                                                {displayName}
+                                            </MenuItem>
+                                        )
+                                    })
+                                )}
+                            </Select>
+                        </FormControl>
+                        <Button
+                            variant="contained"
+                            onClick={handleMakeModel}
+                            disabled={
+                                !selectedInstanceKey ||
+                                typeof window.package?.makeModelFromInstance !==
+                                    "function"
+                            }
+                        >
+                            Make Model
+                        </Button>
+                    </Stack>
+                </Box>
             </Stack>
         </Box>
     )
 }
 
-export default BasicInfo
+export default Info
+
+
