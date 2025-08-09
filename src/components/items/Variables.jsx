@@ -26,13 +26,7 @@ import {
     FormControl,
     InputLabel,
 } from "@mui/material"
-import {
-    Add,
-    DragIndicator,
-    Delete,
-    Info,
-    Code,
-} from "@mui/icons-material"
+import { Add, DragIndicator, Delete, Info, Code } from "@mui/icons-material"
 import {
     DndContext,
     closestCenter,
@@ -47,24 +41,26 @@ import {
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
-import {
-    useSortable,
-} from "@dnd-kit/sortable"
+import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 
 // Custom modifier to restrict drag movement to parent bounds
-const restrictToParentBounds = ({ transform, containerNodeRect, draggingNodeRect }) => {
+const restrictToParentBounds = ({
+    transform,
+    containerNodeRect,
+    draggingNodeRect,
+}) => {
     if (!containerNodeRect || !draggingNodeRect) {
-        return transform;
+        return transform
     }
 
-    const maxX = containerNodeRect.width - draggingNodeRect.width;
-    
+    const maxX = containerNodeRect.width - draggingNodeRect.width
+
     return {
         ...transform,
         x: Math.min(transform.x, maxX),
-    };
-};
+    }
+}
 
 // Sortable Variable Item Component
 function SortableVariableItem({ variable, onUpdateValue, onDelete }) {
@@ -93,8 +89,7 @@ function SortableVariableItem({ variable, onUpdateValue, onDelete }) {
                 borderColor: "divider",
                 borderWidth: 1,
                 cursor: isDragging ? "grabbing" : "auto",
-            }}
-        >
+            }}>
             <Box sx={{ p: 2 }}>
                 <Box
                     sx={{
@@ -103,8 +98,14 @@ function SortableVariableItem({ variable, onUpdateValue, onDelete }) {
                         gap: 1,
                     }}>
                     {/* Drag Handle */}
-                    <div {...attributes} {...listeners} style={{ display: "flex", alignItems: "center" }}>
-                        <DragIndicator fontSize="small" sx={{ color: "grey.500", cursor: "grab" }} />
+                    <div
+                        {...attributes}
+                        {...listeners}
+                        style={{ display: "flex", alignItems: "center" }}>
+                        <DragIndicator
+                            fontSize="small"
+                            sx={{ color: "grey.500", cursor: "grab" }}
+                        />
                     </div>
 
                     {/* Variable Type Icon */}
@@ -113,7 +114,14 @@ function SortableVariableItem({ variable, onUpdateValue, onDelete }) {
                     </Tooltip>
 
                     {/* Variable Name + Default Value - LEFT ALIGNED */}
-                    <Box sx={{ minWidth: "200px", flex: 1, display: "flex", alignItems: "center", gap: 2 }}>
+                    <Box
+                        sx={{
+                            minWidth: "200px",
+                            flex: 1,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 2,
+                        }}>
                         <Typography
                             variant="body2"
                             sx={{
@@ -124,82 +132,121 @@ function SortableVariableItem({ variable, onUpdateValue, onDelete }) {
                             }}>
                             {variable.displayName}
                         </Typography>
-                        
-                        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1,
+                            }}>
                             <Typography
                                 variant="caption"
                                 color="text.secondary"
-                                sx={{ 
+                                sx={{
                                     fontSize: "0.7rem",
-                                    whiteSpace: "nowrap"
+                                    whiteSpace: "nowrap",
                                 }}>
                                 Default value:
                             </Typography>
-                        {variable.type === "boolean" ? (
-                            <Checkbox
-                                checked={variable.customValue === "1"}
-                                onChange={(e) => onUpdateValue(variable.id, e.checked ? "1" : "0")}
-                                size="small"
-                                sx={{ p: 0.5 }}
-                            />
-                        ) : variable.type === "enum" ? (
-                            <FormControl size="small" sx={{ minWidth: 120 }}>
-                                <Select
+                            {variable.type === "boolean" ? (
+                                <Checkbox
+                                    checked={variable.customValue === "1"}
+                                    onChange={(e) =>
+                                        onUpdateValue(
+                                            variable.id,
+                                            e.checked ? "1" : "0",
+                                        )
+                                    }
+                                    size="small"
+                                    sx={{ p: 0.5 }}
+                                />
+                            ) : variable.type === "enum" ? (
+                                <FormControl
+                                    size="small"
+                                    sx={{ minWidth: 120 }}>
+                                    <Select
+                                        value={variable.customValue}
+                                        onChange={(e) =>
+                                            onUpdateValue(
+                                                variable.id,
+                                                e.target.value,
+                                            )
+                                        }
+                                        sx={{
+                                            height: 28,
+                                            fontSize: "0.75rem",
+                                            "& .MuiOutlinedInput-notchedOutline":
+                                                {
+                                                    borderColor: "transparent",
+                                                },
+                                            "&:hover .MuiOutlinedInput-notchedOutline":
+                                                {
+                                                    borderColor: "divider",
+                                                },
+                                            "&.Mui-focused .MuiOutlinedInput-notchedOutline":
+                                                {
+                                                    borderColor: "primary.main",
+                                                },
+                                        }}>
+                                        {Object.entries(
+                                            variable.enumValues || {},
+                                        ).map(([value, label]) => (
+                                            <MenuItem
+                                                key={value}
+                                                value={value}
+                                                sx={{ fontSize: "0.75rem" }}>
+                                                {label}
+                                            </MenuItem>
+                                        ))}
+                                    </Select>
+                                </FormControl>
+                            ) : (
+                                <TextField
+                                    size="small"
+                                    type={
+                                        variable.type === "number"
+                                            ? "number"
+                                            : "text"
+                                    }
                                     value={variable.customValue}
-                                    onChange={(e) => onUpdateValue(variable.id, e.target.value)}
+                                    onChange={(e) =>
+                                        onUpdateValue(
+                                            variable.id,
+                                            e.target.value,
+                                        )
+                                    }
+                                    placeholder="Set default value"
+                                    inputProps={{
+                                        min:
+                                            variable.type === "number"
+                                                ? 0
+                                                : undefined,
+                                        step:
+                                            variable.type === "number"
+                                                ? 1
+                                                : undefined,
+                                    }}
                                     sx={{
-                                        height: 28,
-                                        fontSize: "0.75rem",
-                                        "& .MuiOutlinedInput-notchedOutline": {
-                                            borderColor: "transparent",
+                                        "& .MuiInputBase-input": {
+                                            fontSize: "0.75rem",
+                                            fontWeight: "medium",
+                                            color: "text.primary",
                                         },
-                                        "&:hover .MuiOutlinedInput-notchedOutline": {
-                                            borderColor: "divider",
-                                        },
-                                        "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-                                            borderColor: "primary.main",
+                                        "& .MuiOutlinedInput-root": {
+                                            height: 28,
+                                            "& fieldset": {
+                                                borderColor: "transparent",
+                                            },
+                                            "&:hover fieldset": {
+                                                borderColor: "divider",
+                                            },
+                                            "&.Mui-focused fieldset": {
+                                                borderColor: "primary.main",
+                                            },
                                         },
                                     }}
-                                >
-                                    {Object.entries(variable.enumValues || {}).map(([value, label]) => (
-                                        <MenuItem key={value} value={value} sx={{ fontSize: "0.75rem" }}>
-                                            {label}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                        ) : (
-                            <TextField
-                                size="small"
-                                type={variable.type === "number" ? "number" : "text"}
-                                value={variable.customValue}
-                                onChange={(e) => onUpdateValue(variable.id, e.target.value)}
-                                placeholder="Set default value"
-                                inputProps={{
-                                    min: variable.type === "number" ? 0 : undefined,
-                                    step: variable.type === "number" ? 1 : undefined,
-                                }}
-                                sx={{
-                                    "& .MuiInputBase-input": {
-                                        fontSize: "0.75rem",
-                                        fontWeight: "medium",
-                                        color: "text.primary",
-                                    },
-                                    "& .MuiOutlinedInput-root": {
-                                        height: 28,
-                                        "& fieldset": {
-                                            borderColor: "transparent",
-                                        },
-                                        "&:hover fieldset": {
-                                            borderColor: "divider",
-                                        },
-                                        "&.Mui-focused fieldset": {
-                                            borderColor: "primary.main",
-                                        },
-                                    },
-                                }}
-                            />
-                        )}
+                                />
+                            )}
                         </Box>
                     </Box>
 
@@ -215,8 +262,6 @@ function SortableVariableItem({ variable, onUpdateValue, onDelete }) {
                             {variable.fixupName}
                         </Typography>
                     </Box>
-
-
 
                     {/* Action Buttons */}
                     <Box sx={{ display: "flex", gap: 1 }}>
@@ -237,17 +282,17 @@ function SortableVariableItem({ variable, onUpdateValue, onDelete }) {
 
 // Enum definitions for specific types
 const BUTTON_TYPES = {
-    "0": "Weighted",
-    "1": "Cube",
-    "2": "Sphere"
+    0: "Weighted",
+    1: "Cube",
+    2: "Sphere",
 }
 
 const CUBE_TYPES = {
-    "0": "Standard",
-    "1": "Companion", 
-    "2": "Reflective",
-    "3": "Sphere",
-    "4": "Franken"
+    0: "Standard",
+    1: "Companion",
+    2: "Reflective",
+    3: "Sphere",
+    4: "Franken",
 }
 
 // Preset variable definitions
@@ -257,56 +302,56 @@ const VARIABLE_PRESETS = {
         fixupName: "$start_enabled",
         description: "2 Conditions",
         defaultValue: "1",
-        type: "boolean"
+        type: "boolean",
     },
     StartActive: {
         displayName: "Start Active",
-        fixupName: "$start_active", 
+        fixupName: "$start_active",
         description: "2 Conditions",
         defaultValue: "1",
-        type: "boolean"
+        type: "boolean",
     },
     StartDeployed: {
         displayName: "Start Deployed",
-        fixupName: "$start_deployed", 
+        fixupName: "$start_deployed",
         description: "2 Conditions",
         defaultValue: "1",
-        type: "boolean"
+        type: "boolean",
     },
     StartOpen: {
         displayName: "Start Open",
         fixupName: "$start_open",
         description: "2 Conditions",
         defaultValue: "0",
-        type: "boolean"
+        type: "boolean",
     },
     StartLocked: {
         displayName: "Start Locked",
         fixupName: "$start_locked",
         description: "2 Conditions",
         defaultValue: "0",
-        type: "boolean"
+        type: "boolean",
     },
     StartReversed: {
         displayName: "Start Reversed",
         fixupName: "$start_reversed",
         description: "2 Conditions",
         defaultValue: "0",
-        type: "boolean"
+        type: "boolean",
     },
     AutoDrop: {
         displayName: "Auto Drop",
         fixupName: "$disable_autodrop",
         description: "2 Conditions",
         defaultValue: "0",
-        type: "boolean"
+        type: "boolean",
     },
     AutoRespawn: {
         displayName: "Auto Respawn",
         fixupName: "$disable_autorespawn",
         description: "2 Conditions",
         defaultValue: "0",
-        type: "boolean"
+        type: "boolean",
     },
     ButtonType: {
         displayName: "Button Type",
@@ -314,7 +359,7 @@ const VARIABLE_PRESETS = {
         description: "3 Conditions",
         defaultValue: "0",
         type: "enum",
-        enumValues: BUTTON_TYPES
+        enumValues: BUTTON_TYPES,
     },
     CubeType: {
         displayName: "Cube Type",
@@ -322,14 +367,14 @@ const VARIABLE_PRESETS = {
         description: "5 Conditions",
         defaultValue: "0",
         type: "enum",
-        enumValues: CUBE_TYPES
+        enumValues: CUBE_TYPES,
     },
     TimerDelay: {
         displayName: "Timer Delay",
         fixupName: "$timer_delay",
         description: "30 Conditions",
         defaultValue: "0",
-        type: "number"
+        type: "number",
     },
 }
 
@@ -338,22 +383,36 @@ function Variables({ item, formData, onUpdateVariables }) {
     const [variables, setVariables] = useState(() => {
         // Ensure initial state is always an array
         const initialVariables = formData.variables
-        console.log("Variables component: Initial formData.variables =", initialVariables, "type:", typeof initialVariables, "isArray:", Array.isArray(initialVariables))
+        console.log(
+            "Variables component: Initial formData.variables =",
+            initialVariables,
+            "type:",
+            typeof initialVariables,
+            "isArray:",
+            Array.isArray(initialVariables),
+        )
         return Array.isArray(initialVariables) ? initialVariables : []
     })
-    
+
     const sensors = useSensors(
         useSensor(PointerSensor),
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
-        })
+        }),
     )
 
     // Sync local state with formData when it changes
     useEffect(() => {
         // Ensure variables is always an array
         const variablesData = formData.variables
-        console.log("Variables component: formData.variables =", variablesData, "type:", typeof variablesData, "isArray:", Array.isArray(variablesData))
+        console.log(
+            "Variables component: formData.variables =",
+            variablesData,
+            "type:",
+            typeof variablesData,
+            "isArray:",
+            Array.isArray(variablesData),
+        )
         if (Array.isArray(variablesData)) {
             setVariables(variablesData)
         } else {
@@ -363,7 +422,9 @@ function Variables({ item, formData, onUpdateVariables }) {
 
     const handleAddVariable = (presetKey) => {
         // Check if this variable type is already added
-        const existingVariable = variables.find(v => v.presetKey === presetKey)
+        const existingVariable = variables.find(
+            (v) => v.presetKey === presetKey,
+        )
         if (existingVariable) {
             console.warn(`Variable ${presetKey} is already added`)
             return
@@ -379,9 +440,9 @@ function Variables({ item, formData, onUpdateVariables }) {
             defaultValue: preset.defaultValue,
             type: preset.type,
             enumValues: preset.enumValues,
-            customValue: preset.defaultValue
+            customValue: preset.defaultValue,
         }
-        
+
         const updatedVariables = [...variables, newVariable]
         setVariables(updatedVariables)
         onUpdateVariables(updatedVariables)
@@ -389,14 +450,14 @@ function Variables({ item, formData, onUpdateVariables }) {
     }
 
     const handleDeleteVariable = (variableId) => {
-        const updatedVariables = variables.filter(v => v.id !== variableId)
+        const updatedVariables = variables.filter((v) => v.id !== variableId)
         setVariables(updatedVariables)
         onUpdateVariables(updatedVariables)
     }
 
     const handleUpdateVariableValue = (variableId, newValue) => {
-        const updatedVariables = variables.map(v => 
-            v.id === variableId ? { ...v, customValue: newValue } : v
+        const updatedVariables = variables.map((v) =>
+            v.id === variableId ? { ...v, customValue: newValue } : v,
         )
         setVariables(updatedVariables)
         onUpdateVariables(updatedVariables)
@@ -406,7 +467,9 @@ function Variables({ item, formData, onUpdateVariables }) {
         const { active, over } = event
 
         if (active.id !== over?.id) {
-            const oldIndex = variables.findIndex((item) => item.id === active.id)
+            const oldIndex = variables.findIndex(
+                (item) => item.id === active.id,
+            )
             const newIndex = variables.findIndex((item) => item.id === over.id)
 
             const reorderedVariables = arrayMove(variables, oldIndex, newIndex)
@@ -425,7 +488,8 @@ function Variables({ item, formData, onUpdateVariables }) {
                     mb: 2,
                 }}>
                 <Typography variant="h6">
-                    Variables ({Array.isArray(variables) ? variables.length : 0})
+                    Variables ({Array.isArray(variables) ? variables.length : 0}
+                    )
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
                     <Tooltip title="Add a variable from the preset list">
@@ -474,94 +538,128 @@ function Variables({ item, formData, onUpdateVariables }) {
                 </Box>
             ) : (
                 <Stack spacing={2}>
-                                    <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                    modifiers={[restrictToParentBounds]}
-                >
+                    <DndContext
+                        sensors={sensors}
+                        collisionDetection={closestCenter}
+                        onDragEnd={handleDragEnd}
+                        modifiers={[restrictToParentBounds]}>
                         <SortableContext
-                            items={Array.isArray(variables) ? variables.map(v => v.id) : []}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            {Array.isArray(variables) ? variables.map((variable) => (
-                                <SortableVariableItem
-                                    key={variable.id}
-                                    variable={variable}
-                                    onUpdateValue={handleUpdateVariableValue}
-                                    onDelete={handleDeleteVariable}
-                                />
-                            )) : null}
+                            items={
+                                Array.isArray(variables)
+                                    ? variables.map((v) => v.id)
+                                    : []
+                            }
+                            strategy={verticalListSortingStrategy}>
+                            {Array.isArray(variables)
+                                ? variables.map((variable) => (
+                                      <SortableVariableItem
+                                          key={variable.id}
+                                          variable={variable}
+                                          onUpdateValue={
+                                              handleUpdateVariableValue
+                                          }
+                                          onDelete={handleDeleteVariable}
+                                      />
+                                  ))
+                                : null}
                         </SortableContext>
                     </DndContext>
                 </Stack>
             )}
 
             {/* Add Variable Dialog */}
-            <Dialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} maxWidth="md" fullWidth>
+            <Dialog
+                open={addDialogOpen}
+                onClose={() => setAddDialogOpen(false)}
+                maxWidth="md"
+                fullWidth>
                 <DialogTitle>Add Variable</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" mb={2}>
-                        Select a variable from the preset list to add to your item configuration.
+                        Select a variable from the preset list to add to your
+                        item configuration.
                     </Typography>
-                    {Object.entries(VARIABLE_PRESETS).filter(([key, preset]) => 
-                        !variables.find(v => v.presetKey === key)
+                    {Object.entries(VARIABLE_PRESETS).filter(
+                        ([key, preset]) =>
+                            !variables.find((v) => v.presetKey === key),
                     ).length === 0 ? (
                         <Box sx={{ textAlign: "center", py: 4 }}>
                             <Typography variant="h6" color="text.secondary">
                                 All Variables Added
                             </Typography>
                             <Typography variant="body2" color="text.secondary">
-                                You have already added all available variables to this item.
+                                You have already added all available variables
+                                to this item.
                             </Typography>
                         </Box>
                     ) : (
                         <List>
-                        {Object.entries(VARIABLE_PRESETS)
-                            .filter(([key, preset]) => {
-                                // Only show variables that haven't been added yet
-                                return !variables.find(v => v.presetKey === key)
-                            })
-                            .map(([key, preset]) => (
-                                <ListItem key={key} disablePadding>
-                                    <ListItemButton onClick={() => handleAddVariable(key)}>
-                                        <ListItemText
-                                            primary={
-                                                <Stack direction="row" alignItems="center" spacing={1}>
-                                                    <Typography variant="subtitle1">
-                                                        {preset.displayName}
-                                                    </Typography>
-                                                    <Chip
-                                                        icon={<Code />}
-                                                        label={preset.fixupName}
-                                                        size="small"
-                                                        variant="outlined"
-                                                    />
-                                                </Stack>
-                                            }
-                                            secondary={
-                                                <Box>
-                                                    <Typography variant="body2" color="text.secondary">
-                                                        {preset.description}
-                                                    </Typography>
-                                                    <Typography variant="caption" color="text.secondary">
-                                                        Default value: {preset.defaultValue} • Type: {preset.type}
-                                                    </Typography>
-                                                </Box>
-                                            }
-                                        />
-                                    </ListItemButton>
-                                </ListItem>
-                            ))}
+                            {Object.entries(VARIABLE_PRESETS)
+                                .filter(([key, preset]) => {
+                                    // Only show variables that haven't been added yet
+                                    return !variables.find(
+                                        (v) => v.presetKey === key,
+                                    )
+                                })
+                                .map(([key, preset]) => (
+                                    <ListItem key={key} disablePadding>
+                                        <ListItemButton
+                                            onClick={() =>
+                                                handleAddVariable(key)
+                                            }>
+                                            <ListItemText
+                                                primary={
+                                                    <Stack
+                                                        direction="row"
+                                                        alignItems="center"
+                                                        spacing={1}>
+                                                        <Typography variant="subtitle1">
+                                                            {preset.displayName}
+                                                        </Typography>
+                                                        <Chip
+                                                            icon={<Code />}
+                                                            label={
+                                                                preset.fixupName
+                                                            }
+                                                            size="small"
+                                                            variant="outlined"
+                                                        />
+                                                    </Stack>
+                                                }
+                                                secondary={
+                                                    <Box>
+                                                        <Typography
+                                                            variant="body2"
+                                                            color="text.secondary">
+                                                            {preset.description}
+                                                        </Typography>
+                                                        <Typography
+                                                            variant="caption"
+                                                            color="text.secondary">
+                                                            Default value:{" "}
+                                                            {
+                                                                preset.defaultValue
+                                                            }{" "}
+                                                            • Type:{" "}
+                                                            {preset.type}
+                                                        </Typography>
+                                                    </Box>
+                                                }
+                                            />
+                                        </ListItemButton>
+                                    </ListItem>
+                                ))}
                         </List>
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setAddDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={() => setAddDialogOpen(false)}>
+                        Cancel
+                    </Button>
                 </DialogActions>
             </Dialog>
         </Box>
     )
 }
 
-export default Variables 
+export default Variables

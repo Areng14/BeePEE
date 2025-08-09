@@ -11,7 +11,7 @@ describe("Instance Naming", () => {
         // Create test directory structure
         testPackagePath = path.join(__dirname, "temp_test_package")
         testItemPath = path.join(testPackagePath, "items", "testitem")
-        
+
         // Clean up from previous tests
         if (fs.existsSync(testPackagePath)) {
             fs.rmSync(testPackagePath, { recursive: true, force: true })
@@ -20,7 +20,9 @@ describe("Instance Naming", () => {
         // Create directory structure
         fs.mkdirSync(testPackagePath, { recursive: true })
         fs.mkdirSync(testItemPath, { recursive: true })
-        fs.mkdirSync(path.join(testPackagePath, "resources"), { recursive: true })
+        fs.mkdirSync(path.join(testPackagePath, "resources"), {
+            recursive: true,
+        })
     })
 
     afterEach(() => {
@@ -36,9 +38,9 @@ describe("Instance Naming", () => {
             ID: testItemId,
             Version: {
                 Styles: {
-                    BEE2_CLEAN: "testitem"
-                }
-            }
+                    BEE2_CLEAN: "testitem",
+                },
+            },
         }
 
         // Create editoritems.json with instances
@@ -50,37 +52,37 @@ describe("Instance Naming", () => {
                     SubType: {
                         Name: "Test Instance Naming Item",
                         Model: {
-                            ModelName: "test_model.3ds"
+                            ModelName: "test_model.3ds",
                         },
                         Palette: {
                             Tooltip: "TEST INSTANCE NAMING ITEM",
                             Image: "palette/test/test_item.png",
-                            Position: "0 0 0"
-                        }
-                    }
+                            Position: "0 0 0",
+                        },
+                    },
                 },
                 Exporting: {
                     Instances: {
-                        "0": {
+                        0: {
                             Name: "instances/test_instance1.vmf",
                             EntityCount: 1,
                             BrushCount: 2,
-                            BrushSideCount: 3
+                            BrushSideCount: 3,
                         },
-                        "1": {
+                        1: {
                             Name: "instances/test_instance2.vmf",
                             EntityCount: 4,
                             BrushCount: 5,
-                            BrushSideCount: 6
-                        }
-                    }
-                }
-            }
+                            BrushSideCount: 6,
+                        },
+                    },
+                },
+            },
         }
 
         fs.writeFileSync(
             path.join(testItemPath, "editoritems.json"),
-            JSON.stringify(editorItems, null, 2)
+            JSON.stringify(editorItems, null, 2),
         )
 
         // Create properties.json
@@ -88,13 +90,13 @@ describe("Instance Naming", () => {
             Properties: {
                 Name: "Test Instance Naming Item",
                 Author: "Test Author",
-                Description: "A test item with instance naming"
-            }
+                Description: "A test item with instance naming",
+            },
         }
 
         fs.writeFileSync(
             path.join(testItemPath, "properties.json"),
-            JSON.stringify(properties, null, 2)
+            JSON.stringify(properties, null, 2),
         )
 
         // Create the Item instance
@@ -112,9 +114,9 @@ describe("Instance Naming", () => {
             ID: testItemId,
             Version: {
                 Styles: {
-                    BEE2_CLEAN: "testitem"
-                }
-            }
+                    BEE2_CLEAN: "testitem",
+                },
+            },
         }
 
         // Create editoritems.json with instances
@@ -126,37 +128,37 @@ describe("Instance Naming", () => {
                     SubType: {
                         Name: "Test Instance Naming Item",
                         Model: {
-                            ModelName: "test_model.3ds"
+                            ModelName: "test_model.3ds",
                         },
                         Palette: {
                             Tooltip: "TEST INSTANCE NAMING ITEM",
                             Image: "palette/test/test_item.png",
-                            Position: "0 0 0"
-                        }
-                    }
+                            Position: "0 0 0",
+                        },
+                    },
                 },
                 Exporting: {
                     Instances: {
-                        "0": {
+                        0: {
                             Name: "instances/test_instance1.vmf",
                             EntityCount: 1,
                             BrushCount: 2,
-                            BrushSideCount: 3
+                            BrushSideCount: 3,
                         },
-                        "1": {
+                        1: {
                             Name: "instances/test_instance2.vmf",
                             EntityCount: 4,
                             BrushCount: 5,
-                            BrushSideCount: 6
-                        }
-                    }
-                }
-            }
+                            BrushSideCount: 6,
+                        },
+                    },
+                },
+            },
         }
 
         fs.writeFileSync(
             path.join(testItemPath, "editoritems.json"),
-            JSON.stringify(editorItems, null, 2)
+            JSON.stringify(editorItems, null, 2),
         )
 
         // Create properties.json
@@ -164,13 +166,13 @@ describe("Instance Naming", () => {
             Properties: {
                 Name: "Test Instance Naming Item",
                 Author: "Test Author",
-                Description: "A test item with instance naming"
-            }
+                Description: "A test item with instance naming",
+            },
         }
 
         fs.writeFileSync(
             path.join(testItemPath, "properties.json"),
-            JSON.stringify(properties, null, 2)
+            JSON.stringify(properties, null, 2),
         )
 
         // Create the Item instance
@@ -200,9 +202,9 @@ describe("Instance Naming", () => {
             ID: testItemId,
             Version: {
                 Styles: {
-                    BEE2_CLEAN: "testitem"
-                }
-            }
+                    BEE2_CLEAN: "testitem",
+                },
+            },
         }
 
         // Create editoritems.json with instances
@@ -214,37 +216,37 @@ describe("Instance Naming", () => {
                     SubType: {
                         Name: "Test Instance Naming Item",
                         Model: {
-                            ModelName: "test_model.3ds"
+                            ModelName: "test_model.3ds",
                         },
                         Palette: {
                             Tooltip: "TEST INSTANCE NAMING ITEM",
                             Image: "palette/test/test_item.png",
-                            Position: "0 0 0"
-                        }
-                    }
+                            Position: "0 0 0",
+                        },
+                    },
                 },
                 Exporting: {
                     Instances: {
-                        "0": {
+                        0: {
                             Name: "instances/test_instance1.vmf",
                             EntityCount: 1,
                             BrushCount: 2,
-                            BrushSideCount: 3
+                            BrushSideCount: 3,
                         },
-                        "1": {
+                        1: {
                             Name: "instances/test_instance2.vmf",
                             EntityCount: 4,
                             BrushCount: 5,
-                            BrushSideCount: 6
-                        }
-                    }
-                }
-            }
+                            BrushSideCount: 6,
+                        },
+                    },
+                },
+            },
         }
 
         fs.writeFileSync(
             path.join(testItemPath, "editoritems.json"),
-            JSON.stringify(editorItems, null, 2)
+            JSON.stringify(editorItems, null, 2),
         )
 
         // Create properties.json
@@ -252,13 +254,13 @@ describe("Instance Naming", () => {
             Properties: {
                 Name: "Test Instance Naming Item",
                 Author: "Test Author",
-                Description: "A test item with instance naming"
-            }
+                Description: "A test item with instance naming",
+            },
         }
 
         fs.writeFileSync(
             path.join(testItemPath, "properties.json"),
-            JSON.stringify(properties, null, 2)
+            JSON.stringify(properties, null, 2),
         )
 
         // Create the Item instance
@@ -270,15 +272,15 @@ describe("Instance Naming", () => {
         // Get all instance names
         const allNames = item.getInstanceNames()
         expect(allNames).toEqual({
-            "0": "Main Door"
+            0: "Main Door",
         })
 
         // Set another name
         item.setInstanceName("1", "Side Window")
         const updatedNames = item.getInstanceNames()
         expect(updatedNames).toEqual({
-            "0": "Main Door",
-            "1": "Side Window"
+            0: "Main Door",
+            1: "Side Window",
         })
     })
 
@@ -288,9 +290,9 @@ describe("Instance Naming", () => {
             ID: testItemId,
             Version: {
                 Styles: {
-                    BEE2_CLEAN: "testitem"
-                }
-            }
+                    BEE2_CLEAN: "testitem",
+                },
+            },
         }
 
         // Create editoritems.json with instances
@@ -302,31 +304,31 @@ describe("Instance Naming", () => {
                     SubType: {
                         Name: "Test Instance Naming Item",
                         Model: {
-                            ModelName: "test_model.3ds"
+                            ModelName: "test_model.3ds",
                         },
                         Palette: {
                             Tooltip: "TEST INSTANCE NAMING ITEM",
                             Image: "palette/test/test_item.png",
-                            Position: "0 0 0"
-                        }
-                    }
+                            Position: "0 0 0",
+                        },
+                    },
                 },
                 Exporting: {
                     Instances: {
-                        "0": {
+                        0: {
                             Name: "instances/test_instance1.vmf",
                             EntityCount: 1,
                             BrushCount: 2,
-                            BrushSideCount: 3
-                        }
-                    }
-                }
-            }
+                            BrushSideCount: 3,
+                        },
+                    },
+                },
+            },
         }
 
         fs.writeFileSync(
             path.join(testItemPath, "editoritems.json"),
-            JSON.stringify(editorItems, null, 2)
+            JSON.stringify(editorItems, null, 2),
         )
 
         // Create properties.json
@@ -334,13 +336,13 @@ describe("Instance Naming", () => {
             Properties: {
                 Name: "Test Instance Naming Item",
                 Author: "Test Author",
-                Description: "A test item with instance naming"
-            }
+                Description: "A test item with instance naming",
+            },
         }
 
         fs.writeFileSync(
             path.join(testItemPath, "properties.json"),
-            JSON.stringify(properties, null, 2)
+            JSON.stringify(properties, null, 2),
         )
 
         // Create the Item instance
@@ -367,9 +369,9 @@ describe("Instance Naming", () => {
             ID: testItemId,
             Version: {
                 Styles: {
-                    BEE2_CLEAN: "testitem"
-                }
-            }
+                    BEE2_CLEAN: "testitem",
+                },
+            },
         }
 
         // Create editoritems.json with instances
@@ -381,37 +383,37 @@ describe("Instance Naming", () => {
                     SubType: {
                         Name: "Test Instance Naming Item",
                         Model: {
-                            ModelName: "test_model.3ds"
+                            ModelName: "test_model.3ds",
                         },
                         Palette: {
                             Tooltip: "TEST INSTANCE NAMING ITEM",
                             Image: "palette/test/test_item.png",
-                            Position: "0 0 0"
-                        }
-                    }
+                            Position: "0 0 0",
+                        },
+                    },
                 },
                 Exporting: {
                     Instances: {
-                        "0": {
+                        0: {
                             Name: "instances/test_instance1.vmf",
                             EntityCount: 1,
                             BrushCount: 2,
-                            BrushSideCount: 3
+                            BrushSideCount: 3,
                         },
-                        "1": {
+                        1: {
                             Name: "instances/test_instance2.vmf",
                             EntityCount: 4,
                             BrushCount: 5,
-                            BrushSideCount: 6
-                        }
-                    }
-                }
-            }
+                            BrushSideCount: 6,
+                        },
+                    },
+                },
+            },
         }
 
         fs.writeFileSync(
             path.join(testItemPath, "editoritems.json"),
-            JSON.stringify(editorItems, null, 2)
+            JSON.stringify(editorItems, null, 2),
         )
 
         // Create properties.json
@@ -419,13 +421,13 @@ describe("Instance Naming", () => {
             Properties: {
                 Name: "Test Instance Naming Item",
                 Author: "Test Author",
-                Description: "A test item with instance naming"
-            }
+                Description: "A test item with instance naming",
+            },
         }
 
         fs.writeFileSync(
             path.join(testItemPath, "properties.json"),
-            JSON.stringify(properties, null, 2)
+            JSON.stringify(properties, null, 2),
         )
 
         // Create the Item instance
@@ -441,4 +443,4 @@ describe("Instance Naming", () => {
         expect(instancesWithStatus["0"].displayName).toBe("Main Door")
         expect(instancesWithStatus["1"].displayName).toBe("Instance 1") // Default name
     })
-}) 
+})

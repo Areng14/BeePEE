@@ -74,33 +74,41 @@ function isVdfFile(filePath) {
 
 // Helper function to add UUIDs to VBSP blocks that can have duplicates
 function addUuidsToVbspConditions(data) {
-    const generateUuid = () => `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    
+    const generateUuid = () =>
+        `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
     function processObject(obj) {
-        if (typeof obj !== 'object' || obj === null) {
+        if (typeof obj !== "object" || obj === null) {
             return obj
         }
-        
+
         const newObj = {}
         for (const [key, value] of Object.entries(obj)) {
             let newKey = key
             let newValue = value
-            
+
             // Add UUID to blocks that can have multiple instances
-            if ((key === 'Switch' || key === 'Condition' || key === 'MapInstVar') && typeof value === 'object') {
+            if (
+                (key === "Switch" ||
+                    key === "Condition" ||
+                    key === "MapInstVar") &&
+                typeof value === "object"
+            ) {
                 newKey = `${key}_${generateUuid()}`
-                newValue = typeof value === 'object' ? processObject(value) : value
+                newValue =
+                    typeof value === "object" ? processObject(value) : value
             } else {
                 // Recursively process nested objects
-                newValue = typeof value === 'object' ? processObject(value) : value
+                newValue =
+                    typeof value === "object" ? processObject(value) : value
             }
-            
+
             newObj[newKey] = newValue
         }
-        
+
         return newObj
     }
-    
+
     return processObject(data)
 }
 
@@ -119,12 +127,12 @@ function convertVdfToJson(filePath) {
         })
 
         const parsedData = vdf.parse(fixedLines.join("\n"))
-        
+
         // Add UUIDs to VBSP condition keys if this is a vbsp_config file
-        if (filePath.includes('vbsp_config')) {
+        if (filePath.includes("vbsp_config")) {
             return addUuidsToVbspConditions(parsedData)
         }
-        
+
         return parsedData
     } catch (error) {
         // Extract item name from file path for better error reporting
@@ -148,7 +156,11 @@ function processVdfFiles(directory) {
         if (stat.isDirectory()) {
             // Recursively process subdirectories
             processVdfFiles(fullPath)
-        } else if (file === "info.txt" || file === "editoritems.txt" || file === "properties.txt") {
+        } else if (
+            file === "info.txt" ||
+            file === "editoritems.txt" ||
+            file === "properties.txt"
+        ) {
             // Always convert these specific files to JSON
             try {
                 // Convert VDF to JSON
@@ -156,10 +168,7 @@ function processVdfFiles(directory) {
 
                 // Save as JSON file (same name but .json extension)
                 const jsonPath = fullPath.replace(/\.txt$/i, ".json")
-                fs.writeFileSync(
-                    jsonPath,
-                    JSON.stringify(jsonData, null, 4),
-                )
+                fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 4))
 
                 // Delete the original .txt file
                 fs.unlinkSync(fullPath)
@@ -175,10 +184,7 @@ function processVdfFiles(directory) {
 
                 // Save as JSON file (same name but .json extension)
                 const jsonPath = fullPath.replace(/\.cfg$/i, ".json")
-                fs.writeFileSync(
-                    jsonPath,
-                    JSON.stringify(jsonData, null, 4),
-                )
+                fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 4))
 
                 // Delete the original .cfg file
                 fs.unlinkSync(fullPath)
