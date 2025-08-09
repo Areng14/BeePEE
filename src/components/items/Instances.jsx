@@ -29,7 +29,13 @@ import LabelIcon from "@mui/icons-material/Label"
 import { useState, useEffect } from "react"
 import ViewInAr from "@mui/icons-material/ViewInAr"
 
-function Instances({ item, formData, onUpdateInstances, editingNames, setEditingNames }) {
+function Instances({
+    item,
+    formData,
+    onUpdateInstances,
+    editingNames,
+    setEditingNames,
+}) {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [instanceToDelete, setInstanceToDelete] = useState(null)
     const [isRemovingMissing, setIsRemovingMissing] = useState(false)
@@ -256,17 +262,16 @@ function Instances({ item, formData, onUpdateInstances, editingNames, setEditing
         }
     }
 
-
-
     return (
-        <Box sx={{ 
-            overflow: "hidden",
-            "&::-webkit-scrollbar": {
-                display: "none"
-            },
-            msOverflowStyle: "none",
-            scrollbarWidth: "none"
-        }}>
+        <Box
+            sx={{
+                overflow: "hidden",
+                "&::-webkit-scrollbar": {
+                    display: "none",
+                },
+                msOverflowStyle: "none",
+                scrollbarWidth: "none",
+            }}>
             <Box
                 sx={{
                     display: "flex",
@@ -348,14 +353,14 @@ function Instances({ item, formData, onUpdateInstances, editingNames, setEditing
                                     opacity: isDisabled ? 0.8 : 1,
                                 }}>
                                 <Box sx={{ p: 2 }}>
-                                                                         <Box
-                                         sx={{
-                                             display: "flex",
-                                             alignItems: "center",
-                                             gap: 1,
-                                             width: "100%",
-                                             minWidth: 0,
-                                         }}>
+                                    <Box
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 1,
+                                            width: "100%",
+                                            minWidth: 0,
+                                        }}>
                                         {/* Instance Type Icon */}
                                         <Tooltip
                                             title={
@@ -373,16 +378,34 @@ function Instances({ item, formData, onUpdateInstances, editingNames, setEditing
                                         </Tooltip>
 
                                         {/* Instance Name - Always Editable */}
-                                        <Box sx={{ minWidth: "80px", maxWidth: "120px", display: "flex", alignItems: "center", gap: 0.5 }}>
+                                        <Box
+                                            sx={{
+                                                minWidth: "80px",
+                                                maxWidth: "120px",
+                                                display: "flex",
+                                                alignItems: "center",
+                                                gap: 0.5,
+                                            }}>
                                             <TextField
                                                 size="small"
-                                                value={editingNames[instance.index] !== undefined ? editingNames[instance.index] : (instance.displayName || `Instance ${instanceNumber}`)}
+                                                value={
+                                                    editingNames[
+                                                        instance.index
+                                                    ] !== undefined
+                                                        ? editingNames[
+                                                              instance.index
+                                                          ]
+                                                        : instance.displayName ||
+                                                          `Instance ${instanceNumber}`
+                                                }
                                                 onChange={(e) => {
                                                     // Just update the local state, don't save to meta.json yet
-                                                    const newName = e.target.value
-                                                    setEditingNames(prev => ({
+                                                    const newName =
+                                                        e.target.value
+                                                    setEditingNames((prev) => ({
                                                         ...prev,
-                                                        [instance.index]: newName
+                                                        [instance.index]:
+                                                            newName,
                                                     }))
                                                 }}
                                                 placeholder={`Instance ${instanceNumber}`}
@@ -394,39 +417,51 @@ function Instances({ item, formData, onUpdateInstances, editingNames, setEditing
                                                         fontWeight: "medium",
                                                         color: "text.primary",
                                                     },
-                                                    "& .MuiOutlinedInput-root": {
-                                                        "& fieldset": {
-                                                            borderColor: "transparent",
+                                                    "& .MuiOutlinedInput-root":
+                                                        {
+                                                            "& fieldset": {
+                                                                borderColor:
+                                                                    "transparent",
+                                                            },
+                                                            "&:hover fieldset":
+                                                                {
+                                                                    borderColor:
+                                                                        "divider",
+                                                                },
+                                                            "&.Mui-focused fieldset":
+                                                                {
+                                                                    borderColor:
+                                                                        "primary.main",
+                                                                },
                                                         },
-                                                        "&:hover fieldset": {
-                                                            borderColor: "divider",
-                                                        },
-                                                        "&.Mui-focused fieldset": {
-                                                            borderColor: "primary.main",
-                                                        },
-                                                    },
                                                 }}
                                             />
                                         </Box>
 
-                                                                                 {/* Instance Path */}
-                                         <Typography
-                                             variant="body2"
-                                             color="text.secondary"
-                                             sx={{
-                                                 fontFamily: "monospace",
-                                                 overflow: "hidden",
-                                                 textOverflow: "ellipsis",
-                                                 whiteSpace: "nowrap",
-                                                 flex: 1,
-                                                 minWidth: 0,
-                                                 maxWidth: "100%",
-                                                 fontSize: "0.75rem",
-                                             }}>
-                                             {instance.Name || "(unnamed instance)"}
-                                         </Typography>
+                                        {/* Instance Path */}
+                                        <Typography
+                                            variant="body2"
+                                            color="text.secondary"
+                                            sx={{
+                                                fontFamily: "monospace",
+                                                overflow: "hidden",
+                                                textOverflow: "ellipsis",
+                                                whiteSpace: "nowrap",
+                                                flex: 1,
+                                                minWidth: 0,
+                                                maxWidth: "100%",
+                                                fontSize: "0.75rem",
+                                            }}>
+                                            {instance.Name ||
+                                                "(unnamed instance)"}
+                                        </Typography>
 
-                                        <Box sx={{ display: "flex", gap: 1, flexShrink: 0 }}>
+                                        <Box
+                                            sx={{
+                                                display: "flex",
+                                                gap: 1,
+                                                flexShrink: 0,
+                                            }}>
                                             {hasStats && (
                                                 <Tooltip
                                                     title={

@@ -33,19 +33,24 @@ async function handleVTFConversion(
 
     // Check if this is a palette image path that needs VTF conversion
     // Handle both original palette paths and already-converted material paths
-    const needsVTFConversion = paletteImage.startsWith("palette/") || 
-                              paletteImage.startsWith("models/props_map_editor/palette/")
-    
+    const needsVTFConversion =
+        paletteImage.startsWith("palette/") ||
+        paletteImage.startsWith("models/props_map_editor/palette/")
+
     if (needsVTFConversion) {
         // For already-converted paths, extract the original palette path
         let originalPalettePath = paletteImage
         if (paletteImage.startsWith("models/props_map_editor/")) {
             // Convert "models/props_map_editor/palette/beepkg/item" back to "palette/beepkg/item.png"
-            originalPalettePath = paletteImage.replace("models/props_map_editor/", "") + ".png"
+            originalPalettePath =
+                paletteImage.replace("models/props_map_editor/", "") + ".png"
         }
         try {
             // Get the VTF output path using the original palette path
-            const vtfPath = getVTFPathFromImagePath(packagePath, originalPalettePath)
+            const vtfPath = getVTFPathFromImagePath(
+                packagePath,
+                originalPalettePath,
+            )
 
             // Convert the icon to VTF format
             await convertImageToVTF(iconPath, vtfPath, {
