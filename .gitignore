@@ -26,3 +26,4 @@ dist-ssr
 # BEEPEE stuff
 packages
 backend/__tests__/package
+backend/libs/vmf2obj/jre
