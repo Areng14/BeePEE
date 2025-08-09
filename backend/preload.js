@@ -125,6 +125,28 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.invoke("convert-blocks-to-vbsp", { blocks }),
 
     // ========================================
+    // VMF2OBJ CONVERSION
+    // ========================================
+    convertVmfToObj: (vmfPath, outputDir) =>
+        ipcRenderer.invoke("convert-vmf-to-obj", { vmfPath, outputDir }),
+    convertInstanceToObj: (itemId, instanceKey, options = {}) =>
+        ipcRenderer.invoke("convert-instance-to-obj", {
+            itemId,
+            instanceKey,
+            options,
+        }),
+    setExtraResourcePaths: (paths) =>
+        ipcRenderer.invoke("set-extra-resource-paths", { paths }),
+    getExtraResourcePaths: () => ipcRenderer.invoke("get-extra-resource-paths"),
+    findPortal2Resources: () => ipcRenderer.invoke("find-portal2-resources"),
+    getFileStats: (filePath) =>
+        ipcRenderer.invoke("get-file-stats", { filePath }),
+    showItemInFolder: (filePath) =>
+        ipcRenderer.invoke("show-item-in-folder", { filePath }),
+    showModelPreview: (objPath, mtlPath, title) =>
+        ipcRenderer.invoke("show-model-preview", { objPath, mtlPath, title }),
+
+    // ========================================
     // ENTITY AND FGD DATA FUNCTIONS
     // ========================================
     getItemEntities: (itemId) =>

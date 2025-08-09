@@ -22,6 +22,11 @@ const { spawn } = require("child_process")
 const { Instance } = require("./items/Instance")
 const { getCleanInstancePath } = require("./utils/instancePaths")
 const { vmfStatsCache } = require("./utils/vmfParser")
+const {
+    convertVmfToObj,
+    setExtraResourcePaths,
+    getExtraResourcePaths,
+} = require("./utils/vmf2obj")
 
 // Track last saved .bpee path in memory (could be improved with persistent storage)
 let lastSavedBpeePath = null
@@ -125,6 +130,347 @@ function createIconPreviewWindow(iconPath, itemName, parentWindow) {
     )
 
     // Remove menu bar
+    previewWindow.setMenuBarVisibility(false)
+}
+
+function createModelPreviewWindow(objPath, mtlPath, title = "Model Preview") {
+    // Normalize to file URLs and encode for spaces/special chars
+    const toFileUrl = (p) => {
+        if (!p) return null
+        // Remove any existing file:// prefix to avoid double prefixes
+        const cleanPath = p
+            .replace(/^file:\/\/\//, "")
+            .replace(/^file:\/\//, "")
+        const normalized = path.normalize(cleanPath).replace(/\\/g, "/")
+        return `file:///${normalized}`
+    }
+    const objUrl = toFileUrl(objPath)
+    const mtlUrl = mtlPath && fs.existsSync(mtlPath) ? toFileUrl(mtlPath) : null
+
+    console.log("createModelPreviewWindow paths:")
+    console.log("  objPath input:", objPath)
+    console.log("  mtlPath input:", mtlPath)
+    console.log("  objUrl output:", objUrl)
+    console.log("  mtlUrl output:", mtlUrl)
+
+    const previewWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        resizable: true,
+        maximizable: true,
+        minimizable: true,
+        title,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            webSecurity: false, // Required for loading local files
+        },
+    })
+
+    const html = `<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8" />
+        <title>${title.replace(/</g, "&lt;")}</title>
+        <style>
+            html, body { 
+                margin: 0; 
+                padding: 0; 
+                height: 100%; 
+                overflow: hidden; 
+                background: #1e1e1e; 
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            }
+            #info { 
+                position: absolute; 
+                top: 10px; 
+                left: 10px; 
+                color: #ddd; 
+                font: 12px sans-serif; 
+                z-index: 100;
+                background: rgba(0,0,0,0.7);
+                padding: 8px 12px;
+                border-radius: 4px;
+            }
+            #container { 
+                width: 100%; 
+                height: 100%; 
+            }
+            #loading {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                color: #ddd;
+                font-size: 16px;
+                z-index: 50;
+            }
+            #error {
+                position: absolute;
+                bottom: 20px;
+                left: 20px;
+                right: 20px;
+                background: #d32f2f;
+                color: white;
+                padding: 12px;
+                border-radius: 4px;
+                display: none;
+                z-index: 100;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="info">🎯 Loading model... Use mouse to orbit, zoom, and pan</div>
+        <div id="loading">⏳ Loading 3D model...</div>
+        <div id="error"></div>
+        <div id="container"></div>
+        
+        <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+        </script>
+        
+        <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+        import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
+        import { TGALoader } from 'three/addons/loaders/TGALoader.js';
+
+        const container = document.getElementById('container');
+        const loading = document.getElementById('loading');
+        const info = document.getElementById('info');
+        const errorDiv = document.getElementById('error');
+        
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1e1e1e);
+        
+        const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(5, 5, 8);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        container.appendChild(renderer.domElement);
+        
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        
+        // Lighting - optimized for texture viewing
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        scene.add(ambientLight);
+        
+        const directionalLight1 = new THREE.DirectionalLight(0xffffff, 1.0);
+        directionalLight1.position.set(10, 10, 10);
+        directionalLight1.castShadow = true;
+        directionalLight1.shadow.mapSize.width = 2048;
+        directionalLight1.shadow.mapSize.height = 2048;
+        scene.add(directionalLight1);
+        
+        const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.6);
+        directionalLight2.position.set(-10, -10, -10);
+        scene.add(directionalLight2);
+        
+        // Add a fill light from the side
+        const sideLight = new THREE.DirectionalLight(0xffffff, 0.3);
+        sideLight.position.set(0, 5, -10);
+        scene.add(sideLight);
+        
+        // Grid
+        const grid = new THREE.GridHelper(20, 20, 0x555555, 0x333333);
+        scene.add(grid);
+        
+        // Model URLs
+        const objUrl = ${JSON.stringify(objUrl)};
+        const mtlUrl = ${JSON.stringify(mtlUrl)};
+        
+        console.log('Loading model with:');
+        console.log('  OBJ URL:', objUrl);
+        console.log('  MTL URL:', mtlUrl);
+        
+        function showError(message) {
+            console.error(message);
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            loading.style.display = 'none';
+        }
+        
+        function centerAndScale(object) {
+            const box = new THREE.Box3().setFromObject(object);
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+            
+            // Keep model at origin, just move camera
+            object.position.set(0, 0, 0);
+            
+            // Scale to fit in view
+            const maxDim = Math.max(size.x, size.y, size.z);
+            if (maxDim > 0) {
+                const scale = 6 / maxDim;
+                object.scale.setScalar(scale);
+            }
+            
+            // Update camera position based on object size
+            const distance = Math.max(8, maxDim * 1.5);
+            camera.position.set(distance * 0.7, distance * 0.7, distance);
+            controls.target.set(0, 0, 0); // Look at origin
+            controls.update();
+        }
+        
+        function loadModel() {
+            const objLoader = new OBJLoader();
+            
+            const onLoad = (object) => {
+                loading.style.display = 'none';
+                info.textContent = '🎯 Model loaded! Left-drag: orbit • Right-drag: pan • Wheel: zoom';
+                
+                // Apply materials and setup rendering
+                object.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        
+                        // If no material loaded, use a textured-looking default
+                        if (!child.material) {
+                            child.material = new THREE.MeshStandardMaterial({ 
+                                color: 0xcccccc,
+                                roughness: 0.7,
+                                metalness: 0.1,
+                                side: THREE.DoubleSide 
+                            });
+                        } else {
+                            // Ensure materials are double-sided for complex geometry
+                            if (Array.isArray(child.material)) {
+                                child.material.forEach(mat => {
+                                    mat.side = THREE.DoubleSide;
+                                    // Enable texture filtering for better quality
+                                    if (mat.map) {
+                                        mat.map.generateMipmaps = true;
+                                        mat.map.minFilter = THREE.LinearMipmapLinearFilter;
+                                        mat.map.magFilter = THREE.LinearFilter;
+                                    }
+                                });
+                            } else {
+                                child.material.side = THREE.DoubleSide;
+                                if (child.material.map) {
+                                    child.material.map.generateMipmaps = true;
+                                    child.material.map.minFilter = THREE.LinearMipmapLinearFilter;
+                                    child.material.map.magFilter = THREE.LinearFilter;
+                                }
+                            }
+                        }
+                        
+                        console.log('Mesh:', child.name, 'Material:', child.material);
+                    }
+                });
+                
+                // Model is already rotated in the OBJ file from VMF2OBJ conversion
+                // Just position at world origin
+                object.position.set(0, 0, 0);
+                
+                centerAndScale(object);
+                scene.add(object);
+            };
+            
+            const onError = (error) => {
+                showError('Failed to load OBJ model: ' + error.message);
+            };
+            
+            if (mtlUrl) {
+                // Load MTL first, then OBJ
+                const mtlLoader = new MTLLoader();
+                
+                // Set up TGA loader for Source engine textures
+                const tgaLoader = new TGALoader();
+                
+                // Configure MTL loader to handle TGA files
+                const originalLoad = THREE.TextureLoader.prototype.load;
+                THREE.TextureLoader.prototype.load = function(url, onLoad, onProgress, onError) {
+                    if (url.toLowerCase().endsWith('.tga')) {
+                        console.log('Loading TGA texture:', url);
+                        return tgaLoader.load(url, onLoad, onProgress, onError);
+                    } else {
+                        return originalLoad.call(this, url, onLoad, onProgress, onError);
+                    }
+                };
+                
+                // Set the resource path for textures - VMF2OBJ puts materials in /materials subfolder
+                // But the MTL file references them as "materials/models/..." so we need the base directory
+                const baseDir = mtlUrl.substring(0, mtlUrl.lastIndexOf('/') + 1);
+                
+                console.log('Setting MTL resource paths:');
+                console.log('  MTL URL:', mtlUrl);
+                console.log('  Base directory:', baseDir);
+                
+                // Set resource path to base directory so "materials/..." paths in MTL work correctly
+                mtlLoader.setResourcePath(baseDir);
+                mtlLoader.setPath('');
+                
+                mtlLoader.load(
+                    mtlUrl,
+                    (materials) => {
+                        console.log('MTL loaded successfully:', materials);
+                        materials.preload();
+                        
+                        // Debug: log material info
+                        Object.keys(materials.materials).forEach(key => {
+                            const mat = materials.materials[key];
+                            console.log('Material:', key, mat);
+                            if (mat.map) console.log('  - Diffuse texture:', mat.map.image?.src);
+                            if (mat.normalMap) console.log('  - Normal texture:', mat.normalMap.image?.src);
+                        });
+                        
+                        objLoader.setMaterials(materials);
+                        objLoader.load(objUrl, onLoad, undefined, onError);
+                    },
+                    (progress) => {
+                        console.log('MTL loading progress:', progress);
+                    },
+                    (error) => {
+                        console.warn('Failed to load MTL, loading OBJ without materials:', error);
+                        objLoader.load(objUrl, onLoad, undefined, onError);
+                    }
+                );
+            } else {
+                objLoader.load(objUrl, onLoad, undefined, onError);
+            }
+        }
+        
+        // Start loading
+        loadModel();
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+        
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        });
+        </script>
+    </body>
+    </html>`
+
+    previewWindow.loadURL(
+        `data:text/html;charset=UTF-8,${encodeURIComponent(html)}`,
+    )
     previewWindow.setMenuBarVisibility(false)
 }
 
@@ -298,6 +644,23 @@ function reg_events(mainWindow) {
                 return { success: true }
             } catch (error) {
                 console.error("Failed to show icon preview:", error)
+                throw error
+            }
+        },
+    )
+
+    // Register model preview handler
+    ipcMain.handle(
+        "show-model-preview",
+        async (event, { objPath, mtlPath, title }) => {
+            try {
+                if (!objPath || !fs.existsSync(objPath)) {
+                    throw new Error("OBJ file not found")
+                }
+                createModelPreviewWindow(objPath, mtlPath, title)
+                return { success: true }
+            } catch (error) {
+                console.error("Failed to show model preview:", error)
                 throw error
             }
         },
@@ -1615,6 +1978,158 @@ function reg_events(mainWindow) {
             return { success: true }
         } catch (error) {
             dialog.showErrorBox("Failed to Save Conditions", error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
+    // VMF2OBJ conversion handler
+    ipcMain.handle(
+        "convert-vmf-to-obj",
+        async (event, { vmfPath, outputDir }) => {
+            try {
+                const result = await convertVmfToObj(vmfPath, { outputDir })
+                return { success: true, ...result }
+            } catch (error) {
+                const details = [
+                    error.message,
+                    error.cmd ? `cmd: ${error.cmd}` : null,
+                    error.cwd ? `cwd: ${error.cwd}` : null,
+                ]
+                    .filter(Boolean)
+                    .join("\n")
+                dialog.showErrorBox("VMF to OBJ Conversion Failed", details)
+                return {
+                    success: false,
+                    error: error.message,
+                    cmd: error.cmd,
+                    cwd: error.cwd,
+                }
+            }
+        },
+    )
+
+    // VMF2OBJ conversion by instance key (resolves VMF path server-side)
+    ipcMain.handle(
+        "convert-instance-to-obj",
+        async (event, { itemId, instanceKey, options = {} }) => {
+            try {
+                const item = packages
+                    .flatMap((p) => p.items)
+                    .find((i) => i.id === itemId)
+                if (!item) throw new Error("Item not found")
+
+                const instance = item.instances?.[instanceKey]
+                if (!instance?.Name) throw new Error("Instance not found")
+
+                // Resolve clean on-disk path (removes BEE2 prefix, ensures instances/ prefix)
+                const vmfPath = Instance.getCleanPath(
+                    item.packagePath,
+                    instance.Name,
+                )
+
+                // Create temp directory for models in package root
+                const tempDir = path.join(item.packagePath, "temp_models")
+                if (!fs.existsSync(tempDir)) {
+                    fs.mkdirSync(tempDir, { recursive: true })
+                }
+
+                const result = await convertVmfToObj(vmfPath, {
+                    outputDir: tempDir,
+                    textureStyle: options.textureStyle || "cartoon",
+                })
+                // Compute output paths for convenience
+                const fileBase = path.basename(vmfPath, path.extname(vmfPath))
+                const objPath = path.join(tempDir, `${fileBase}.obj`)
+                const mtlPath = path.join(tempDir, `${fileBase}.mtl`)
+                return {
+                    success: true,
+                    vmfPath,
+                    tempDir,
+                    objPath,
+                    mtlPath,
+                    ...result,
+                }
+            } catch (error) {
+                const details = [
+                    error.message,
+                    error.cmd ? `cmd: ${error.cmd}` : null,
+                    error.cwd ? `cwd: ${error.cwd}` : null,
+                ]
+                    .filter(Boolean)
+                    .join("\n")
+                dialog.showErrorBox("VMF to OBJ Conversion Failed", details)
+                return {
+                    success: false,
+                    error: error.message,
+                    cmd: error.cmd,
+                    cwd: error.cwd,
+                }
+            }
+        },
+    )
+
+    // Allow configuring extra resource paths (folders or VPKs)
+    ipcMain.handle("set-extra-resource-paths", async (event, { paths }) => {
+        try {
+            setExtraResourcePaths(paths)
+            return { success: true }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+    ipcMain.handle("get-extra-resource-paths", async () => {
+        try {
+            const paths = getExtraResourcePaths()
+            return { success: true, paths }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+    ipcMain.handle("find-portal2-resources", async () => {
+        try {
+            const { findPortal2Resources } = require("./data")
+            const resources = await findPortal2Resources(console)
+            return { success: true, ...resources }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Get file stats (size, modified date, etc.)
+    ipcMain.handle("get-file-stats", async (event, { filePath }) => {
+        try {
+            if (!fs.existsSync(filePath)) {
+                return { success: false, error: "File not found" }
+            }
+            const stats = fs.statSync(filePath)
+            return {
+                success: true,
+                size: stats.size,
+                modified: stats.mtime,
+                created: stats.ctime,
+            }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Show file in file explorer
+    ipcMain.handle("show-item-in-folder", async (event, { filePath }) => {
+        try {
+            const { shell } = require("electron")
+            if (!fs.existsSync(filePath)) {
+                // If file doesn't exist, show the directory instead
+                const dir = path.dirname(filePath)
+                if (fs.existsSync(dir)) {
+                    shell.showItemInFolder(dir)
+                    return { success: true }
+                } else {
+                    return { success: false, error: "Directory not found" }
+                }
+            }
+            shell.showItemInFolder(filePath)
+            return { success: true }
+        } catch (error) {
             return { success: false, error: error.message }
         }
     })
