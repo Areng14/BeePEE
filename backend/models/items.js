@@ -41,10 +41,8 @@ class Item {
             meta: path.join(fullItemPath, "meta.json"),
         }
 
-        //If there is vbsp add it (now using .json instead of .cfg)
-        if (fs.existsSync(path.join(fullItemPath, "vbsp_config.json"))) {
-            this.paths.vbsp_config = path.join(fullItemPath, "vbsp_config.json")
-        }
+        // Always set vbsp_config path (now using .json instead of .cfg). Creation happens on save.
+        this.paths.vbsp_config = path.join(fullItemPath, "vbsp_config.json")
 
         //parse editoritems file
         if (!fs.existsSync(this.paths.editorItems)) {
@@ -1122,7 +1120,14 @@ class Item {
 
             // Convert blocks to VBSP format if needed
             let vbspData = conditions
-            if (conditions.blocks && Array.isArray(conditions.blocks)) {
+            if (conditions && conditions.blocks && Array.isArray(conditions.blocks)) {
+                // If there are no blocks, delete the vbsp_config.json if it exists and return success
+                if (conditions.blocks.length === 0) {
+                    if (fs.existsSync(this.paths.vbsp_config)) {
+                        fs.unlinkSync(this.paths.vbsp_config)
+                    }
+                    return true
+                }
                 // Convert blocks to VBSP format
                 vbspData = this.convertBlocksToVbsp(conditions.blocks)
             }
