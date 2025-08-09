@@ -1120,7 +1120,11 @@ class Item {
 
             // Convert blocks to VBSP format if needed
             let vbspData = conditions
-            if (conditions && conditions.blocks && Array.isArray(conditions.blocks)) {
+            if (
+                conditions &&
+                conditions.blocks &&
+                Array.isArray(conditions.blocks)
+            ) {
                 // If there are no blocks, delete the vbsp_config.json if it exists and return success
                 if (conditions.blocks.length === 0) {
                     if (fs.existsSync(this.paths.vbsp_config)) {

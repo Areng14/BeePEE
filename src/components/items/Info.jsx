@@ -11,8 +11,15 @@ import {
     InputLabel,
     Select,
     MenuItem,
+    CircularProgress,
 } from "@mui/material"
-import { Visibility, Edit, FolderOpen, Image } from "@mui/icons-material"
+import {
+    Visibility,
+    Edit,
+    FolderOpen,
+    Image,
+    Preview,
+} from "@mui/icons-material"
 import ReactMarkdown from "react-markdown"
 import { useState, useEffect } from "react"
 
@@ -20,6 +27,9 @@ function Info({ item, formData, onUpdate }) {
     const [iconSrc, setIconSrc] = useState(null)
     const [isPreview, setIsPreview] = useState(false)
     const [selectedInstanceKey, setSelectedInstanceKey] = useState("")
+    const [isConverting, setIsConverting] = useState(false)
+    const [textureStyle, setTextureStyle] = useState("cartoon")
+    const [useDevTools, setUseDevTools] = useState(false)
 
     useEffect(() => {
         // Load the icon when item changes or when staged icon changes
@@ -62,7 +72,9 @@ function Info({ item, formData, onUpdate }) {
         const packagePath = item.packagePath
 
         if (fullIconPath.startsWith(packagePath)) {
-            return fullIconPath.substring(packagePath.length).replace(/^[\\\/]/, "")
+            return fullIconPath
+                .substring(packagePath.length)
+                .replace(/^[\\\/]/, "")
         }
 
         return iconPath // fallback to full path if something goes wrong
@@ -86,7 +98,9 @@ function Info({ item, formData, onUpdate }) {
         ),
         // Better list styling
         ul: ({ children }) => (
-            <Box component="ul" sx={{ pl: 2, mb: 1, "&:last-child": { mb: 0 } }}>
+            <Box
+                component="ul"
+                sx={{ pl: 2, mb: 1, "&:last-child": { mb: 0 } }}>
                 {children}
             </Box>
         ),
@@ -107,19 +121,105 @@ function Info({ item, formData, onUpdate }) {
         ([, inst]) => !inst?._toRemove,
     )
 
+    // Get the expected OBJ file path for the current instance
+    const getObjPath = () => {
+        if (!selectedInstanceKey || !item?.packagePath) return null
+
+        const instanceData = formData.instances?.[selectedInstanceKey]
+        const instanceName = instanceData?.Name
+        if (!instanceName) return null
+
+        // VMF2OBJ outputs to temp_models/ with only the filename base (no subdirs)
+        const tempDir = `${item.packagePath}/temp_models`
+        const fileBase = instanceName
+            .split(/[\\\//]/)
+            .pop()
+            ?.replace(/\.vmf$/i, "")
+        if (!fileBase) return null
+        return `${tempDir}/${fileBase}.obj`
+    }
+
+    // Get the expected MTL file path for the current instance
+    const getMtlPath = () => {
+        const objPath = getObjPath()
+        if (!objPath) return null
+        return objPath.replace(/\.obj$/i, ".mtl")
+    }
+
+    // Get display name for the current instance
+    const getInstanceDisplayName = () => {
+        if (!selectedInstanceKey) return null
+
+        const instanceData = formData.instances?.[selectedInstanceKey]
+        const idx = instanceEntries.findIndex(
+            ([key]) => key === selectedInstanceKey,
+        )
+        return instanceData?.displayName || `Instance ${idx + 1}`
+    }
+
     const handleMakeModel = async () => {
-        if (!selectedInstanceKey) return
+        if (!selectedInstanceKey || isConverting) return
+
+        setIsConverting(true)
         try {
-            if (typeof window.package?.makeModelFromInstance === "function") {
-                await window.package.makeModelFromInstance(
-                    item.id,
-                    selectedInstanceKey,
-                )
+            // Compute the on-disk VMF path for the selected instance
+            const instanceData = formData.instances?.[selectedInstanceKey]
+            const instanceName = instanceData?.Name
+            if (!instanceName) return
+
+            // Ask backend to resolve the VMF path and convert
+            const result = await window.package.convertInstanceToObj(
+                item.id,
+                selectedInstanceKey,
+                { textureStyle, debug: useDevTools },
+            )
+            if (result?.success) {
+                console.log("VMF2OBJ conversion completed successfully")
+                // Could add a success notification here
             } else {
-                console.warn("makeModelFromInstance is not available on backend")
+                console.error("VMF2OBJ failed:", result?.error)
+                // Could add an error notification here
             }
         } catch (error) {
             console.error("Failed to make model:", error)
+            // Could add an error notification here
+        } finally {
+            setIsConverting(false)
+        }
+    }
+
+    const handlePreview = async () => {
+        if (!selectedInstanceKey) return
+
+        const objPath = getObjPath()
+        const mtlPath = getMtlPath()
+
+        if (!objPath) {
+            alert("No OBJ path found. Please generate the model first.")
+            return
+        }
+
+        // Check if the OBJ file exists
+        try {
+            const stats = await window.package?.getFileStats?.(objPath)
+            if (!stats) {
+                alert(
+                    'Model file not found. Please click "Make Model" first to generate the 3D model.',
+                )
+                return
+            }
+        } catch (e) {
+            alert(
+                'Model file not found. Please click "Make Model" first to generate the 3D model.',
+            )
+            return
+        }
+
+        const title = `${getInstanceDisplayName() || "Instance"} — ${item?.name || "Model"}`
+        try {
+            await window.package?.showModelPreview?.(objPath, mtlPath, title)
+        } catch (e) {
+            console.error("Failed to open model preview:", e)
         }
     }
 
@@ -131,8 +231,7 @@ function Info({ item, formData, onUpdate }) {
                     justifyContent: "space-between",
                     alignItems: "center",
                     mb: 2,
-                }}
-            >
+                }}>
                 <Typography variant="h6">Info</Typography>
             </Box>
 
@@ -169,10 +268,18 @@ function Info({ item, formData, onUpdate }) {
                                             const result =
                                                 await window.package.browseForIconFile()
                                             if (result.success) {
-                                                console.log("Icon staged successfully")
+                                                console.log(
+                                                    "Icon staged successfully",
+                                                )
                                                 // Stage the icon change
-                                                onUpdate("stagedIconPath", result.filePath)
-                                                onUpdate("stagedIconName", result.fileName)
+                                                onUpdate(
+                                                    "stagedIconPath",
+                                                    result.filePath,
+                                                )
+                                                onUpdate(
+                                                    "stagedIconName",
+                                                    result.fileName,
+                                                )
                                                 onUpdate(
                                                     "iconChanged",
                                                     true,
@@ -192,15 +299,15 @@ function Info({ item, formData, onUpdate }) {
                                         }
                                     }}
                                     title="Browse for Icon"
-                                    sx={{ mr: 0.5 }}
-                                >
+                                    sx={{ mr: 0.5 }}>
                                     <FolderOpen />
                                 </IconButton>
                                 <IconButton
                                     size="small"
                                     onClick={async () => {
                                         const iconToShow =
-                                            formData.stagedIconPath || item?.icon
+                                            formData.stagedIconPath ||
+                                            item?.icon
                                         if (iconToShow) {
                                             try {
                                                 await window.package.showIconPreview(
@@ -216,8 +323,9 @@ function Info({ item, formData, onUpdate }) {
                                         }
                                     }}
                                     title="View Icon"
-                                    disabled={!formData.stagedIconPath && !item?.icon}
-                                >
+                                    disabled={
+                                        !formData.stagedIconPath && !item?.icon
+                                    }>
                                     <Image />
                                 </IconButton>
                             </InputAdornment>
@@ -233,8 +341,7 @@ function Info({ item, formData, onUpdate }) {
                             alignItems: "center",
                             gap: 1,
                             mb: 1,
-                        }}
-                    >
+                        }}>
                         <Typography variant="body2" color="text.secondary">
                             Description
                         </Typography>
@@ -242,8 +349,7 @@ function Info({ item, formData, onUpdate }) {
                             size="small"
                             onClick={() => setIsPreview(!isPreview)}
                             sx={{ ml: "auto" }}
-                            title={isPreview ? "Edit" : "Preview"}
-                        >
+                            title={isPreview ? "Edit" : "Preview"}>
                             {isPreview ? <Edit /> : <Visibility />}
                         </IconButton>
                     </Box>
@@ -260,8 +366,7 @@ function Info({ item, formData, onUpdate }) {
                                 overflow: "auto",
                                 "& > *:first-of-type": { mt: 0 },
                                 "& > *:last-child": { mb: 0 },
-                            }}
-                        >
+                            }}>
                             <ReactMarkdown components={markdownComponents}>
                                 {processMarkdown(formData.description)}
                             </ReactMarkdown>
@@ -269,7 +374,9 @@ function Info({ item, formData, onUpdate }) {
                     ) : (
                         <TextField
                             value={formData.description}
-                            onChange={(e) => onUpdate("description", e.target.value)}
+                            onChange={(e) =>
+                                onUpdate("description", e.target.value)
+                            }
                             fullWidth
                             multiline
                             placeholder="Enter description...   Markdown formatting is supported"
@@ -293,14 +400,46 @@ function Info({ item, formData, onUpdate }) {
                         Instance Model
                     </Typography>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                        <FormControl size="small" sx={{ minWidth: 180 }}>
-                            <InputLabel id="instance-select-label">Instance</InputLabel>
+                        <FormControl size="small" sx={{ minWidth: 160 }}>
+                            <InputLabel id="texture-style-label">
+                                Textures
+                            </InputLabel>
+                            <Select
+                                labelId="texture-style-label"
+                                label="Textures"
+                                value={textureStyle}
+                                onChange={(e) =>
+                                    setTextureStyle(e.target.value)
+                                }>
+                                <MenuItem value="cartoon">Cartoonish</MenuItem>
+                                <MenuItem value="raw">Raw</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <FormControl size="small" sx={{ minWidth: 160 }}>
+                            <InputLabel id="dev-tools-label">Mode</InputLabel>
+                            <Select
+                                labelId="dev-tools-label"
+                                label="Mode"
+                                value={useDevTools ? "dev" : "normal"}
+                                onChange={(e) =>
+                                    setUseDevTools(e.target.value === "dev")
+                                }>
+                                <MenuItem value="normal">Normal</MenuItem>
+                                <MenuItem value="dev">Use Dev Tools</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <FormControl size="small" fullWidth>
+                            <InputLabel id="instance-select-label">
+                                Instance
+                            </InputLabel>
                             <Select
                                 labelId="instance-select-label"
                                 label="Instance"
                                 value={selectedInstanceKey}
-                                onChange={(e) => setSelectedInstanceKey(e.target.value)}
-                            >
+                                onChange={(e) =>
+                                    setSelectedInstanceKey(e.target.value)
+                                }
+                                fullWidth>
                                 {instanceEntries.length === 0 ? (
                                     <MenuItem value="" disabled>
                                         No instances
@@ -308,7 +447,9 @@ function Info({ item, formData, onUpdate }) {
                                 ) : (
                                     instanceEntries.map(([key, inst], idx) => {
                                         const displayName =
-                                            inst.displayName || inst.Name || `Instance ${idx}`
+                                            (inst.displayName ||
+                                                `Instance ${idx}`) +
+                                            (inst.Name ? ` — ${inst.Name}` : "")
                                         return (
                                             <MenuItem key={key} value={key}>
                                                 {displayName}
@@ -318,16 +459,30 @@ function Info({ item, formData, onUpdate }) {
                                 )}
                             </Select>
                         </FormControl>
+                    </Stack>
+                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                        <Button
+                            variant="outlined"
+                            onClick={handlePreview}
+                            disabled={!selectedInstanceKey}
+                            startIcon={<Preview />}
+                            sx={{ flexShrink: 0 }}>
+                            Preview
+                        </Button>
                         <Button
                             variant="contained"
                             onClick={handleMakeModel}
-                            disabled={
-                                !selectedInstanceKey ||
-                                typeof window.package?.makeModelFromInstance !==
-                                    "function"
-                            }
-                        >
-                            Make Model
+                            disabled={!selectedInstanceKey || isConverting}
+                            fullWidth
+                            startIcon={
+                                isConverting ? (
+                                    <CircularProgress
+                                        size={20}
+                                        color="inherit"
+                                    />
+                                ) : null
+                            }>
+                            {isConverting ? "Converting..." : "Make Model"}
                         </Button>
                     </Stack>
                 </Box>
@@ -337,5 +492,3 @@ function Info({ item, formData, onUpdate }) {
 }
 
 export default Info
-
-
