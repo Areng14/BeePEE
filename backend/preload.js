@@ -72,7 +72,11 @@ contextBridge.exposeInMainWorld("package", {
     getInstanceName: (itemId, instanceIndex) =>
         ipcRenderer.invoke("get-instance-name", { itemId, instanceIndex }),
     setInstanceName: (itemId, instanceIndex, name) =>
-        ipcRenderer.invoke("set-instance-name", { itemId, instanceIndex, name }),
+        ipcRenderer.invoke("set-instance-name", {
+            itemId,
+            instanceIndex,
+            name,
+        }),
     getInstanceNames: (itemId) =>
         ipcRenderer.invoke("get-instance-names", { itemId }),
     removeInstanceName: (itemId, instanceIndex) =>
@@ -117,6 +121,8 @@ contextBridge.exposeInMainWorld("package", {
     getConditions: (itemId) => ipcRenderer.invoke("get-conditions", { itemId }),
     saveConditions: (itemId, conditions) =>
         ipcRenderer.invoke("save-conditions", { itemId, conditions }),
+    convertBlocksToVbsp: (blocks) =>
+        ipcRenderer.invoke("convert-blocks-to-vbsp", { blocks }),
 
     // ========================================
     // ENTITY AND FGD DATA FUNCTIONS
@@ -145,7 +151,7 @@ contextBridge.exposeInMainWorld("package", {
     // PACKAGE MANAGEMENT FUNCTIONS
     // ========================================
     reloadPackage: () => ipcRenderer.invoke("reload-package"),
-    
+
     // ========================================
     // PACKAGE LOADING PROGRESS
     // ========================================

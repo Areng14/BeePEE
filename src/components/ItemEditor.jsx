@@ -48,80 +48,83 @@ function ItemEditor() {
     const [showSaveSuccess, setShowSaveSuccess] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [discardDialogOpen, setDiscardDialogOpen] = useState(false)
-    
+
     // Undo/Redo system
     const [undoStack, setUndoStack] = useState([])
     const [redoStack, setRedoStack] = useState([])
     const [isUndoRedoAction, setIsUndoRedoAction] = useState(false)
     const [editingNames, setEditingNames] = useState({})
-    
+
     // Create a snapshot of current form data for undo/redo
     const createSnapshot = (action, description) => {
         return {
             action,
             description,
             timestamp: Date.now(),
-            formData: JSON.parse(JSON.stringify(formData)) // Deep clone
+            formData: JSON.parse(JSON.stringify(formData)), // Deep clone
         }
     }
-    
+
     // Add action to undo stack
     const addToUndoStack = (action, description) => {
         if (isUndoRedoAction) return // Don't track undo/redo actions themselves
-        
+
         const snapshot = createSnapshot(action, description)
-        setUndoStack(prev => [...prev, snapshot].slice(-50)) // Keep last 50 actions
+        setUndoStack((prev) => [...prev, snapshot].slice(-50)) // Keep last 50 actions
         setRedoStack([]) // Clear redo stack when new action is performed
     }
-    
+
     // Undo function
     const performUndo = () => {
         if (undoStack.length === 0) return
-        
-        const currentSnapshot = createSnapshot('current', 'Current state')
+
+        const currentSnapshot = createSnapshot("current", "Current state")
         const previousSnapshot = undoStack[undoStack.length - 1]
-        
+
         setIsUndoRedoAction(true)
         setFormData(previousSnapshot.formData)
-        setUndoStack(prev => prev.slice(0, -1))
-        setRedoStack(prev => [...prev, currentSnapshot])
-        
+        setUndoStack((prev) => prev.slice(0, -1))
+        setRedoStack((prev) => [...prev, currentSnapshot])
+
         console.log(`Undid: ${previousSnapshot.description}`)
         setTimeout(() => setIsUndoRedoAction(false), 100)
     }
-    
+
     // Redo function
     const performRedo = () => {
         if (redoStack.length === 0) return
-        
-        const currentSnapshot = createSnapshot('current', 'Current state')
+
+        const currentSnapshot = createSnapshot("current", "Current state")
         const nextSnapshot = redoStack[redoStack.length - 1]
-        
+
         setIsUndoRedoAction(true)
         setFormData(nextSnapshot.formData)
-        setRedoStack(prev => prev.slice(0, -1))
-        setUndoStack(prev => [...prev, currentSnapshot])
-        
+        setRedoStack((prev) => prev.slice(0, -1))
+        setUndoStack((prev) => [...prev, currentSnapshot])
+
         console.log(`Redid: ${nextSnapshot.description}`)
         setTimeout(() => setIsUndoRedoAction(false), 100)
     }
-    
+
     // Keyboard shortcuts for undo/redo
     useEffect(() => {
         const handleKeyDown = (event) => {
             if (event.ctrlKey || event.metaKey) {
-                if (event.key === 'z' && !event.shiftKey) {
+                if (event.key === "z" && !event.shiftKey) {
                     event.preventDefault()
                     performUndo()
-                } else if ((event.key === 'y') || (event.key === 'z' && event.shiftKey)) {
+                } else if (
+                    event.key === "y" ||
+                    (event.key === "z" && event.shiftKey)
+                ) {
                     event.preventDefault()
                     performRedo()
                 }
             }
         }
-        
-        document.addEventListener('keydown', handleKeyDown)
-        return () => document.removeEventListener('keydown', handleKeyDown)
+
+        document.addEventListener("keydown", handleKeyDown)
+        return () => document.removeEventListener("keydown", handleKeyDown)
     }, [undoStack, redoStack])
 
     // Form state for all tabs
@@ -180,7 +183,12 @@ function ItemEditor() {
             // Load inputs, outputs, variables, and conditions
             const loadData = async () => {
                 try {
-                    const [inputResult, outputResult, variablesResult, conditionsResult] = await Promise.all([
+                    const [
+                        inputResult,
+                        outputResult,
+                        variablesResult,
+                        conditionsResult,
+                    ] = await Promise.all([
                         window.package.getInputs(item.id),
                         window.package.getOutputs(item.id),
                         window.package.getVariables(item.id),
@@ -200,8 +208,12 @@ function ItemEditor() {
                         instances: prev._modified.instances
                             ? prev.instances
                             : item.instances || {},
-                        variables: variablesResult.success ? variablesResult.variables : {},
-                        conditions: conditionsResult.success ? conditionsResult.conditions : {},
+                        variables: variablesResult.success
+                            ? variablesResult.variables
+                            : {},
+                        conditions: conditionsResult.success
+                            ? conditionsResult.conditions
+                            : {},
                         other: item.other || {},
                         _modified: {
                             basicInfo: false,
@@ -271,7 +283,7 @@ function ItemEditor() {
     const updateFormData = (field, value, section = "basicInfo") => {
         // Add to undo stack before making changes
         addToUndoStack(section, `Change ${field}`)
-        
+
         setFormData((prev) => {
             const newData = {
                 ...prev,
@@ -297,8 +309,8 @@ function ItemEditor() {
     // Specialized update functions for different sections
     const updateInputsData = (inputs) => {
         // Add to undo stack before making changes
-        addToUndoStack('inputs', 'Update inputs')
-        
+        addToUndoStack("inputs", "Update inputs")
+
         setFormData((prev) => ({
             ...prev,
             inputs,
@@ -312,8 +324,8 @@ function ItemEditor() {
 
     const updateOutputsData = (outputs) => {
         // Add to undo stack before making changes
-        addToUndoStack('outputs', 'Update outputs')
-        
+        addToUndoStack("outputs", "Update outputs")
+
         setFormData((prev) => ({
             ...prev,
             outputs,
@@ -327,8 +339,8 @@ function ItemEditor() {
 
     const updateInstancesData = (instances) => {
         // Add to undo stack before making changes
-        addToUndoStack('instances', 'Update instances')
-        
+        addToUndoStack("instances", "Update instances")
+
         setFormData((prev) => ({
             ...prev,
             instances,
@@ -342,8 +354,8 @@ function ItemEditor() {
 
     const updateVariablesData = (variables) => {
         // Add to undo stack before making changes
-        addToUndoStack('variables', 'Update Variables')
-        
+        addToUndoStack("variables", "Update Variables")
+
         setFormData((prev) => ({
             ...prev,
             variables,
@@ -357,8 +369,8 @@ function ItemEditor() {
 
     const updateConditionsData = (blocks) => {
         // Add to undo stack before making changes
-        addToUndoStack('conditions', 'Update Conditions')
-        
+        addToUndoStack("conditions", "Update Conditions")
+
         setFormData((prev) => ({
             ...prev,
             blocks, // Store as blocks format
@@ -381,8 +393,8 @@ function ItemEditor() {
 
     const updateOtherData = (other) => {
         // Add to undo stack before making changes
-        addToUndoStack('other', 'Update other data')
-        
+        addToUndoStack("other", "Update other data")
+
         setFormData((prev) => ({
             ...prev,
             other,
@@ -579,19 +591,28 @@ function ItemEditor() {
             // Save instance names if any are being edited
             if (Object.keys(editingNames).length > 0) {
                 try {
-                    for (const [instanceIndex, newName] of Object.entries(editingNames)) {
+                    for (const [instanceIndex, newName] of Object.entries(
+                        editingNames,
+                    )) {
                         const trimmedName = newName.trim()
                         const defaultName = `Instance ${parseInt(instanceIndex) + 1}`
-                        
+
                         if (trimmedName === defaultName || trimmedName === "") {
                             // Remove custom name
-                            await window.package.removeInstanceName(item.id, parseInt(instanceIndex))
+                            await window.package.removeInstanceName(
+                                item.id,
+                                parseInt(instanceIndex),
+                            )
                         } else {
                             // Set custom name
-                            await window.package.setInstanceName(item.id, parseInt(instanceIndex), trimmedName)
+                            await window.package.setInstanceName(
+                                item.id,
+                                parseInt(instanceIndex),
+                                trimmedName,
+                            )
                         }
                     }
-                    
+
                     // Clear editing names after saving
                     setEditingNames({})
                 } catch (error) {
@@ -604,7 +625,10 @@ function ItemEditor() {
             // Save Variables data if modified
             if (formData._modified.variables) {
                 try {
-                    await window.package.saveVariables?.(item.id, formData.variables)
+                    await window.package.saveVariables?.(
+                        item.id,
+                        formData.variables,
+                    )
                 } catch (error) {
                     console.error("Failed to save Variables data:", error)
                     hasErrors = true
@@ -615,8 +639,10 @@ function ItemEditor() {
             // Save Conditions data if modified
             if (formData._modified.conditions) {
                 try {
-                    // Save blocks format - the backend will handle conversion if needed
-                    await window.package.saveConditions?.(item.id, { blocks: formData.blocks })
+                    // Save blocks format - the backend will handle conversion and logging
+                    await window.package.saveConditions?.(item.id, {
+                        blocks: formData.blocks,
+                    })
                 } catch (error) {
                     console.error("Failed to save Conditions data:", error)
                     hasErrors = true
@@ -898,7 +924,8 @@ function ItemEditor() {
             <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
                 <Stack direction="row" spacing={1}>
                     {/* Undo/Redo Buttons */}
-                    <Tooltip title={`Undo (Ctrl+Z)${undoStack.length > 0 ? ` - ${undoStack[undoStack.length - 1]?.description}` : ' - No actions to undo'}`}>
+                    <Tooltip
+                        title={`Undo (Ctrl+Z)${undoStack.length > 0 ? ` - ${undoStack[undoStack.length - 1]?.description}` : " - No actions to undo"}`}>
                         <span>
                             <IconButton
                                 onClick={performUndo}
@@ -908,7 +935,8 @@ function ItemEditor() {
                             </IconButton>
                         </span>
                     </Tooltip>
-                    <Tooltip title={`Redo (Ctrl+Y)${redoStack.length > 0 ? ` - ${redoStack[redoStack.length - 1]?.description}` : ' - No actions to redo'}`}>
+                    <Tooltip
+                        title={`Redo (Ctrl+Y)${redoStack.length > 0 ? ` - ${redoStack[redoStack.length - 1]?.description}` : " - No actions to redo"}`}>
                         <span>
                             <IconButton
                                 onClick={performRedo}
@@ -918,7 +946,7 @@ function ItemEditor() {
                             </IconButton>
                         </span>
                     </Tooltip>
-                                            <Tooltip
+                    <Tooltip
                         title={(() => {
                             const modifiedSections = Object.entries(
                                 formData._modified,
@@ -975,7 +1003,9 @@ function ItemEditor() {
                             disabled={
                                 (!Object.values(formData._modified).some(
                                     (modified) => modified,
-                                ) && Object.keys(editingNames).length === 0) || isSaving
+                                ) &&
+                                    Object.keys(editingNames).length === 0) ||
+                                isSaving
                             }
                             sx={{ flex: 1 }}>
                             {isSaving
