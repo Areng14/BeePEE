@@ -34,16 +34,21 @@ function ItemBrowser() {
                 updatedItem?.id,
                 updatedItem?.icon,
             )
-            
+
             if (!updatedItem || !updatedItem.id) {
                 console.warn("Received invalid item update:", updatedItem)
                 return
             }
-            
+
             setItems((currentItems) => {
-                const itemIndex = currentItems.findIndex(item => item.id === updatedItem.id)
+                const itemIndex = currentItems.findIndex(
+                    (item) => item.id === updatedItem.id,
+                )
                 if (itemIndex === -1) {
-                    console.log("Item not found in current list, adding:", updatedItem.id)
+                    console.log(
+                        "Item not found in current list, adding:",
+                        updatedItem.id,
+                    )
                     return [...currentItems, updatedItem]
                 } else {
                     console.log("Updating existing item:", updatedItem.id)

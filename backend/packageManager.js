@@ -72,6 +72,46 @@ function isVdfFile(filePath) {
     }
 }
 
+// Helper function to add UUIDs to VBSP blocks that can have duplicates
+function addUuidsToVbspConditions(data) {
+    const generateUuid = () =>
+        `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+
+    function processObject(obj) {
+        if (typeof obj !== "object" || obj === null) {
+            return obj
+        }
+
+        const newObj = {}
+        for (const [key, value] of Object.entries(obj)) {
+            let newKey = key
+            let newValue = value
+
+            // Add UUID to blocks that can have multiple instances
+            if (
+                (key === "Switch" ||
+                    key === "Condition" ||
+                    key === "MapInstVar") &&
+                typeof value === "object"
+            ) {
+                newKey = `${key}_${generateUuid()}`
+                newValue =
+                    typeof value === "object" ? processObject(value) : value
+            } else {
+                // Recursively process nested objects
+                newValue =
+                    typeof value === "object" ? processObject(value) : value
+            }
+
+            newObj[newKey] = newValue
+        }
+
+        return newObj
+    }
+
+    return processObject(data)
+}
+
 // Helper function to convert VDF to JSON
 function convertVdfToJson(filePath) {
     try {
@@ -86,7 +126,14 @@ function convertVdfToJson(filePath) {
             })
         })
 
-        return vdf.parse(fixedLines.join("\n"))
+        const parsedData = vdf.parse(fixedLines.join("\n"))
+
+        // Add UUIDs to VBSP condition keys if this is a vbsp_config file
+        if (filePath.includes("vbsp_config")) {
+            return addUuidsToVbspConditions(parsedData)
+        }
+
+        return parsedData
     } catch (error) {
         // Extract item name from file path for better error reporting
         const fileName = path.basename(filePath, ".txt")
@@ -109,28 +156,42 @@ function processVdfFiles(directory) {
         if (stat.isDirectory()) {
             // Recursively process subdirectories
             processVdfFiles(fullPath)
-        } else if (file.endsWith(".txt")) {
-            // Only process files that are actually VDF files
-            if (isVdfFile(fullPath)) {
-                try {
-                    // Convert VDF to JSON
-                    const jsonData = convertVdfToJson(fullPath)
+        } else if (
+            file === "info.txt" ||
+            file === "editoritems.txt" ||
+            file === "properties.txt"
+        ) {
+            // Always convert these specific files to JSON
+            try {
+                // Convert VDF to JSON
+                const jsonData = convertVdfToJson(fullPath)
 
-                    // Save as JSON file (same name but .json extension)
-                    const jsonPath = fullPath.replace(/\.txt$/i, ".json")
-                    fs.writeFileSync(
-                        jsonPath,
-                        JSON.stringify(jsonData, null, 4),
-                    )
+                // Save as JSON file (same name but .json extension)
+                const jsonPath = fullPath.replace(/\.txt$/i, ".json")
+                fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 4))
 
-                    // Delete the original .txt file
-                    fs.unlinkSync(fullPath)
-                } catch (error) {
-                    // The error already contains the file context from convertVdfToJson
-                    throw error
-                }
+                // Delete the original .txt file
+                fs.unlinkSync(fullPath)
+            } catch (error) {
+                // The error already contains the file context from convertVdfToJson
+                throw error
             }
-            // Skip non-VDF .txt files (like README.txt)
+        } else if (file === "vbsp_config.cfg") {
+            // Convert vbsp_config.cfg to JSON
+            try {
+                // Convert VDF to JSON
+                const jsonData = convertVdfToJson(fullPath)
+
+                // Save as JSON file (same name but .json extension)
+                const jsonPath = fullPath.replace(/\.cfg$/i, ".json")
+                fs.writeFileSync(jsonPath, JSON.stringify(jsonData, null, 4))
+
+                // Delete the original .cfg file
+                fs.unlinkSync(fullPath)
+            } catch (error) {
+                // The error already contains the file context from convertVdfToJson
+                throw error
+            }
         } else if (file.endsWith(".vmx")) {
             // Delete .vmx files (not needed)
             fs.unlinkSync(fullPath)

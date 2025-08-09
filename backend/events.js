@@ -1,4 +1,8 @@
-const { reg_loadPackagePopup, packages, loadPackage } = require("./packageManager")
+const {
+    reg_loadPackagePopup,
+    packages,
+    loadPackage,
+} = require("./packageManager")
 const {
     createItemEditor,
     sendItemUpdateToEditor,
@@ -140,20 +144,28 @@ async function handleItemSave(item, event, mainWindow) {
         // Find the current item instance in memory to get the most up-to-date data
         const packagePath =
             item.packagePath || path.dirname(path.dirname(item.fullItemPath))
-        
+
         // Try to find the existing item instance first
         let updatedItemInstance = packages
             .flatMap((p) => p.items)
             .find((i) => i.id === item.id)
-        
+
         if (updatedItemInstance) {
             // Reload the item's data from disk to get the latest changes
             updatedItemInstance.reloadInstances()
-            
+
             // Update the icon path if it was changed during save
             if (item.iconData && item.iconData.stagedIconPath) {
-                const bee2ItemsPath = path.join(packagePath, "resources", "BEE2", "items")
-                const relativePath = path.relative(bee2ItemsPath, item.iconData.stagedIconPath)
+                const bee2ItemsPath = path.join(
+                    packagePath,
+                    "resources",
+                    "BEE2",
+                    "items",
+                )
+                const relativePath = path.relative(
+                    bee2ItemsPath,
+                    item.iconData.stagedIconPath,
+                )
                 updatedItemInstance.icon = item.iconData.stagedIconPath
             }
         } else {
@@ -172,7 +184,7 @@ async function handleItemSave(item, event, mainWindow) {
             }
             updatedItemInstance = new Item({ packagePath, itemJSON })
         }
-        
+
         const updatedItem = updatedItemInstance.toJSONWithExistence()
 
         // Debug logging
@@ -240,28 +252,30 @@ function reg_events(mainWindow) {
     ipcMain.handle("reload-package", async (event) => {
         try {
             console.log("Reloading current package...")
-            
+
             // Get the current package path from the first loaded package
             if (packages.length === 0) {
                 throw new Error("No package currently loaded")
             }
-            
+
             const currentPackage = packages[0]
             const packagePath = currentPackage.packageDir
-            
+
             console.log("Reloading package at:", packagePath)
-            
+
             // Clear current packages
             packages.length = 0
-            
+
             // Reload the package
             const reloadedPackage = await loadPackage(packagePath)
             packages.push(reloadedPackage)
-            
+
             // Send updated items to main window
-            const updatedItems = reloadedPackage.items.map(item => item.toJSONWithExistence())
+            const updatedItems = reloadedPackage.items.map((item) =>
+                item.toJSONWithExistence(),
+            )
             mainWindow.webContents.send("package-loaded", updatedItems)
-            
+
             console.log("Package reloaded successfully")
             return { success: true, itemCount: updatedItems.length }
         } catch (error) {
@@ -1446,10 +1460,10 @@ function reg_events(mainWindow) {
                 // Send updated item data to both windows
                 const updatedItem = item.toJSONWithExistence()
                 event.sender.send("item-updated", updatedItem)
-                
+
                 // Find main window and send update
-                const mainWindow = BrowserWindow.getAllWindows().find(
-                    (w) => w.getTitle().includes("BeePEE")
+                const mainWindow = BrowserWindow.getAllWindows().find((w) =>
+                    w.getTitle().includes("BeePEE"),
                 )
                 if (mainWindow) {
                     mainWindow.webContents.send("item-updated", updatedItem)
@@ -1463,26 +1477,23 @@ function reg_events(mainWindow) {
         },
     )
 
-    ipcMain.handle(
-        "get-instance-names",
-        async (event, { itemId }) => {
-            try {
-                const item = packages
-                    .flatMap((p) => p.items)
-                    .find((i) => i.id === itemId)
+    ipcMain.handle("get-instance-names", async (event, { itemId }) => {
+        try {
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
 
-                if (!item) {
-                    throw new Error(`Item ${itemId} not found`)
-                }
-
-                const names = item.getInstanceNames()
-                return { success: true, names }
-            } catch (error) {
-                console.error("Error getting instance names:", error)
-                return { success: false, error: error.message }
+            if (!item) {
+                throw new Error(`Item ${itemId} not found`)
             }
-        },
-    )
+
+            const names = item.getInstanceNames()
+            return { success: true, names }
+        } catch (error) {
+            console.error("Error getting instance names:", error)
+            return { success: false, error: error.message }
+        }
+    })
 
     ipcMain.handle(
         "remove-instance-name",
@@ -1501,10 +1512,10 @@ function reg_events(mainWindow) {
                 // Send updated item data to both windows
                 const updatedItem = item.toJSONWithExistence()
                 event.sender.send("item-updated", updatedItem)
-                
+
                 // Find main window and send update
-                const mainWindow = BrowserWindow.getAllWindows().find(
-                    (w) => w.getTitle().includes("BeePEE")
+                const mainWindow = BrowserWindow.getAllWindows().find((w) =>
+                    w.getTitle().includes("BeePEE"),
                 )
                 if (mainWindow) {
                     mainWindow.webContents.send("item-updated", updatedItem)
@@ -1577,10 +1588,404 @@ function reg_events(mainWindow) {
                 .find((i) => i.id === itemId)
             if (!item) throw new Error("Item not found")
 
-            item.saveConditions(conditions)
+            // Print blocks to main console on save (JSON only)
+            if (conditions?.blocks) {
+                console.log(JSON.stringify(conditions.blocks, null, 2))
+            }
+
+            // Convert blocks to VBSP format and save
+            const success = item.saveConditions(conditions)
+            if (!success) {
+                throw new Error("Failed to save conditions to VBSP config")
+            }
+
+            // Print resulting VBSP JSON to main console
+            try {
+                const vbsp = item.getConditions()
+                console.log(JSON.stringify(vbsp, null, 2))
+            } catch (e) {
+                // ignore
+            }
+
+            // Send updated item data to frontend
+            const updatedItem = item.toJSONWithExistence()
+            mainWindow.webContents.send("item-updated", updatedItem)
+            sendItemUpdateToEditor(itemId, updatedItem)
+
             return { success: true }
         } catch (error) {
             dialog.showErrorBox("Failed to Save Conditions", error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
+    // VBSP conversion handler
+    ipcMain.handle("convert-blocks-to-vbsp", async (event, { blocks }) => {
+        try {
+            // Print blocks JSON only (for conversion calls too)
+            if (blocks) {
+                console.log(JSON.stringify(blocks, null, 2))
+            }
+
+            // Create a temporary item instance to use the conversion method
+            const tempItem = {
+                convertBlocksToVbsp: function (blockList) {
+                    const vbspConditions = {
+                        Conditions: {},
+                    }
+
+                    // Helper function to convert boolean values
+                    function convertBooleanValue(value, variableName = "") {
+                        // If value is explicitly provided, convert it
+                        if (
+                            value !== undefined &&
+                            value !== null &&
+                            value !== ""
+                        ) {
+                            if (value === true || value === "true") return "1"
+                            if (value === false || value === "false") return "0"
+                            return value.toString()
+                        }
+
+                        // If no value provided, check if it's a boolean variable and provide default
+                        if (variableName) {
+                            // Remove $ prefix if present for comparison
+                            const cleanVariableName = variableName.replace(
+                                /^\$/,
+                                "",
+                            )
+
+                            // Check if the variable name suggests it's a boolean variable
+                            const booleanVariables = [
+                                "StartEnabled",
+                                "StartActive",
+                                "StartDeployed",
+                                "StartOpen",
+                                "StartLocked",
+                                "StartReversed",
+                                "AutoDrop",
+                                "AutoRespawn",
+                            ]
+                            if (
+                                booleanVariables.some((v) =>
+                                    cleanVariableName.includes(v),
+                                )
+                            ) {
+                                // For boolean variables, default to '1' (true)
+                                return "1"
+                            }
+                        }
+
+                        // For other cases, return '1' as a sensible default
+                        return "1"
+                    }
+
+                    // Convert a single block to VBSP format
+                    function convertBlockToVbsp(block) {
+                        // Helper function to process child blocks
+                        function processChildBlocks(
+                            childBlocks,
+                            containerName,
+                        ) {
+                            if (!childBlocks || childBlocks.length === 0)
+                                return {}
+
+                            const result = {}
+
+                            function addMulti(obj, key, value) {
+                                if (obj[key] === undefined) {
+                                    obj[key] = value
+                                } else if (Array.isArray(obj[key])) {
+                                    obj[key].push(value)
+                                } else {
+                                    obj[key] = [obj[key], value]
+                                }
+                            }
+
+                            childBlocks.forEach((childBlock) => {
+                                const childVbsp = convertBlockToVbsp(childBlock)
+
+                                if (
+                                    childBlock.type === "if" ||
+                                    childBlock.type === "ifElse"
+                                ) {
+                                    addMulti(result, "Condition", childVbsp)
+                                    return
+                                }
+                                if (
+                                    childBlock.type === "switchCase" ||
+                                    childBlock.type === "switchGlobal"
+                                ) {
+                                    const inner =
+                                        childVbsp.Switch ||
+                                        childVbsp.switch ||
+                                        childVbsp
+                                    addMulti(result, "Switch", inner)
+                                    return
+                                }
+
+                                Object.assign(result, childVbsp)
+                            })
+                            return result
+                        }
+
+                        switch (block.type) {
+                            case "if":
+                                const ifValue = convertBooleanValue(
+                                    block.value,
+                                    block.variable,
+                                )
+                                const ifOperator = block.operator || "=="
+                                const ifResult = {
+                                    instVar: `${block.variable || ""} ${ifOperator} ${ifValue}`,
+                                }
+
+                                if (
+                                    block.thenBlocks &&
+                                    block.thenBlocks.length > 0
+                                ) {
+                                    const thenResult = processChildBlocks(
+                                        block.thenBlocks,
+                                        "thenBlocks",
+                                    )
+                                    ifResult.Result = thenResult
+                                }
+
+                                return ifResult
+
+                            case "ifElse":
+                                const ifElseValue = convertBooleanValue(
+                                    block.value,
+                                    block.variable,
+                                )
+                                const ifElseOperator = block.operator || "=="
+                                const ifElseResult = {
+                                    instVar: `${block.variable || ""} ${ifElseOperator} ${ifElseValue}`,
+                                }
+
+                                if (
+                                    block.thenBlocks &&
+                                    block.thenBlocks.length > 0
+                                ) {
+                                    const thenResult = processChildBlocks(
+                                        block.thenBlocks,
+                                        "thenBlocks",
+                                    )
+                                    ifElseResult.Result = thenResult
+                                }
+
+                                if (
+                                    block.elseBlocks &&
+                                    block.elseBlocks.length > 0
+                                ) {
+                                    const elseResult = processChildBlocks(
+                                        block.elseBlocks,
+                                        "elseBlocks",
+                                    )
+                                    ifElseResult.Else = elseResult
+                                }
+
+                                return ifElseResult
+
+                            case "ifHas":
+                                const ifHasResult = {
+                                    styleVar: block.value || "",
+                                }
+
+                                if (
+                                    block.thenBlocks &&
+                                    block.thenBlocks.length > 0
+                                ) {
+                                    const thenResult = processChildBlocks(
+                                        block.thenBlocks,
+                                        "thenBlocks",
+                                    )
+                                    ifHasResult.Result = thenResult
+                                }
+
+                                return ifHasResult
+
+                            case "ifHasElse":
+                                const ifHasElseResult = {
+                                    styleVar: block.value || "",
+                                }
+
+                                if (
+                                    block.thenBlocks &&
+                                    block.thenBlocks.length > 0
+                                ) {
+                                    const thenResult = processChildBlocks(
+                                        block.thenBlocks,
+                                        "thenBlocks",
+                                    )
+                                    ifHasElseResult.Result = thenResult
+                                }
+
+                                if (
+                                    block.elseBlocks &&
+                                    block.elseBlocks.length > 0
+                                ) {
+                                    const elseResult = processChildBlocks(
+                                        block.elseBlocks,
+                                        "elseBlocks",
+                                    )
+                                    ifHasElseResult.Else = elseResult
+                                }
+
+                                return ifHasElseResult
+
+                            case "switchCase": {
+                                const variable = block.variable || ""
+                                const variableWithDollar = variable.startsWith(
+                                    "$",
+                                )
+                                    ? variable
+                                    : variable
+                                      ? `$${variable}`
+                                      : ""
+                                const switchObj = {
+                                    Switch: {
+                                        method: block.method || "first",
+                                        test: "instvar",
+                                    },
+                                }
+
+                                if (Array.isArray(block.cases)) {
+                                    for (const caseBlock of block.cases) {
+                                        const arg =
+                                            caseBlock &&
+                                            caseBlock.value !== undefined &&
+                                            caseBlock.value !== null &&
+                                            caseBlock.value !== ""
+                                                ? `${variableWithDollar} ${convertBooleanValue(caseBlock.value, variableWithDollar)}`
+                                                : "<default>"
+                                        const caseResults = processChildBlocks(
+                                            caseBlock?.thenBlocks || [],
+                                            "thenBlocks",
+                                        )
+                                        switchObj.Switch[arg] = caseResults
+                                    }
+                                }
+                                return switchObj
+                            }
+                            case "switchGlobal": {
+                                const testName = block.test || "styleVar"
+                                const switchObj = {
+                                    Switch: {
+                                        method: block.method || "first",
+                                        test: testName,
+                                    },
+                                }
+
+                                if (Array.isArray(block.cases)) {
+                                    for (const caseBlock of block.cases) {
+                                        const arg =
+                                            caseBlock &&
+                                            caseBlock.value !== undefined &&
+                                            caseBlock.value !== null &&
+                                            caseBlock.value !== ""
+                                                ? `${caseBlock.value}`
+                                                : "<default>"
+                                        const caseResults = processChildBlocks(
+                                            caseBlock?.thenBlocks || [],
+                                            "thenBlocks",
+                                        )
+                                        switchObj.Switch[arg] = caseResults
+                                    }
+                                }
+                                return switchObj
+                            }
+
+                            case "case":
+                                const caseResult = {}
+
+                                if (
+                                    block.thenBlocks &&
+                                    block.thenBlocks.length > 0
+                                ) {
+                                    const thenResult = processChildBlocks(
+                                        block.thenBlocks,
+                                        "thenBlocks",
+                                    )
+                                    Object.assign(caseResult, thenResult)
+                                }
+
+                                return caseResult
+
+                            case "changeInstance":
+                                return {
+                                    changeInstance: block.instanceName || "",
+                                }
+
+                            case "addOverlay":
+                                return {
+                                    addOverlay: block.overlayName || "",
+                                }
+
+                            case "addGlobalEnt":
+                                return {
+                                    addGlobalEnt: block.instanceName || "",
+                                }
+
+                            case "offsetInstance":
+                                return {
+                                    offsetInstance: `${block.instanceName || ""} ${block.offset || "0 0 0"}`,
+                                }
+
+                            case "mapInstVar":
+                                const mapResult = {}
+                                if (
+                                    block.sourceVariable &&
+                                    block.targetVariable
+                                ) {
+                                    mapResult.setInstVar = `${block.targetVariable} ${block.sourceVariable}`
+                                }
+                                if (
+                                    block.mappings &&
+                                    Object.keys(block.mappings).length > 0
+                                ) {
+                                    Object.assign(mapResult, block.mappings)
+                                }
+                                return mapResult
+
+                            case "debug":
+                                return {
+                                    debug: block.message || "",
+                                }
+
+                            default:
+                                return {
+                                    unknown: {
+                                        type: block.type,
+                                        data: block,
+                                    },
+                                }
+                        }
+                    }
+
+                    // Process each top-level block and create Condition objects
+                    const conditions = []
+                    blockList.forEach((block, index) => {
+                        const vbspBlock = convertBlockToVbsp(block)
+                        conditions.push(vbspBlock)
+                    })
+
+                    // If there's only one condition, use a single object
+                    // If there are multiple conditions, use an array
+                    if (conditions.length === 1) {
+                        vbspConditions.Conditions.Condition = conditions[0]
+                    } else if (conditions.length > 1) {
+                        vbspConditions.Conditions.Condition = conditions
+                    }
+
+                    return vbspConditions
+                },
+            }
+
+            const vbspConfig = tempItem.convertBlocksToVbsp(blocks)
+            return { success: true, vbspConfig }
+        } catch (error) {
+            console.error("Failed to convert blocks to VBSP:", error)
             return { success: false, error: error.message }
         }
     })
