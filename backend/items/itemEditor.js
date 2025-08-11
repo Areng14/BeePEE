@@ -13,13 +13,19 @@ function createItemEditor(item, mainWindow) {
     const window = new BrowserWindow({
         width: 960,
         height: 1024,
-        parent: mainWindow,
+        title: `BeePEE - Edit ${item.name}`,
+        // Remove parent to ensure separate taskbar entry
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, "..", "preload.js"),
         },
         devTools: isDev,
+        // Ensure window shows in taskbar independently
+        skipTaskbar: false,
+        minimizable: true,
+        maximizable: true,
+        resizable: true,
     })
 
     openEditors.set(item.id, window)
@@ -31,7 +37,7 @@ function createItemEditor(item, mainWindow) {
     if (isDev) {
         window.loadURL(`http://localhost:5173/editor`)
     } else {
-        window.loadFile(path.join(__dirname, "../dist/index.html"))
+        window.loadFile(path.join(__dirname, "../dist/index.html"), { query: { route: "editor" } })
     }
 
     window.setMenuBarVisibility(false)

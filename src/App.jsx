@@ -7,6 +7,10 @@ import { ItemProvider } from "./contexts/ItemContext"
 import "./global.css"
 
 function App() {
+    // Check if this window should show the editor (for production builds)
+    const urlParams = new URLSearchParams(window.location.search)
+    const routeParam = urlParams.get('route')
+    const showEditor = routeParam === 'editor'
     const [loadingState, setLoadingState] = useState({
         open: false,
         progress: 0,
@@ -41,25 +45,48 @@ function App() {
 
     return (
         <ItemProvider>
-            <BrowserRouter>
-                <Routes>
-                    <Route path="/" element={<ItemBrowser />} />
-                    <Route path="/editor" element={<ItemEditor />} />
-                </Routes>
-            </BrowserRouter>
-            <LoadingPopup
-                open={loadingState.open}
-                progress={loadingState.progress}
-                message={loadingState.message}
-                error={loadingState.error}
-                onClose={() =>
-                    setLoadingState((prev) => ({
-                        ...prev,
-                        open: false,
-                        error: null,
-                    }))
-                }
-            />
+            {showEditor ? (
+                // Show ItemEditor directly for production editor windows
+                <>
+                    <ItemEditor />
+                    <LoadingPopup
+                        open={loadingState.open}
+                        progress={loadingState.progress}
+                        message={loadingState.message}
+                        error={loadingState.error}
+                        onClose={() =>
+                            setLoadingState((prev) => ({
+                                ...prev,
+                                open: false,
+                                error: null,
+                            }))
+                        }
+                    />
+                </>
+            ) : (
+                // Use normal routing for main window and development
+                <>
+                    <BrowserRouter>
+                        <Routes>
+                            <Route path="/" element={<ItemBrowser />} />
+                            <Route path="/editor" element={<ItemEditor />} />
+                        </Routes>
+                    </BrowserRouter>
+                    <LoadingPopup
+                        open={loadingState.open}
+                        progress={loadingState.progress}
+                        message={loadingState.message}
+                        error={loadingState.error}
+                        onClose={() =>
+                            setLoadingState((prev) => ({
+                                ...prev,
+                                open: false,
+                                error: null,
+                            }))
+                        }
+                    />
+                </>
+            )}
         </ItemProvider>
     )
 }
