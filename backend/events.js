@@ -134,18 +134,39 @@ function createIconPreviewWindow(iconPath, itemName, parentWindow) {
 }
 
 function createModelPreviewWindow(objPath, mtlPath, title = "Model Preview") {
-    // Normalize to file URLs and encode for spaces/special chars
-    const toFileUrl = (p) => {
+    // Normalize to beep URLs for secure protocol
+    const toBeepUrl = (p) => {
         if (!p) return null
-        // Remove any existing file:// prefix to avoid double prefixes
-        const cleanPath = p
-            .replace(/^file:\/\/\//, "")
-            .replace(/^file:\/\//, "")
-        const normalized = path.normalize(cleanPath).replace(/\\/g, "/")
-        return `file:///${normalized}`
+        
+        try {
+            // Remove any existing protocol prefixes to avoid double prefixes
+            let cleanPath = p
+                .replace(/^file:\/\/\//, "")
+                .replace(/^file:\/\//, "")
+                .replace(/^beep:\/\//, "")
+            
+            // Handle Windows drive letters consistently
+            if (process.platform === 'win32') {
+                // Ensure proper drive letter format: C:/path/to/file
+                if (cleanPath.match(/^[a-z]\//)) {
+                    cleanPath = cleanPath.charAt(0).toUpperCase() + ':' + cleanPath.slice(1)
+                } else if (cleanPath.match(/^[a-z]:\//)) {
+                    cleanPath = cleanPath.charAt(0).toUpperCase() + cleanPath.slice(1)
+                }
+            }
+            
+            // Normalize path and convert backslashes to forward slashes
+            const normalized = path.normalize(cleanPath).replace(/\\/g, "/")
+            
+            // Construct beep:// URL
+            return `beep://${normalized}`
+        } catch (error) {
+            console.error('Error creating beep URL from path:', p, error)
+            return null
+        }
     }
-    const objUrl = toFileUrl(objPath)
-    const mtlUrl = mtlPath && fs.existsSync(mtlPath) ? toFileUrl(mtlPath) : null
+    const objUrl = toBeepUrl(objPath)
+    const mtlUrl = mtlPath && fs.existsSync(mtlPath) ? toBeepUrl(mtlPath) : null
 
     console.log("createModelPreviewWindow paths:")
     console.log("  objPath input:", objPath)
@@ -220,8 +241,8 @@ function createModelPreviewWindow(objPath, mtlPath, title = "Model Preview") {
         </style>
     </head>
     <body>
-        <div id="info">🎯 Loading model... Use mouse to orbit, zoom, and pan</div>
-        <div id="loading">⏳ Loading 3D model...</div>
+        <div id="info">Loading model... Use mouse to orbit, zoom, and pan</div>
+        <div id="loading">Loading 3D model...</div>
         <div id="error"></div>
         <div id="container"></div>
         
@@ -251,7 +272,7 @@ function createModelPreviewWindow(objPath, mtlPath, title = "Model Preview") {
         scene.background = new THREE.Color(0x1e1e1e);
         
         const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(5, 5, 8);
+        camera.position.set(2, 2, 3); // Start closer to the item
         
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -284,8 +305,9 @@ function createModelPreviewWindow(objPath, mtlPath, title = "Model Preview") {
         sideLight.position.set(0, 5, -10);
         scene.add(sideLight);
         
-        // Grid
-        const grid = new THREE.GridHelper(20, 20, 0x555555, 0x333333);
+        // Grid - 32x32 unit cells, positioned at y = -32
+        const grid = new THREE.GridHelper(640, 20, 0x555555, 0x333333); // 640 units total / 20 divisions = 32 units per cell
+        grid.position.y = -64;
         scene.add(grid);
         
         // Model URLs
@@ -304,33 +326,78 @@ function createModelPreviewWindow(objPath, mtlPath, title = "Model Preview") {
         }
         
         function centerAndScale(object) {
+            // Preserve Hammer units: do not rescale the object
+            object.scale.setScalar(1);
+
+            // Keep object at its EXACT OBJ coordinates - do not move it!
+            // The OBJ file position is sacred and must be preserved
+
+            // Compute bounding box at the object's actual position
             const box = new THREE.Box3().setFromObject(object);
             const size = box.getSize(new THREE.Vector3());
             const center = box.getCenter(new THREE.Vector3());
-            
-            // Keep model at origin, just move camera
-            object.position.set(0, 0, 0);
-            
-            // Scale to fit in view
-            const maxDim = Math.max(size.x, size.y, size.z);
-            if (maxDim > 0) {
-                const scale = 6 / maxDim;
-                object.scale.setScalar(scale);
-            }
-            
-            // Update camera position based on object size
-            const distance = Math.max(8, maxDim * 1.5);
-            camera.position.set(distance * 0.7, distance * 0.7, distance);
-            controls.target.set(0, 0, 0); // Look at origin
+
+            // Fit camera so full model is visible without changing object position
+            const maxSize = Math.max(size.x, size.y, size.z);
+            if (maxSize === 0) return;
+
+            // Compute required distance from FOV to fit the largest dimension
+            const fov = camera.fov * (Math.PI / 180);
+            const fitHeightDistance = (maxSize / 2) / Math.tan(fov / 2);
+            const fitWidthDistance = (maxSize / 2) / Math.tan(Math.atan(Math.tan(fov / 2) * camera.aspect));
+            const distance = Math.max(fitHeightDistance, fitWidthDistance);
+
+            // Position camera to view the object at its actual location
+            const nearDistance = distance * 0.85;
+            const cameraOffset = new THREE.Vector3(nearDistance, nearDistance * 0.35, nearDistance);
+            camera.position.copy(center).add(cameraOffset);
+
+            // Look at the object's actual center position
+            controls.target.copy(center);
             controls.update();
         }
         
         function loadModel() {
             const objLoader = new OBJLoader();
             
+            // Override OBJ loader's load method to handle beep:// URLs
+            const originalOBJLoad = objLoader.load.bind(objLoader);
+            objLoader.load = function(url, onLoad, onProgress, onError) {
+                console.log('OBJ Loader attempting to load:', url);
+                
+                if (url.startsWith('beep://')) {
+                    fetch(url)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('Network response was not ok: ' + response.status + ' ' + response.statusText);
+                            }
+                            return response.text();
+                        })
+                        .then(text => {
+                            console.log('OBJ: Fetched text content from beep://', url);
+                            // Parse the OBJ text directly
+                            try {
+                                const object = objLoader.parse(text);
+                                console.log('OBJ parsed successfully from beep://', url);
+                                if (onLoad) onLoad(object);
+                            } catch (parseError) {
+                                console.error('OBJ parsing failed:', parseError);
+                                if (onError) onError(parseError);
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Failed to fetch OBJ from beep://', url, error);
+                            if (onError) onError(error);
+                        });
+                } else {
+                    // Use original loader for non-beep URLs
+                    return originalOBJLoad(url, onLoad, onProgress, onError);
+                }
+            };
+            
             const onLoad = (object) => {
                 loading.style.display = 'none';
-                info.textContent = '🎯 Model loaded! Left-drag: orbit • Right-drag: pan • Wheel: zoom';
+                info.textContent = 'Model loaded! Left-drag: orbit • Right-drag: pan • Wheel: zoom';
                 
                 // Apply materials and setup rendering
                 object.traverse((child) => {
@@ -388,18 +455,187 @@ function createModelPreviewWindow(objPath, mtlPath, title = "Model Preview") {
                 // Load MTL first, then OBJ
                 const mtlLoader = new MTLLoader();
                 
+                // Override MTL loader's load method to handle beep:// URLs
+                const originalMTLLoad = mtlLoader.load.bind(mtlLoader);
+                mtlLoader.load = function(url, onLoad, onProgress, onError) {
+                    console.log('MTL Loader attempting to load:', url);
+                    
+                    if (url.startsWith('beep://')) {
+                        fetch(url)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Network response was not ok: ' + response.status + ' ' + response.statusText);
+                                }
+                                return response.text();
+                            })
+                            .then(text => {
+                                console.log('MTL: Fetched text content from beep://', url);
+                                // Parse the MTL text directly
+                                try {
+                                    const materials = mtlLoader.parse(text, '');
+                                    console.log('MTL parsed successfully from beep://', url);
+                                    if (onLoad) onLoad(materials);
+                                } catch (parseError) {
+                                    console.error('MTL parsing failed:', parseError);
+                                    if (onError) onError(parseError);
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Failed to fetch MTL from beep://', url, error);
+                                if (onError) onError(error);
+                            });
+                    } else {
+                        // Use original loader for non-beep URLs
+                        return originalMTLLoad(url, onLoad, onProgress, onError);
+                    }
+                };
+                
+                // Set up LoadingManager to properly handle texture timing
+                const loadingManager = new THREE.LoadingManager();
+                
                 // Set up TGA loader for Source engine textures
                 const tgaLoader = new TGALoader();
                 
-                // Configure MTL loader to handle TGA files
+                // Override the TGA loader's load method to handle beep:// URLs
+                const originalTGALoad = tgaLoader.load.bind(tgaLoader);
+                tgaLoader.load = function(url, onLoad, onProgress, onError) {
+                    console.log('TGA Loader attempting to load:', url);
+                    
+                    // If it's a beep:// URL, fetch it directly and then load the blob
+                    if (url.startsWith('beep://')) {
+                        // Create a placeholder texture with valid default data
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 1;
+                        canvas.height = 1;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#808080'; // Gray placeholder
+                        ctx.fillRect(0, 0, 1, 1);
+                        
+                        const texture = new THREE.Texture(canvas);
+                        texture.name = url;
+                        texture.needsUpdate = true;
+                        
+                        fetch(url)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Network response was not ok: ' + response.status + ' ' + response.statusText);
+                                }
+                                return response.blob();
+                            })
+                            .then(blob => {
+                                const objectUrl = URL.createObjectURL(blob);
+                                console.log('TGA: Created object URL for beep:// resource:', objectUrl);
+                                
+                                // Use the original loader with the object URL
+                                originalTGALoad(objectUrl, (loadedTexture) => {
+                                    console.log('TGA texture loaded successfully from beep://', url);
+                                    // Copy loaded texture properties to our placeholder
+                                    texture.image = loadedTexture.image;
+                                    texture.format = loadedTexture.format;
+                                    texture.type = loadedTexture.type;
+                                    texture.generateMipmaps = loadedTexture.generateMipmaps;
+                                    texture.flipY = loadedTexture.flipY;
+                                    texture.needsUpdate = true;
+                                    
+                                    // Clean up the object URL after loading
+                                    URL.revokeObjectURL(objectUrl);
+                                    if (onLoad) onLoad(texture);
+                                }, onProgress, (error) => {
+                                    console.error('TGA loading failed:', error);
+                                    URL.revokeObjectURL(objectUrl);
+                                    if (onError) onError(error);
+                                });
+                            })
+                            .catch(error => {
+                                console.error('Failed to fetch TGA from beep://', url, error);
+                                if (onError) onError(error);
+                            });
+                        
+                        return texture;
+                    } else {
+                        // Use original loader for non-beep URLs
+                        return originalTGALoad(url, onLoad, onProgress, onError);
+                    }
+                };
+                
+                // Configure MTL loader to handle TGA files and beep:// URLs
+                // Note: After TGA to PNG conversion, most textures will be PNG files
                 const originalLoad = THREE.TextureLoader.prototype.load;
                 THREE.TextureLoader.prototype.load = function(url, onLoad, onProgress, onError) {
                     if (url.toLowerCase().endsWith('.tga')) {
                         console.log('Loading TGA texture:', url);
                         return tgaLoader.load(url, onLoad, onProgress, onError);
+                    } else if (url.startsWith('beep://')) {
+                        console.log('Loading regular texture from beep://', url);
+                        
+                        // Create a placeholder texture with valid default data
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 1;
+                        canvas.height = 1;
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#808080'; // Gray placeholder
+                        ctx.fillRect(0, 0, 1, 1);
+                        
+                        const texture = new THREE.Texture(canvas);
+                        texture.name = url;
+                        texture.needsUpdate = true;
+                        
+                        // For regular image formats, fetch as blob and create object URL
+                        fetch(url)
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error('Network response was not ok: ' + response.status + ' ' + response.statusText);
+                                }
+                                return response.blob();
+                            })
+                            .then(blob => {
+                                const objectUrl = URL.createObjectURL(blob);
+                                console.log('Created object URL for beep:// texture:', objectUrl);
+                                
+                                // Use the original loader with the object URL
+                                originalLoad.call(this, objectUrl, (loadedTexture) => {
+                                    console.log('Texture loaded successfully from beep://', url);
+                                    // Copy loaded texture properties to our placeholder
+                                    texture.image = loadedTexture.image;
+                                    texture.format = loadedTexture.format;
+                                    texture.type = loadedTexture.type;
+                                    texture.generateMipmaps = loadedTexture.generateMipmaps;
+                                    texture.flipY = loadedTexture.flipY;
+                                    texture.needsUpdate = true;
+                                    
+                                    // Clean up the object URL after loading
+                                    URL.revokeObjectURL(objectUrl);
+                                    if (onLoad) onLoad(texture);
+                                }, onProgress, (error) => {
+                                    console.error('Texture loading failed:', error);
+                                    URL.revokeObjectURL(objectUrl);
+                                    if (onError) onError(error);
+                                });
+                            })
+                            .catch(error => {
+                                console.error('Failed to fetch texture from beep://', url, error);
+                                if (onError) onError(error);
+                            });
+                        
+                        return texture;
                     } else {
                         return originalLoad.call(this, url, onLoad, onProgress, onError);
                     }
+                };
+                
+                // Configure LoadingManager callbacks for proper timing
+                loadingManager.onLoad = () => {
+                    console.log('LoadingManager: All textures and materials fully loaded!');
+                    info.textContent = 'Model loaded with textures! Left-drag: orbit • Right-drag: pan • Wheel: zoom';
+                };
+                
+                loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+                    console.log('Loading progress: ' + itemsLoaded + '/' + itemsTotal + ' - ' + url);
+                    info.textContent = 'Loading textures... ' + itemsLoaded + '/' + itemsTotal;
+                };
+                
+                loadingManager.onError = (url) => {
+                    console.error('LoadingManager error loading:', url);
                 };
                 
                 // Set the resource path for textures - VMF2OBJ puts materials in /materials subfolder
@@ -413,6 +649,9 @@ function createModelPreviewWindow(objPath, mtlPath, title = "Model Preview") {
                 // Set resource path to base directory so "materials/..." paths in MTL work correctly
                 mtlLoader.setResourcePath(baseDir);
                 mtlLoader.setPath('');
+                
+                // CRITICAL: Set the LoadingManager on the MTL loader
+                mtlLoader.manager = loadingManager;
                 
                 mtlLoader.load(
                     mtlUrl,

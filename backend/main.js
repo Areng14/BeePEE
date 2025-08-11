@@ -1,10 +1,26 @@
-const { app, BrowserWindow, ipcMain } = require("electron")
+const { app, BrowserWindow, ipcMain, protocol, net } = require("electron")
 const path = require("path")
 const { createMainMenu } = require("./menu.js")
 const fs = require("fs")
 const { reg_events } = require("./events.js")
 const { WindowTitleManager } = require("./windowTitleManager.js")
 const { setMainWindow, clearPackagesDirectory } = require("./packageManager.js")
+
+// Register custom schemes as privileged BEFORE app is ready
+// This ensures that the 'beep' scheme can be used with fetch API and other web features.
+protocol.registerSchemesAsPrivileged([
+    { 
+        scheme: 'beep', 
+        privileges: { 
+            standard: true, 
+            secure: true, 
+            bypassCSP: true, 
+            allowServiceWorkers: true, 
+            supportFetchAPI: true, 
+            corsEnabled: true 
+        } 
+    }
+])
 
 const createWindow = () => {
     const isDev = !app.isPackaged
@@ -58,6 +74,146 @@ ipcMain.handle("api:loadImage", async (event, filePath) => {
 })
 
 app.whenReady().then(async () => {
+    // Register custom file protocol for secure local file access
+    protocol.handle('beep', async (request) => {
+        try {
+            let url = request.url.replace('beep://', '')
+            
+            // Handle URL decoding (e.g., %20 -> space, %2F -> /)
+            try {
+                url = decodeURIComponent(url)
+            } catch (decodeError) {
+                console.error('Failed to decode URL:', url, decodeError)
+                return new Response('Bad Request: Invalid URL encoding', { status: 400 })
+            }
+            
+            // Handle Windows drive letters and paths
+            if (process.platform === 'win32') {
+                // Pattern 1: "c/Users/..." -> "C:/Users/..."
+                if (url.match(/^[a-z]\//)) {
+                    url = url.charAt(0).toUpperCase() + ':' + url.slice(1)
+                }
+                // Pattern 2: "/c/Users/..." -> "C:/Users/..." (some systems add leading slash)
+                else if (url.match(/^\/[a-z]\//)) {
+                    url = url.charAt(1).toUpperCase() + ':' + url.slice(2)
+                }
+                // Pattern 3: "c:/Users/..." -> "C:/Users/..." (already has colon)
+                else if (url.match(/^[a-z]:\//)) {
+                    url = url.charAt(0).toUpperCase() + url.slice(1)
+                }
+            }
+            
+            // Convert to absolute path
+            let filePath
+            try {
+                filePath = path.resolve(url)
+            } catch (pathError) {
+                console.error('Failed to resolve path:', url, pathError)
+                return new Response('Bad Request: Invalid file path', { status: 400 })
+            }
+            
+            // Security: Only allow access to files within the project directory
+            const projectRoot = path.resolve(__dirname, '..')
+            const normalizedFilePath = path.normalize(filePath)
+            const normalizedProjectRoot = path.normalize(projectRoot)
+            
+            if (!normalizedFilePath.startsWith(normalizedProjectRoot)) {
+                console.log(`Security check failed: ${normalizedFilePath} is not within ${normalizedProjectRoot}`)
+                return new Response('Forbidden: Access denied', { status: 403 })
+            }
+            
+            // Check if file exists and is accessible before attempting to fetch
+            let stats
+            try {
+                if (!fs.existsSync(filePath)) {
+                    console.log(`File not found: ${filePath}`)
+                    return new Response('Not Found', { status: 404 })
+                }
+                
+                stats = fs.statSync(filePath)
+            } catch (fsError) {
+                console.error(`File system error accessing ${filePath}:`, fsError)
+                return new Response('Internal Server Error: File access error', { status: 500 })
+            }
+            
+            // Check if it's actually a file (not a directory)
+            if (!stats.isFile()) {
+                console.log(`Not a file: ${filePath}`)
+                return new Response('Bad Request: Path is not a file', { status: 400 })
+            }
+            
+            // Check file permissions (readable)
+            try {
+                fs.accessSync(filePath, fs.constants.R_OK)
+            } catch (accessError) {
+                console.error(`File not readable: ${filePath}`, accessError)
+                return new Response('Forbidden: File not readable', { status: 403 })
+            }
+            
+            // Construct proper file:// URL for net.fetch
+            let fileUrl
+            if (process.platform === 'win32') {
+                // Windows: file:///C:/path/to/file
+                fileUrl = `file:///${filePath.replace(/\\/g, '/')}`
+            } else {
+                // Unix-like: file:///path/to/file
+                fileUrl = `file://${filePath}`
+            }
+            
+            console.log(`Serving file: ${filePath} via ${fileUrl}`)
+            
+            // Fetch the file
+            const response = await net.fetch(fileUrl)
+            
+            // Check if the fetch was successful
+            if (!response.ok) {
+                console.error(`Failed to fetch file: ${fileUrl}, status: ${response.status}`)
+                return new Response('Internal Server Error: Failed to read file', { status: 500 })
+            }
+            
+            // Get file extension and set appropriate MIME type if not already set
+            const ext = path.extname(filePath).toLowerCase()
+            const mimeTypes = {
+                '.obj': 'text/plain',
+                '.mtl': 'text/plain',
+                '.tga': 'image/tga',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.png': 'image/png',
+                '.gif': 'image/gif',
+                '.bmp': 'image/bmp',
+                '.txt': 'text/plain',
+                '.json': 'application/json',
+                '.xml': 'application/xml',
+                '.css': 'text/css',
+                '.js': 'application/javascript',
+                '.html': 'text/html'
+            }
+            
+            // Clone response to add/modify headers if needed
+            const contentType = response.headers.get('content-type')
+            if (!contentType && mimeTypes[ext]) {
+                const buffer = await response.arrayBuffer()
+                return new Response(buffer, {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: {
+                        ...Object.fromEntries(response.headers.entries()),
+                        'content-type': mimeTypes[ext]
+                    }
+                })
+            }
+            
+            return response
+            
+        } catch (error) {
+            console.error('Beep protocol handler error:', error)
+            return new Response('Internal Server Error', { status: 500 })
+        }
+    })
+    
+    console.log('🔧 Registered beep:// protocol for secure file access')
+    
     createWindow()
 
     // Configure VMF2OBJ resource paths on startup

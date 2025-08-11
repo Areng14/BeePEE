@@ -2,6 +2,7 @@ const fs = require("fs")
 const path = require("path")
 const { app } = require("electron")
 const { findPortal2Resources } = require("../data")
+const { convertTexturesForModel } = require("./tgaConverter")
 
 // Extra resource search paths configurable at runtime (folders or VPKs)
 let extraResourcePaths = []
@@ -342,6 +343,25 @@ async function convertVmfToObj(vmfPath, options = {}) {
                             "Failed to apply Source engine rotation:",
                             rotationError.message,
                         )
+                    }
+                }
+
+                // Convert TGA textures to PNG for better Three.js compatibility
+                if (hasMtl) {
+                    try {
+                        console.log("Converting TGA textures to PNG...")
+                        const conversionResult = await convertTexturesForModel(outputDir, baseName)
+                        if (conversionResult.success) {
+                            console.log(`TGA conversion successful: ${conversionResult.converted.length} files converted`)
+                            if (conversionResult.failed.length > 0) {
+                                console.warn(`Failed to convert ${conversionResult.failed.length} TGA files:`, conversionResult.failed)
+                            }
+                        } else {
+                            console.warn("TGA to PNG conversion failed, but continuing with original textures")
+                        }
+                    } catch (conversionError) {
+                        console.warn("Error during TGA to PNG conversion:", conversionError)
+                        // Continue anyway - original TGA files will still work with our loaders
                     }
                 }
 
