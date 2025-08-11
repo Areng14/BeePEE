@@ -69,6 +69,106 @@ function getJarPath() {
     return jarPath
 }
 
+function getCartoonExePath() {
+    const isDev = !app.isPackaged
+    const exePath = isDev
+        ? path.join(__dirname, "..", "libs", "areng_cartoonify", "cartoon.exe")
+        : path.join(
+              process.resourcesPath,
+              "extraResources",
+              "areng_cartoonify",
+              "cartoon.exe",
+          )
+
+    return exePath
+}
+
+function findPngFilesRecursively(dirPath) {
+    const result = []
+    try {
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true })
+        for (const entry of entries) {
+            const full = path.join(dirPath, entry.name)
+            if (entry.isDirectory()) {
+                result.push(...findPngFilesRecursively(full))
+            } else if (entry.isFile() && /\.png$/i.test(entry.name)) {
+                result.push(full)
+            }
+        }
+    } catch {}
+    return result
+}
+
+async function applyCartoonishToTextures(outputDir, { debug } = {}) {
+    const materialsDir = path.join(outputDir, "materials")
+    if (!fs.existsSync(materialsDir)) {
+        console.log("No materials directory for cartoonify, skipping")
+        return { success: true, processed: 0 }
+    }
+
+    const pngFiles = findPngFilesRecursively(materialsDir)
+    if (pngFiles.length === 0) {
+        console.log("No PNG textures found to cartoonify, skipping")
+        return { success: true, processed: 0 }
+    }
+
+    const exePath = getCartoonExePath()
+    if (!fs.existsSync(exePath)) {
+        console.warn("cartoon.exe not found, skipping cartoonish processing:", exePath)
+        return { success: false, processed: 0, error: "cartoon.exe missing" }
+    }
+
+    const { spawn } = require("child_process")
+
+    // Run in chunks to avoid excessively long command lines
+    const chunkSize = 50
+    let processed = 0
+
+    for (let i = 0; i < pngFiles.length; i += chunkSize) {
+        const chunk = pngFiles.slice(i, i + chunkSize)
+        const cmd = [
+            // cartoon.exe expects image paths as arguments
+            ...chunk,
+        ]
+
+        if (debug) {
+            console.log("Running cartoon.exe on", chunk.length, "textures")
+        }
+
+        await new Promise((resolve, reject) => {
+            const child = spawn(exePath, cmd, {
+                cwd: path.dirname(exePath),
+                stdio: debug ? "inherit" : "pipe",
+                windowsHide: !debug,
+            })
+
+            let stdout = ""
+            let stderr = ""
+
+            if (!debug) {
+                child.stdout?.on("data", (d) => (stdout += d.toString()))
+                child.stderr?.on("data", (d) => (stderr += d.toString()))
+            }
+
+            child.on("close", (code) => {
+                if (code === 0) {
+                    processed += chunk.length
+                    resolve()
+                } else {
+                    console.warn("cartoon.exe failed with code", code, stderr)
+                    reject(new Error(`cartoon.exe exited with code ${code}`))
+                }
+            })
+
+            child.on("error", (err) => {
+                reject(err)
+            })
+        })
+    }
+
+    return { success: true, processed }
+}
+
 /**
  * Apply Source engine coordinate rotation to OBJ file
  * Rotates 90 degrees around Z-axis to convert from Source to standard 3D coordinates
@@ -363,6 +463,21 @@ async function convertVmfToObj(vmfPath, options = {}) {
                         console.warn("Error during TGA to PNG conversion:", conversionError)
                         // Continue anyway - original TGA files will still work with our loaders
                     }
+                }
+
+                // If user selected cartoonish textures, run cartoon.exe on the PNG textures
+                try {
+                    if (textureStyle === "cartoon") {
+                        console.log("Applying cartoonish effect to textures...")
+                        const cartoonResult = await applyCartoonishToTextures(outputDir, { debug })
+                        if (cartoonResult.success) {
+                            console.log(`Cartoonified ${cartoonResult.processed} textures`)
+                        } else {
+                            console.warn("Cartoonify step reported failure:", cartoonResult.error || "unknown")
+                        }
+                    }
+                } catch (cartoonError) {
+                    console.warn("Cartoonify step failed:", cartoonError?.message || cartoonError)
                 }
 
                 resolve({
