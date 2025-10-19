@@ -3,6 +3,7 @@ const {
     loadPackage,
     importPackage,
     savePackageAsBpee,
+    exportPackageAsBeePack,
     clearPackagesDirectory,
     closePackage,
 } = require("./packageManager")
@@ -208,6 +209,40 @@ function createMainMenu(mainWindow) {
                             })
                         } catch (err) {
                             dialog.showErrorBox("Save As Failed", err.message)
+                        }
+                    },
+                },
+                { type: "separator" },
+                {
+                    label: "Export Package...",
+                    accelerator: "Ctrl+E",
+                    click: async () => {
+                        try {
+                            if (!currentPackageDir)
+                                throw new Error("No package loaded")
+                            const { canceled, filePath } =
+                                await dialog.showSaveDialog(mainWindow, {
+                                    title: "Export Package",
+                                    defaultPath:
+                                        getCurrentPackageName() + ".bee_pack",
+                                    filters: [
+                                        {
+                                            name: "BEEmod Package",
+                                            extensions: ["bee_pack"],
+                                        },
+                                    ],
+                                })
+                            if (canceled || !filePath) return
+                            await exportPackageAsBeePack(
+                                currentPackageDir,
+                                filePath,
+                            )
+                            dialog.showMessageBox(mainWindow, {
+                                message: `Package exported to: ${filePath}`,
+                                type: "info",
+                            })
+                        } catch (err) {
+                            dialog.showErrorBox("Export Failed", err.message)
                         }
                     },
                 },

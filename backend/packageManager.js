@@ -112,6 +112,117 @@ function addUuidsToVbspConditions(data) {
     return processObject(data)
 }
 
+// Helper function to remove UUIDs from VBSP blocks for export
+function removeUuidsFromVbspConditions(data) {
+    function processObject(obj) {
+        if (typeof obj !== "object" || obj === null) {
+            return obj
+        }
+
+        const newObj = {}
+        for (const [key, value] of Object.entries(obj)) {
+            let newKey = key
+            let newValue = value
+
+            // Remove UUID suffix from blocks that were added during import
+            if (
+                key.startsWith("Switch_") ||
+                key.startsWith("Condition_") ||
+                key.startsWith("MapInstVar_")
+            ) {
+                // Extract the base key name (before the UUID)
+                const baseKey = key.split("_")[0]
+                newKey = baseKey
+                newValue =
+                    typeof value === "object" ? processObject(value) : value
+            } else {
+                // Recursively process nested objects
+                newValue =
+                    typeof value === "object" ? processObject(value) : value
+            }
+
+            newObj[newKey] = newValue
+        }
+
+        return newObj
+    }
+
+    return processObject(data)
+}
+
+// Helper function to check if an object is an array-like object (all keys are sequential numbers)
+function isArrayLikeObject(obj) {
+    const keys = Object.keys(obj)
+    if (keys.length === 0) return false
+
+    // Check if all keys are numeric strings
+    const numericKeys = keys.map((k) => parseInt(k, 10))
+    if (numericKeys.some((k) => isNaN(k))) return false
+
+    // Check if keys are sequential starting from 0
+    numericKeys.sort((a, b) => a - b)
+    for (let i = 0; i < numericKeys.length; i++) {
+        if (numericKeys[i] !== i) return false
+    }
+
+    return true
+}
+
+// Helper function to convert JSON to VDF format
+function convertJsonToVdf(jsonData, indent = 0, parentKey = null) {
+    const indentStr = "\t".repeat(indent)
+    let vdfString = ""
+
+    if (typeof jsonData !== "object" || jsonData === null) {
+        return `"${jsonData}"`
+    }
+
+    // Check if this object represents an array (all keys are sequential numbers 0, 1, 2, ...)
+    if (isArrayLikeObject(jsonData)) {
+        // This is an array - write each element as a separate block with the parent key
+        const sortedKeys = Object.keys(jsonData).sort(
+            (a, b) => parseInt(a, 10) - parseInt(b, 10),
+        )
+
+        for (const key of sortedKeys) {
+            const value = jsonData[key]
+            if (typeof value === "object" && value !== null) {
+                // Write array element as a separate block
+                // Use the parent key name for each array element
+                if (parentKey) {
+                    vdfString += `${indentStr}"${parentKey}"\n${indentStr}{\n`
+                    vdfString += convertJsonToVdf(value, indent + 1, null)
+                    vdfString += `${indentStr}}\n`
+                }
+            }
+        }
+    } else {
+        // Regular object - write key-value pairs
+        for (const [key, value] of Object.entries(jsonData)) {
+            // Handle desc_ keys - convert them back to empty string keys
+            const vdfKey = key.startsWith("desc_") ? "" : key
+
+            if (typeof value === "object" && value !== null) {
+                // Check if the value is an array-like object
+                if (isArrayLikeObject(value)) {
+                    // Write array elements with the current key as parent
+                    vdfString += convertJsonToVdf(value, indent, vdfKey)
+                } else {
+                    // Nested object
+                    vdfString += `${indentStr}"${vdfKey}"\n${indentStr}{\n`
+                    vdfString += convertJsonToVdf(value, indent + 1, null)
+                    vdfString += `${indentStr}}\n`
+                }
+            } else {
+                // Simple key-value pair
+                vdfString += `${indentStr}"${vdfKey}" "${value}"\n`
+            }
+        }
+    }
+
+    return vdfString
+}
+
 // Helper function to convert VDF to JSON
 function convertVdfToJson(filePath) {
     try {
@@ -211,6 +322,75 @@ function processVdfFiles(directory) {
                     }
                 }
                 fs.writeFileSync(fullPath, JSON.stringify(jsonData, null, 4))
+            }
+        }
+    }
+}
+
+// Helper function to recursively process JSON files back to VDF for export
+function processJsonFilesToVdf(directory) {
+    const files = fs.readdirSync(directory)
+
+    for (const file of files) {
+        const fullPath = path.join(directory, file)
+        const stat = fs.statSync(fullPath)
+
+        if (stat.isDirectory()) {
+            // Recursively process subdirectories
+            processJsonFilesToVdf(fullPath)
+        } else if (file === "info.json") {
+            // Convert info.json to info.txt
+            try {
+                const jsonData = JSON.parse(fs.readFileSync(fullPath, "utf-8"))
+                const vdfString = convertJsonToVdf(jsonData)
+                const txtPath = fullPath.replace(/\.json$/i, ".txt")
+                fs.writeFileSync(txtPath, vdfString)
+                fs.unlinkSync(fullPath)
+            } catch (error) {
+                throw new Error(
+                    `[${path.basename(directory)} : info.json]: ${error.message}`,
+                )
+            }
+        } else if (file === "editoritems.json") {
+            // Convert editoritems.json to editoritems.txt
+            try {
+                const jsonData = JSON.parse(fs.readFileSync(fullPath, "utf-8"))
+                const vdfString = convertJsonToVdf(jsonData)
+                const txtPath = fullPath.replace(/\.json$/i, ".txt")
+                fs.writeFileSync(txtPath, vdfString)
+                fs.unlinkSync(fullPath)
+            } catch (error) {
+                throw new Error(
+                    `[${path.basename(directory)} : editoritems.json]: ${error.message}`,
+                )
+            }
+        } else if (file === "properties.json") {
+            // Convert properties.json to properties.txt
+            try {
+                const jsonData = JSON.parse(fs.readFileSync(fullPath, "utf-8"))
+                const vdfString = convertJsonToVdf(jsonData)
+                const txtPath = fullPath.replace(/\.json$/i, ".txt")
+                fs.writeFileSync(txtPath, vdfString)
+                fs.unlinkSync(fullPath)
+            } catch (error) {
+                throw new Error(
+                    `[${path.basename(directory)} : properties.json]: ${error.message}`,
+                )
+            }
+        } else if (file === "vbsp_config.json") {
+            // Convert vbsp_config.json to vbsp_config.cfg
+            try {
+                let jsonData = JSON.parse(fs.readFileSync(fullPath, "utf-8"))
+                // Remove UUIDs from VBSP conditions before export
+                jsonData = removeUuidsFromVbspConditions(jsonData)
+                const vdfString = convertJsonToVdf(jsonData)
+                const cfgPath = fullPath.replace(/\.json$/i, ".cfg")
+                fs.writeFileSync(cfgPath, vdfString)
+                fs.unlinkSync(fullPath)
+            } catch (error) {
+                throw new Error(
+                    `[${path.basename(directory)} : vbsp_config.json]: ${error.message}`,
+                )
             }
         }
     }
@@ -507,6 +687,13 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
             if (!skipProgressReset) {
                 sendProgressUpdate(80, "Loading package data...")
             }
+
+            // Close existing package
+            await closePackage()
+            currentPackageDir = null
+            lastSavedBpeePath = null
+            mainWindow.webContents.send("package:closed")
+
             // Now load the package
             await pkg.load()
             packages.push(pkg)
@@ -519,6 +706,7 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
             if (!skipProgressReset) {
                 sendProgressUpdate(100, "Package loaded successfully!")
             }
+
             return pkg
         } catch (error) {
             console.error("Failed to load package:", error)
@@ -571,6 +759,103 @@ function savePackageAsBpee(packageDir, outputBpeePath) {
 }
 
 /**
+ * Exports a package directory as a .bee_pack file using 7zip.
+ * Converts all JSON files back to VDF format before archiving.
+ * @param {string} packageDir - The directory to export.
+ * @param {string} outputBeePackPath - The output .bee_pack file path.
+ * @returns {Promise<void>} Resolves when done, rejects on error.
+ */
+async function exportPackageAsBeePack(packageDir, outputBeePackPath) {
+    return timeOperation("Export package", async () => {
+        // Create a temporary directory for the export
+        const tempExportDir = path.join(
+            path.dirname(packageDir),
+            `${path.basename(packageDir)}_export_temp`,
+        )
+
+        try {
+            sendProgressUpdate(0, "Starting package export...")
+
+            // Copy the package directory to a temporary location
+            if (fs.existsSync(tempExportDir)) {
+                fs.rmSync(tempExportDir, { recursive: true, force: true })
+            }
+
+            sendProgressUpdate(10, "Copying package files...")
+
+            // Recursively copy directory
+            const copyDir = (src, dest) => {
+                fs.mkdirSync(dest, { recursive: true })
+                const entries = fs.readdirSync(src, { withFileTypes: true })
+
+                for (const entry of entries) {
+                    const srcPath = path.join(src, entry.name)
+                    const destPath = path.join(dest, entry.name)
+
+                    if (entry.isDirectory()) {
+                        copyDir(srcPath, destPath)
+                    } else {
+                        fs.copyFileSync(srcPath, destPath)
+                    }
+                }
+            }
+
+            copyDir(packageDir, tempExportDir)
+
+            sendProgressUpdate(40, "Converting JSON files to VDF format...")
+
+            // Convert all JSON files back to VDF
+            processJsonFilesToVdf(tempExportDir)
+
+            sendProgressUpdate(70, "Creating .bee_pack archive...")
+
+            // Ensure output directory exists
+            const outDir = path.dirname(outputBeePackPath)
+            if (!fs.existsSync(outDir)) {
+                fs.mkdirSync(outDir, { recursive: true })
+            }
+
+            // Zip the temporary directory as .bee_pack
+            await new Promise((resolve, reject) => {
+                const archiveStream = add(
+                    outputBeePackPath,
+                    [tempExportDir + path.sep + "*"],
+                    { $bin: path7za, recursive: true },
+                )
+                archiveStream.on("end", resolve)
+                archiveStream.on("error", reject)
+            })
+
+            sendProgressUpdate(90, "Cleaning up temporary files...")
+
+            // Clean up temporary directory
+            fs.rmSync(tempExportDir, { recursive: true, force: true })
+
+            sendProgressUpdate(100, "Package exported successfully!")
+        } catch (error) {
+            console.error("Failed to export package:", error.message)
+
+            // Send error to frontend
+            sendProgressUpdate(100, "Package export failed!", error.message)
+
+            // Clean up temporary directory on error
+            if (fs.existsSync(tempExportDir)) {
+                try {
+                    fs.rmSync(tempExportDir, { recursive: true, force: true })
+                } catch (cleanupError) {
+                    console.error(
+                        "Failed to cleanup export directory:",
+                        cleanupError.message,
+                    )
+                }
+            }
+
+            throw error
+        }
+    })
+}
+
+/**
  * Clears all contents of the packages directory at the project root.
  * @returns {Promise<void>} Resolves when done, rejects on error.
  */
@@ -609,7 +894,8 @@ module.exports = {
     unloadPackage,
     packages,
     savePackageAsBpee,
+    exportPackageAsBeePack,
     clearPackagesDirectory,
-    closePackage, // Export the new function
+    closePackage,
     setMainWindow,
 }
