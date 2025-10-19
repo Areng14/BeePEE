@@ -228,6 +228,49 @@ async function parseFGD(fgdPath, log = console) {
 
 let cachedResources = null
 
+/**
+ * Parse gameinfo.txt to find all search paths and DLC folders
+ * @param {string} gameinfoPath - Path to gameinfo.txt
+ * @param {string} baseDir - Base directory for resolving relative paths
+ * @returns {Object} Object containing search paths and DLC info
+ */
+async function parseGameInfo(gameinfoPath, baseDir, log = console) {
+    try {
+        log.log(`Parsing gameinfo.txt: ${gameinfoPath}`)
+        const content = fs.readFileSync(gameinfoPath, "utf-8")
+
+        const searchPaths = []
+        const dlcFolders = []
+
+        // Parse SearchPaths section
+        const searchPathsMatch = content.match(/SearchPaths\s*\{([^}]+)\}/s)
+        if (searchPathsMatch) {
+            const searchPathsContent = searchPathsMatch[1]
+            log.log(`📁 Parsing SearchPaths section from gameinfo.txt`)
+
+            // Extract all search paths
+            const pathMatches =
+                searchPathsContent.matchAll(/Game\s+([^\r\n]+)/g)
+            for (const match of pathMatches) {
+                const searchPath = match[1].trim()
+                if (searchPath) {
+                    searchPaths.push(searchPath)
+                    log.log(`  ✅ Found search path: ${searchPath}`)
+                }
+            }
+            
+            log.log(`📊 Total search paths found: ${searchPaths.length}`)
+        } else {
+            log.log(`⚠️ No SearchPaths section found in gameinfo.txt`)
+        }
+
+        return { searchPaths, dlcFolders: [] }
+    } catch (error) {
+        log.error(`Failed to parse gameinfo.txt: ${error.message}`)
+        return { searchPaths: [], dlcFolders: [] }
+    }
+}
+
 async function findPortal2Resources(log = console) {
     return timeOperation("Find Portal 2 resources", async () => {
         // Return cached resources if already found
@@ -249,11 +292,54 @@ async function findPortal2Resources(log = console) {
             hammer: null,
         }
 
-        // Check for gameinfo.txt
+        // Check for gameinfo.txt and parse it
         const gameinfoPath = path.join(p2dir, "portal2", "gameinfo.txt")
         if (fs.existsSync(gameinfoPath)) {
             paths.gameinfo = gameinfoPath
+            log.log(`📄 Found gameinfo.txt: ${gameinfoPath}`)
+            
+            const gameInfo = await parseGameInfo(
+                gameinfoPath,
+                path.join(p2dir, "portal2"),
+                log,
+            )
+            paths.searchPaths = gameInfo.searchPaths
+            
+            log.log(`📊 Gameinfo parsing complete:`)
+            log.log(`  - Search paths: ${gameInfo.searchPaths.length}`)
+        } else {
+            log.log(`⚠️ No gameinfo.txt found at: ${gameinfoPath}`)
+            paths.searchPaths = []
         }
+
+        // Always scan for DLCs automatically (like Portal 2 does)
+        log.log(`🔍 Auto-scanning for DLC folders...`)
+        const portal2Root = p2dir // Portal 2 root directory
+        log.log(`  Scanning in: ${portal2Root}`)
+        
+        const autoDlcFolders = []
+        let dlcNumber = 1
+        while (true) {
+            const dlcFolderName = `portal2_dlc${dlcNumber}` // Correct naming: portal2_dlc1, portal2_dlc2, etc.
+            const dlcPath = path.join(portal2Root, dlcFolderName)
+            log.log(`  🔍 Checking: ${dlcFolderName} at ${dlcPath}`)
+            
+            if (fs.existsSync(dlcPath)) {
+                log.log(`    ✅ Found DLC: ${dlcFolderName} at ${dlcPath}`)
+                autoDlcFolders.push({
+                    name: dlcFolderName,
+                    path: dlcPath,
+                    gameinfo: null,
+                })
+                dlcNumber++ // Check next DLC
+            } else {
+                log.log(`    ❌ DLC ${dlcFolderName} not found, stopping at ${dlcNumber - 1}`)
+                break // Stop when we hit a missing DLC
+            }
+        }
+        
+        paths.dlcFolders = autoDlcFolders
+        log.log(`📊 Auto DLC scan complete: ${autoDlcFolders.length} DLCs found`)
 
         // Check for FGD files and parse them
         const fgdPath = path.join(p2dir, "bin", "portal2.fgd")
@@ -364,4 +450,5 @@ module.exports = {
     findPortal2Resources,
     getHammerPath,
     getHammerAvailability,
+    parseGameInfo,
 }

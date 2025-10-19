@@ -17,7 +17,7 @@ import {
     IconButton,
 } from "@mui/material"
 import {
-    Info,
+    Info as InfoIcon,
     Input,
     ViewInAr,
     Code,
@@ -32,7 +32,7 @@ import {
     DataObject,
     Rule,
 } from "@mui/icons-material"
-import BasicInfo from "./items/BasicInfo"
+import Info from "./items/Info"
 import Inputs from "./items/Inputs"
 import Instances from "./items/Instances"
 import Variables from "./items/Variables"
@@ -767,7 +767,7 @@ function ItemEditor() {
                         },
                     }}>
                     <Tooltip
-                        title="Basic Info - Edit name, author, description"
+                        title="Info - Edit name, author, description"
                         placement="right">
                         <Tab
                             icon={
@@ -775,7 +775,7 @@ function ItemEditor() {
                                     color="primary"
                                     variant="dot"
                                     invisible={!formData._modified.basicInfo}>
-                                    <Info />
+                                    <InfoIcon />
                                 </Badge>
                             }
                         />
@@ -863,7 +863,7 @@ function ItemEditor() {
                 {/* Tab Content */}
                 <Box sx={{ flex: 1, p: 2, overflow: "auto" }}>
                     <Box sx={{ display: tabValue === 0 ? "block" : "none" }}>
-                        <BasicInfo
+                        <Info
                             item={item}
                             formData={formData}
                             onUpdate={updateFormData}
