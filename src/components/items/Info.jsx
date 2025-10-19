@@ -6,14 +6,30 @@ import {
     IconButton,
     Button,
     InputAdornment,
+    Divider,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
+    CircularProgress,
 } from "@mui/material"
-import { Visibility, Edit, FolderOpen, Image } from "@mui/icons-material"
+import {
+    Visibility,
+    Edit,
+    FolderOpen,
+    Image,
+    Preview,
+} from "@mui/icons-material"
 import ReactMarkdown from "react-markdown"
 import { useState, useEffect } from "react"
 
-function BasicInfo({ item, formData, onUpdate }) {
+function Info({ item, formData, onUpdate }) {
     const [iconSrc, setIconSrc] = useState(null)
     const [isPreview, setIsPreview] = useState(false)
+    const [selectedInstanceKey, setSelectedInstanceKey] = useState("")
+    const [isConverting, setIsConverting] = useState(false)
+    const [textureStyle, setTextureStyle] = useState("cartoon")
+    const [useDevTools, setUseDevTools] = useState(false)
 
     useEffect(() => {
         // Load the icon when item changes or when staged icon changes
@@ -24,6 +40,21 @@ function BasicInfo({ item, formData, onUpdate }) {
             setIconSrc(null)
         }
     }, [item, formData.stagedIconPath])
+
+    // Keep selected instance in sync when instances list changes
+    useEffect(() => {
+        const entries = Object.entries(formData?.instances || {}).filter(
+            ([, inst]) => !inst?._toRemove,
+        )
+        if (entries.length === 0) {
+            setSelectedInstanceKey("")
+            return
+        }
+        setSelectedInstanceKey((prev) => {
+            const stillExists = entries.some(([key]) => key === prev)
+            return stillExists ? prev : entries[0][0]
+        })
+    }, [formData?.instances])
 
     // Get relative path from package root (show staged path if available)
     const getRelativeIconPath = () => {
@@ -86,6 +117,112 @@ function BasicInfo({ item, formData, onUpdate }) {
         ),
     }
 
+    const instanceEntries = Object.entries(formData?.instances || {}).filter(
+        ([, inst]) => !inst?._toRemove,
+    )
+
+    // Get the expected OBJ file path for the current instance
+    const getObjPath = () => {
+        if (!selectedInstanceKey || !item?.packagePath) return null
+
+        const instanceData = formData.instances?.[selectedInstanceKey]
+        const instanceName = instanceData?.Name
+        if (!instanceName) return null
+
+        // VMF2OBJ outputs to temp_models/ with only the filename base (no subdirs)
+        const tempDir = `${item.packagePath}/temp_models`
+        const fileBase = instanceName
+            .split(/[\\\//]/)
+            .pop()
+            ?.replace(/\.vmf$/i, "")
+        if (!fileBase) return null
+        return `${tempDir}/${fileBase}.obj`
+    }
+
+    // Get the expected MTL file path for the current instance
+    const getMtlPath = () => {
+        const objPath = getObjPath()
+        if (!objPath) return null
+        return objPath.replace(/\.obj$/i, ".mtl")
+    }
+
+    // Get display name for the current instance
+    const getInstanceDisplayName = () => {
+        if (!selectedInstanceKey) return null
+
+        const instanceData = formData.instances?.[selectedInstanceKey]
+        const idx = instanceEntries.findIndex(
+            ([key]) => key === selectedInstanceKey,
+        )
+        return instanceData?.displayName || `Instance ${idx + 1}`
+    }
+
+    const handleMakeModel = async () => {
+        if (!selectedInstanceKey || isConverting) return
+
+        setIsConverting(true)
+        try {
+            // Compute the on-disk VMF path for the selected instance
+            const instanceData = formData.instances?.[selectedInstanceKey]
+            const instanceName = instanceData?.Name
+            if (!instanceName) return
+
+            // Ask backend to resolve the VMF path and convert
+            const result = await window.package.convertInstanceToObj(
+                item.id,
+                selectedInstanceKey,
+                { textureStyle, debug: useDevTools },
+            )
+            if (result?.success) {
+                console.log("VMF2OBJ conversion completed successfully")
+                // Could add a success notification here
+            } else {
+                console.error("VMF2OBJ failed:", result?.error)
+                // Could add an error notification here
+            }
+        } catch (error) {
+            console.error("Failed to make model:", error)
+            // Could add an error notification here
+        } finally {
+            setIsConverting(false)
+        }
+    }
+
+    const handlePreview = async () => {
+        if (!selectedInstanceKey) return
+
+        const objPath = getObjPath()
+        const mtlPath = getMtlPath()
+
+        if (!objPath) {
+            alert("No OBJ path found. Please generate the model first.")
+            return
+        }
+
+        // Check if the OBJ file exists
+        try {
+            const stats = await window.package?.getFileStats?.(objPath)
+            if (!stats) {
+                alert(
+                    'Model file not found. Please click "Make Model" first to generate the 3D model.',
+                )
+                return
+            }
+        } catch (e) {
+            alert(
+                'Model file not found. Please click "Make Model" first to generate the 3D model.',
+            )
+            return
+        }
+
+        const title = `${getInstanceDisplayName() || "Instance"} — ${item?.name || "Model"}`
+        try {
+            await window.package?.showModelPreview?.(objPath, mtlPath, title)
+        } catch (e) {
+            console.error("Failed to open model preview:", e)
+        }
+    }
+
     return (
         <Box>
             <Box
@@ -95,7 +232,7 @@ function BasicInfo({ item, formData, onUpdate }) {
                     alignItems: "center",
                     mb: 2,
                 }}>
-                <Typography variant="h6">Basic Information</Typography>
+                <Typography variant="h6">Info</Typography>
             </Box>
 
             <Stack spacing={2} sx={{ height: "100%" }}>
@@ -253,9 +390,105 @@ function BasicInfo({ item, formData, onUpdate }) {
                         />
                     )}
                 </Box>
+
+                {/* Section divider */}
+                <Divider sx={{ my: 1 }} />
+
+                {/* Instance -> Model section */}
+                <Box>
+                    <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                        Instance Model
+                    </Typography>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                        <FormControl size="small" sx={{ minWidth: 160 }}>
+                            <InputLabel id="texture-style-label">
+                                Textures
+                            </InputLabel>
+                            <Select
+                                labelId="texture-style-label"
+                                label="Textures"
+                                value={textureStyle}
+                                onChange={(e) =>
+                                    setTextureStyle(e.target.value)
+                                }>
+                                <MenuItem value="cartoon">Cartoonish</MenuItem>
+                                <MenuItem value="raw">Raw</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <FormControl size="small" sx={{ minWidth: 160 }}>
+                            <InputLabel id="dev-tools-label">Mode</InputLabel>
+                            <Select
+                                labelId="dev-tools-label"
+                                label="Mode"
+                                value={useDevTools ? "dev" : "normal"}
+                                onChange={(e) =>
+                                    setUseDevTools(e.target.value === "dev")
+                                }>
+                                <MenuItem value="normal">Normal</MenuItem>
+                                <MenuItem value="dev">Use Dev Tools</MenuItem>
+                            </Select>
+                        </FormControl>
+                        <FormControl size="small" fullWidth>
+                            <InputLabel id="instance-select-label">
+                                Instance
+                            </InputLabel>
+                            <Select
+                                labelId="instance-select-label"
+                                label="Instance"
+                                value={selectedInstanceKey}
+                                onChange={(e) =>
+                                    setSelectedInstanceKey(e.target.value)
+                                }
+                                fullWidth>
+                                {instanceEntries.length === 0 ? (
+                                    <MenuItem value="" disabled>
+                                        No instances
+                                    </MenuItem>
+                                ) : (
+                                    instanceEntries.map(([key, inst], idx) => {
+                                        const displayName =
+                                            (inst.displayName ||
+                                                `Instance ${idx}`) +
+                                            (inst.Name ? ` — ${inst.Name}` : "")
+                                        return (
+                                            <MenuItem key={key} value={key}>
+                                                {displayName}
+                                            </MenuItem>
+                                        )
+                                    })
+                                )}
+                            </Select>
+                        </FormControl>
+                    </Stack>
+                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                        <Button
+                            variant="outlined"
+                            onClick={handlePreview}
+                            disabled={!selectedInstanceKey}
+                            startIcon={<Preview />}
+                            sx={{ flexShrink: 0 }}>
+                            Preview
+                        </Button>
+                        <Button
+                            variant="contained"
+                            onClick={handleMakeModel}
+                            disabled={!selectedInstanceKey || isConverting}
+                            fullWidth
+                            startIcon={
+                                isConverting ? (
+                                    <CircularProgress
+                                        size={20}
+                                        color="inherit"
+                                    />
+                                ) : null
+                            }>
+                            {isConverting ? "Converting..." : "Make Model"}
+                        </Button>
+                    </Stack>
+                </Box>
             </Stack>
         </Box>
     )
 }
 
-export default BasicInfo
+export default Info
