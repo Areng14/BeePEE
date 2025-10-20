@@ -8,6 +8,8 @@ const {
     sendItemUpdateToEditor,
     createItemCreationWindow,
     getCreateItemWindow,
+    createPackageCreationWindow,
+    getCreatePackageWindow,
 } = require("./items/itemEditor")
 const { ipcMain, dialog, BrowserWindow } = require("electron")
 const fs = require("fs")
@@ -829,9 +831,208 @@ function reg_events(mainWindow) {
         return { success: true }
     })
 
+    // Register package creation window handler
+    ipcMain.handle("open-create-package-window", async () => {
+        createPackageCreationWindow(mainWindow)
+        return { success: true }
+    })
+
+    // Register package creation handler
+    ipcMain.handle("create-package", async (event, { name, description }) => {
+        try {
+            console.log(`Creating new package: ${name}`)
+
+            // Validate inputs
+            if (!name || !name.trim()) {
+                throw new Error("Package name is required")
+            }
+
+            // Generate package ID: PACKAGENAME_UUID (4 chars)
+            const cleanName = name.replace(/[^a-zA-Z0-9]/g, "_").toUpperCase()
+            const generateShortUuid = () => {
+                return Math.random().toString(36).substring(2, 6).toUpperCase()
+            }
+            const packageId = `${cleanName}_${generateShortUuid()}`
+
+            // Create package directory in packages folder
+            const packagesDir = path.join(__dirname, "..", "packages")
+            if (!fs.existsSync(packagesDir)) {
+                fs.mkdirSync(packagesDir, { recursive: true })
+            }
+
+            const packageDir = path.join(packagesDir, packageId)
+            if (fs.existsSync(packageDir)) {
+                throw new Error("A package with this name already exists. Please try a different name.")
+            }
+
+            // Create package folder structure
+            fs.mkdirSync(packageDir, { recursive: true })
+            fs.mkdirSync(path.join(packageDir, "items"), { recursive: true })
+            fs.mkdirSync(path.join(packageDir, "resources", "instances"), { recursive: true })
+            fs.mkdirSync(path.join(packageDir, "resources", "BEE2", "items"), { recursive: true })
+
+            // Create info.json with package metadata
+            const info = {
+                ID: packageId,
+                Name: name.trim(),
+                Desc: description.trim() || "",
+                Item: []
+            }
+            fs.writeFileSync(
+                path.join(packageDir, "info.json"),
+                JSON.stringify(info, null, 4)
+            )
+
+            console.log(`Package created successfully: ${packageId}`)
+
+            // Load the newly created package
+            const pkg = await loadPackage(path.join(packageDir, "info.json"))
+            
+            // Send package loaded event to main window
+            mainWindow.webContents.send("package:loaded", pkg.items.map(item => item.toJSONWithExistence()))
+
+            // Close the create package window
+            const createWindow = getCreatePackageWindow()
+            if (createWindow && !createWindow.isDestroyed()) {
+                createWindow.close()
+            }
+
+            return { success: true, packageId, packageDir }
+        } catch (error) {
+            console.error("Failed to create package:", error)
+            throw error
+        }
+    })
+
+    // Register import package dialog handler
+    ipcMain.handle("import-package-dialog", async () => {
+        // Trigger the import from menu (reuse existing functionality)
+        const result = await dialog.showOpenDialog(mainWindow, {
+            properties: ["openFile"],
+            filters: [
+                {
+                    name: "BEEmod Package",
+                    extensions: ["bee_pack", "zip"],
+                },
+            ],
+        })
+        
+        if (result.canceled) return null
+
+        try {
+            const { importPackage } = require("./packageManager")
+            await importPackage(result.filePaths[0])
+            
+            // Continue progress from import (70%) to load (80%)
+            mainWindow.webContents.send("package-loading-progress", {
+                progress: 80,
+                message: "Loading imported package...",
+            })
+            
+            const pkg = await loadPackage(result.filePaths[0], true)
+            
+            // Send final completion message
+            mainWindow.webContents.send("package-loading-progress", {
+                progress: 100,
+                message: "Package imported and loaded successfully!",
+            })
+            
+            mainWindow.webContents.send("package:loaded", pkg.items.map(item => item.toJSONWithExistence()))
+            
+            return { success: true }
+        } catch (error) {
+            console.error("Failed to import package:", error)
+            throw error
+        }
+    })
+
     // Register generic file dialog handler
     ipcMain.handle("show-open-dialog", async (event, options) => {
         return await dialog.showOpenDialog(options)
+    })
+
+    // Register item deletion
+    ipcMain.handle("delete-item", async (event, { itemId }) => {
+        try {
+            console.log(`Attempting to delete item: ${itemId}`)
+
+            // Get current package
+            if (packages.length === 0) {
+                throw new Error("No package currently loaded")
+            }
+            const currentPackage = packages[0]
+
+            // Find the item
+            const itemIndex = currentPackage.items.findIndex(item => item.id === itemId)
+            if (itemIndex === -1) {
+                throw new Error(`Item not found: ${itemId}`)
+            }
+
+            const item = currentPackage.items[itemIndex]
+            
+            // Delete item folder and all contents
+            if (item.fullItemPath && fs.existsSync(item.fullItemPath)) {
+                fs.rmSync(item.fullItemPath, { recursive: true, force: true })
+                console.log(`Deleted item folder: ${item.fullItemPath}`)
+            }
+
+            // Delete instance files from resources folder
+            if (item.instances) {
+                const resourcesDir = path.join(currentPackage.packageDir, "resources/instances")
+                for (const [index, instanceData] of Object.entries(item.instances)) {
+                    if (instanceData.Name) {
+                        // Clean the instance path
+                        const instancePath = instanceData.Name.replace(/^instances\/BEE2\//, "instances/")
+                        const fullInstancePath = path.join(currentPackage.packageDir, "resources", instancePath)
+                        
+                        if (fs.existsSync(fullInstancePath)) {
+                            fs.unlinkSync(fullInstancePath)
+                            console.log(`Deleted instance file: ${fullInstancePath}`)
+                        }
+                    }
+                }
+            }
+
+            // Delete icon if it exists
+            if (item.icon && fs.existsSync(item.icon)) {
+                try {
+                    fs.unlinkSync(item.icon)
+                    console.log(`Deleted icon: ${item.icon}`)
+                } catch (iconError) {
+                    console.warn(`Could not delete icon: ${iconError.message}`)
+                }
+            }
+
+            // Remove from info.json
+            const infoPath = path.join(currentPackage.packageDir, "info.json")
+            if (fs.existsSync(infoPath)) {
+                const info = JSON.parse(fs.readFileSync(infoPath, "utf-8"))
+                
+                if (Array.isArray(info.Item)) {
+                    info.Item = info.Item.filter(i => i.ID !== itemId)
+                } else if (info.Item && info.Item.ID === itemId) {
+                    info.Item = []
+                }
+                
+                fs.writeFileSync(infoPath, JSON.stringify(info, null, 4))
+                console.log(`Removed item from info.json`)
+            }
+
+            // Remove from package items array
+            currentPackage.items.splice(itemIndex, 1)
+
+            // Send updated items to main window
+            const updatedItems = currentPackage.items.map((item) =>
+                item.toJSONWithExistence(),
+            )
+            mainWindow.webContents.send("package:loaded", updatedItems)
+
+            console.log(`Successfully deleted item: ${itemId}`)
+            return { success: true, itemId }
+        } catch (error) {
+            console.error("Failed to delete item:", error)
+            throw error
+        }
     })
 
     // Register item saving
@@ -912,8 +1113,10 @@ function reg_events(mainWindow) {
 
             // Add instances to editoritems
             instancePaths.forEach((instancePath, index) => {
+                // Use just the filename for the instance name
+                const instanceFileName = path.basename(instancePath)
                 editoritems.Item.Exporting.Instances[index.toString()] = {
-                    Name: instancePath,
+                    Name: `instances/${instanceFileName}`,
                     EntityCount: 0,
                     BrushCount: 0,
                     BrushSideCount: 0
@@ -1002,7 +1205,7 @@ function reg_events(mainWindow) {
             const updatedItems = currentPackage.items.map((item) =>
                 item.toJSONWithExistence(),
             )
-            mainWindow.webContents.send("package-loaded", updatedItems)
+            mainWindow.webContents.send("package:loaded", updatedItems)
 
             // Close the create item window if it's open
             const createWindow = getCreateItemWindow()
@@ -1052,7 +1255,7 @@ function reg_events(mainWindow) {
             const updatedItems = reloadedPackage.items.map((item) =>
                 item.toJSONWithExistence(),
             )
-            mainWindow.webContents.send("package-loaded", updatedItems)
+            mainWindow.webContents.send("package:loaded", updatedItems)
 
             console.log("Package reloaded successfully")
             return { success: true, itemCount: updatedItems.length }

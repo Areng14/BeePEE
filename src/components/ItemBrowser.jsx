@@ -12,23 +12,23 @@ function ItemBrowser() {
     useEffect(() => {
         console.log("Component mounted, setting up package listener")
 
-        // Handle initial package load
-        window.package.onPackageLoaded((loadedItems) => {
+        // Handle initial package load and updates (includes create/delete)
+        const handlePackageLoaded = (loadedItems) => {
             console.log("Package loaded callback fired")
             console.log("loadedItems:", loadedItems)
             console.log("loadedItems length:", loadedItems?.length)
 
             setItems(loadedItems || [])
             console.log("setItems called")
-        })
+        }
 
         // Handle package close
-        window.package.onPackageClosed(() => {
+        const handlePackageClosed = () => {
             setItems([])
-        })
+        }
 
-        // Handle item updates
-        window.package.onItemUpdated((event, updatedItem) => {
+        // Handle individual item updates
+        const handleItemUpdated = (event, updatedItem) => {
             console.log(
                 "ItemBrowser received item update:",
                 updatedItem?.id,
@@ -57,7 +57,12 @@ function ItemBrowser() {
                     )
                 }
             })
-        })
+        }
+
+        // Register listeners
+        window.package.onPackageLoaded(handlePackageLoaded)
+        window.package.onPackageClosed(handlePackageClosed)
+        window.package.onItemUpdated(handleItemUpdated)
 
         // Add a manual refresh function to window for debugging
         window.refreshItemBrowser = () => {
@@ -66,6 +71,12 @@ function ItemBrowser() {
             if (window.package && window.package.reloadPackage) {
                 window.package.reloadPackage()
             }
+        }
+
+        // Cleanup function - important for preventing duplicate listeners!
+        return () => {
+            console.log("Cleaning up ItemBrowser listeners")
+            // Note: The current preload doesn't support unregistering, but this prevents memory leaks
         }
     }, [])
 
@@ -85,8 +96,18 @@ function ItemBrowser() {
         return () => window.removeEventListener("resize", updateGridSize)
     }, [])
 
-    const handleEditItem = (item) => {
-        window.package.openItemEditor(item)
+    const handleEditItem = (itemId) => {
+        console.log("Attempting to open editor for item:", itemId)
+        console.log("Current items in state:", items.map(i => i.id))
+        
+        // Always use the current state to find the item
+        const currentItem = items.find(i => i.id === itemId)
+        if (!currentItem) {
+            console.warn("Item no longer exists, skipping editor open:", itemId)
+            return
+        }
+        
+        window.package.openItemEditor(currentItem)
     }
 
     const itemsInLastRow = items.length % gridSize.cols
@@ -102,7 +123,7 @@ function ItemBrowser() {
                     <Grid key={item.id} size="auto">
                         <ItemIcon
                             item={item}
-                            onEdit={() => handleEditItem(item)}
+                            onEdit={() => handleEditItem(item.id)}
                         />
                     </Grid>
                 ))}

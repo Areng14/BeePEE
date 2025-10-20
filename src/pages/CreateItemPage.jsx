@@ -124,23 +124,6 @@ function CreateItemPage() {
                 <Typography variant="h6" sx={{ fontWeight: 600 }}>
                     Create New Item
                 </Typography>
-                <Stack direction="row" spacing={1}>
-                    <Button
-                        variant="contained"
-                        color="primary"
-                        onClick={handleCreate}
-                        disabled={loading || !name.trim() || !author.trim() || instancePaths.length === 0}
-                        startIcon={loading ? null : <CheckCircle />}>
-                        {loading ? "Creating..." : "Create"}
-                    </Button>
-                    <Button
-                        variant="outlined"
-                        onClick={() => window.close()}
-                        disabled={loading}
-                        startIcon={<Close />}>
-                        Cancel
-                    </Button>
-                </Stack>
             </Box>
 
             {/* Main Content */}
@@ -296,6 +279,35 @@ function CreateItemPage() {
                         )}
                     </Box>
                 </Box>
+            </Box>
+
+            {/* Footer with Create/Cancel Buttons */}
+            <Box
+                sx={{
+                    p: 2,
+                    borderTop: 1,
+                    borderColor: "divider",
+                    bgcolor: "background.paper",
+                }}>
+                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Button
+                        variant="outlined"
+                        onClick={() => window.close()}
+                        disabled={loading}
+                        startIcon={<Close />}
+                        sx={{ minWidth: 120 }}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleCreate}
+                        disabled={loading || !name.trim() || !author.trim() || instancePaths.length === 0}
+                        startIcon={loading ? null : <CheckCircle />}
+                        sx={{ minWidth: 120 }}>
+                        {loading ? "Creating..." : "Create"}
+                    </Button>
+                </Stack>
             </Box>
         </Box>
     )

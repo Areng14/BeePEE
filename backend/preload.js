@@ -12,10 +12,16 @@ contextBridge.exposeInMainWorld("package", {
     // ========================================
     loadPackage: () => ipcRenderer.invoke("dialog:loadPackage"),
     loadFile: (path) => ipcRenderer.invoke("api:loadImage", path),
-    onPackageLoaded: (callback) =>
-        ipcRenderer.on("package:loaded", (event, items) => callback(items)),
-    onPackageClosed: (callback) =>
-        ipcRenderer.on("package:closed", () => callback()),
+    onPackageLoaded: (callback) => {
+        // Remove existing listeners to prevent stacking
+        ipcRenderer.removeAllListeners("package:loaded")
+        ipcRenderer.on("package:loaded", (event, items) => callback(items))
+    },
+    onPackageClosed: (callback) => {
+        // Remove existing listeners to prevent stacking
+        ipcRenderer.removeAllListeners("package:closed")
+        ipcRenderer.on("package:closed", () => callback())
+    },
 
     // ========================================
     // ITEM EDITING FUNCTIONS
@@ -36,12 +42,12 @@ contextBridge.exposeInMainWorld("package", {
     browseForIconFile: () => ipcRenderer.invoke("browse-for-icon-file"),
     saveItem: (itemData) => ipcRenderer.invoke("save-item", itemData),
     onItemUpdated: (callback) => {
+        // Remove existing listeners to prevent stacking
+        ipcRenderer.removeAllListeners("item-updated")
         if (callback) {
             ipcRenderer.on("item-updated", (event, item) =>
                 callback(event, item),
             )
-        } else {
-            ipcRenderer.removeAllListeners("item-updated")
         }
     },
 
