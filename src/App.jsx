@@ -2,15 +2,17 @@ import { BrowserRouter, Routes, Route } from "react-router-dom"
 import { useState, useEffect } from "react"
 import ItemBrowser from "./components/ItemBrowser"
 import ItemEditor from "./components/ItemEditor"
+import CreateItemPage from "./pages/CreateItemPage"
 import LoadingPopup from "./components/LoadingPopup"
 import { ItemProvider } from "./contexts/ItemContext"
 import "./global.css"
 
 function App() {
-    // Check if this window should show the editor (for production builds)
+    // Check if this window should show the editor or create page (for production builds)
     const urlParams = new URLSearchParams(window.location.search)
     const routeParam = urlParams.get('route')
     const showEditor = routeParam === 'editor'
+    const showCreateItem = routeParam === 'create-item'
     const [loadingState, setLoadingState] = useState({
         open: false,
         progress: 0,
@@ -63,6 +65,9 @@ function App() {
                         }
                     />
                 </>
+            ) : showCreateItem ? (
+                // Show CreateItemPage directly for production create windows
+                <CreateItemPage />
             ) : (
                 // Use normal routing for main window and development
                 <>
@@ -70,6 +75,7 @@ function App() {
                         <Routes>
                             <Route path="/" element={<ItemBrowser />} />
                             <Route path="/editor" element={<ItemEditor />} />
+                            <Route path="/create-item" element={<CreateItemPage />} />
                         </Routes>
                     </BrowserRouter>
                     <LoadingPopup

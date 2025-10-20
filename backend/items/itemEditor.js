@@ -1,4 +1,5 @@
 const openEditors = new Map()
+let createItemWindow = null // Track the create item window
 const { BrowserWindow } = require("electron")
 const path = require("path")
 
@@ -60,4 +61,51 @@ function sendItemUpdateToEditor(itemId, updatedItem) {
     }
 }
 
-module.exports = { createItemEditor, sendItemUpdateToEditor, openEditors }
+function createItemCreationWindow(mainWindow) {
+    // If window already exists, focus it
+    if (createItemWindow && !createItemWindow.isDestroyed()) {
+        createItemWindow.focus()
+        return
+    }
+
+    const isDev = !require("electron").app.isPackaged
+
+    createItemWindow = new BrowserWindow({
+        width: 600,
+        height: 750,
+        title: "BeePEE - Create New Item",
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, "..", "preload.js"),
+        },
+        devTools: isDev,
+        skipTaskbar: false,
+        minimizable: true,
+        maximizable: false,
+        resizable: false,
+        autoHideMenuBar: true,
+    })
+
+    createItemWindow.on("closed", () => {
+        createItemWindow = null
+    })
+
+    if (isDev) {
+        createItemWindow.loadURL(`http://localhost:5173/create-item`)
+    } else {
+        createItemWindow.loadFile(path.join(__dirname, "../dist/index.html"), { 
+            query: { route: "create-item" } 
+        })
+    }
+
+    createItemWindow.setMenuBarVisibility(false)
+}
+
+module.exports = { 
+    createItemEditor, 
+    sendItemUpdateToEditor, 
+    openEditors,
+    createItemCreationWindow,
+    getCreateItemWindow: () => createItemWindow
+}

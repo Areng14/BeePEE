@@ -95,6 +95,8 @@ const validateBlock = (
             )
         case "changeInstance":
             return validateChangeInstanceBlock(block, formData)
+        case "randomSelection":
+            return validateRandomSelectionBlock(block, formData)
         case "addOverlay":
             return validateAddOverlayBlock(block, formData)
         case "addGlobalEnt":
@@ -659,6 +661,44 @@ const validateChangeInstanceBlock = (block, formData = {}) => {
                 field: "instanceName",
             })
         }
+    }
+
+    return errors
+}
+
+const validateRandomSelectionBlock = (block, formData = {}) => {
+    const errors = []
+
+    if (!block.options || !Array.isArray(block.options) || block.options.length === 0) {
+        errors.push({
+            type: "error",
+            message: "Random Selection block must have at least one option",
+            field: "options",
+        })
+    } else if (block.options.length < 2) {
+        errors.push({
+            type: "warning",
+            message: "Random Selection should have at least 2 options to be useful",
+            field: "options",
+        })
+    }
+
+    // Validate each option if they're instance paths
+    if (block.options && formData.instances) {
+        block.options.forEach((option, index) => {
+            if (typeof option === "string" && option.trim() !== "") {
+                const instanceExists = Object.values(formData.instances).some(
+                    (instance) => !instance._toRemove && instance.Name === option
+                )
+                if (!instanceExists) {
+                    errors.push({
+                        type: "info",
+                        message: `Option ${index + 1}: Instance "${option}" may not exist in the package`,
+                        field: `options[${index}]`,
+                    })
+                }
+            }
+        })
     }
 
     return errors
@@ -1946,6 +1986,8 @@ function SortableBlock({
                 return <Code fontSize="small" />
             case "changeInstance":
                 return <SwapHoriz fontSize="small" />
+            case "randomSelection":
+                return <Hive fontSize="small" />
             case "addOverlay":
                 return <AddCircleOutline fontSize="small" />
             case "addGlobalEnt":
@@ -2080,6 +2122,27 @@ function SortableBlock({
                         availableInstances={availableInstances}
                         editingNames={editingNames}
                     />
+                )
+
+            case "randomSelection":
+                return (
+                    <Box>
+                        <Typography variant="body2" sx={{ mb: 1, color: "#888" }}>
+                            Randomly selects one of the following:
+                        </Typography>
+                        <List dense sx={{ pl: 2 }}>
+                            {block.options && block.options.map((option, index) => (
+                                <ListItem key={index} sx={{ py: 0.5 }}>
+                                    <ListItemText
+                                        primary={`${index + 1}. ${option}`}
+                                        primaryTypographyProps={{
+                                            sx: { fontSize: "0.85rem", fontFamily: "monospace" }
+                                        }}
+                                    />
+                                </ListItem>
+                            ))}
+                        </List>
+                    </Box>
                 )
 
             case "addOverlay":
@@ -4406,6 +4469,28 @@ function Conditions({
                 if (condition.Result && typeof condition.Result === "object") {
                     const resultBlocks = processCondition(condition.Result)
                     blocks.push(...resultBlocks)
+                }
+
+                // Process "random" blocks - randomly selects one option
+                if (condition.random && Array.isArray(condition.random)) {
+                    console.log("Found random array:", condition.random)
+                    // Create a random selection group block
+                    const randomBlock = {
+                        id: `random_${generateUniqueId()}`,
+                        type: "randomSelection",
+                        displayName: "Random Selection",
+                        options: condition.random.map((item, index) => {
+                            // Each item in the random array might have a ChangeInstance
+                            if (typeof item === "string") {
+                                return item
+                            } else if (typeof item === "object" && item.Changeinstance) {
+                                return item.Changeinstance || item.changeInstance
+                            }
+                            return `Option ${index + 1}`
+                        }),
+                        thenBlocks: [] // For nested actions if any
+                    }
+                    blocks.push(randomBlock)
                 }
 
                 return blocks

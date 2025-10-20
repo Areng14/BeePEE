@@ -1,5 +1,11 @@
 const { contextBridge, ipcRenderer } = require("electron")
 
+// Expose general electron API
+contextBridge.exposeInMainWorld("electron", {
+    invoke: (channel, data) => ipcRenderer.invoke(channel, data),
+    showOpenDialog: (options) => ipcRenderer.invoke("show-open-dialog", options),
+})
+
 contextBridge.exposeInMainWorld("package", {
     // ========================================
     // PACKAGE MANAGEMENT FUNCTIONS
