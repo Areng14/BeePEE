@@ -31,6 +31,7 @@ import {
     Functions,
     DataObject,
     Rule,
+    Delete,
 } from "@mui/icons-material"
 import Info from "./items/Info"
 import Inputs from "./items/Inputs"
@@ -48,6 +49,8 @@ function ItemEditor() {
     const [showSaveSuccess, setShowSaveSuccess] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
     const [discardDialogOpen, setDiscardDialogOpen] = useState(false)
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
 
     // Undo/Redo system
     const [undoStack, setUndoStack] = useState([])
@@ -729,6 +732,23 @@ function ItemEditor() {
         setDiscardDialogOpen(false)
     }
 
+    const handleDeleteItem = async () => {
+        setIsDeleting(true)
+        try {
+            const result = await window.electron.invoke("delete-item", { itemId: item.id })
+            if (result.success) {
+                // Close the editor window after successful deletion
+                window.close()
+            }
+        } catch (error) {
+            console.error("Failed to delete item:", error)
+            setSaveError(error.message || "Failed to delete item")
+            setDeleteDialogOpen(false)
+        } finally {
+            setIsDeleting(false)
+        }
+    }
+
     if (!item) return null
 
     console.log(item)
@@ -1043,6 +1063,17 @@ function ItemEditor() {
                                 : "Close"}
                         </Button>
                     </Tooltip>
+                    <Box sx={{ flex: 1 }} />
+                    <Tooltip title="Delete this item permanently">
+                        <Button
+                            variant="outlined"
+                            startIcon={<Delete />}
+                            onClick={() => setDeleteDialogOpen(true)}
+                            color="error"
+                            disabled={isDeleting}>
+                            Delete
+                        </Button>
+                    </Tooltip>
                 </Stack>
                 {saveError && (
                     <Alert
@@ -1079,6 +1110,45 @@ function ItemEditor() {
                         color="error"
                         variant="contained">
                         Discard Changes
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Delete Item Confirmation Dialog */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={() => !isDeleting && setDeleteDialogOpen(false)}
+                aria-labelledby="delete-dialog-title"
+                aria-describedby="delete-dialog-description">
+                <DialogTitle id="delete-dialog-title">
+                    Delete Item "{item.name}"?
+                </DialogTitle>
+                <DialogContent>
+                    <DialogContentText id="delete-dialog-description">
+                        This will permanently delete the item and all its associated files.
+                        This action cannot be undone.
+                    </DialogContentText>
+                    <Alert severity="warning" sx={{ mt: 2 }}>
+                        <strong>Warning:</strong> All data for this item will be lost, including:
+                        <ul style={{ marginTop: 8, marginBottom: 0 }}>
+                            <li>Item configuration</li>
+                            <li>All instances</li>
+                            <li>Conditions and variables</li>
+                            <li>Metadata</li>
+                        </ul>
+                    </Alert>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleDeleteItem}
+                        color="error"
+                        variant="contained"
+                        disabled={isDeleting}
+                        startIcon={isDeleting ? <CircularProgress size={20} color="inherit" /> : <Delete />}>
+                        {isDeleting ? "Deleting..." : "Delete Permanently"}
                     </Button>
                 </DialogActions>
             </Dialog>

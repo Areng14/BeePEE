@@ -3370,7 +3370,7 @@ const BLOCK_DEFINITIONS = {
     addOverlay: {
         displayName: "Add Overlay",
         description:
-            "Add an additional instance file on top of the current one (e.g., add decorations or effects)",
+            "Add an additional instance file on top of the current one (e.g., add another thing ontop of it)",
         category: "Actions",
         canContainChildren: false,
     },
