@@ -12,15 +12,22 @@ contextBridge.exposeInMainWorld("package", {
     // ========================================
     loadPackage: () => ipcRenderer.invoke("dialog:loadPackage"),
     loadFile: (path) => ipcRenderer.invoke("api:loadImage", path),
+    getCurrentItems: () => ipcRenderer.invoke("get-current-items"),
     onPackageLoaded: (callback) => {
-        // Remove existing listeners to prevent stacking
-        ipcRenderer.removeAllListeners("package:loaded")
-        ipcRenderer.on("package:loaded", (event, items) => callback(items))
+        // Note: We DON'T remove all listeners here because multiple components need to listen
+        // (App.jsx for navigation, ItemBrowser for loading items)
+        ipcRenderer.on("package:loaded", (event, items) => {
+            console.log("preload.js: Received package:loaded event with items:", items?.length)
+            callback(items)
+        })
     },
     onPackageClosed: (callback) => {
-        // Remove existing listeners to prevent stacking
-        ipcRenderer.removeAllListeners("package:closed")
-        ipcRenderer.on("package:closed", () => callback())
+        // Note: We DON'T remove all listeners here because multiple components need to listen
+        // (App.jsx for navigation, ItemBrowser for clearing items)
+        ipcRenderer.on("package:closed", () => {
+            console.log("preload.js: Received package:closed event")
+            callback()
+        })
     },
 
     // ========================================

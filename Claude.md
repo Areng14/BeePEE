@@ -5,6 +5,18 @@ BeePEE is an Electron-based application for creating and editing Portal 2 Puzzle
 
 ## Recent Development Work
 
+### Welcome Screen & Package Creation
+- **Implemented**: Welcome screen that shows when no package is loaded
+- **Features**:
+  - Three main actions: New Package, Open Package, Import Package
+  - Compact, modern card-based UI
+  - Package creation in separate window
+  - Package ID format: `PACKAGENAME_UUID` (4 characters)
+  - Required fields: Package Name, Description
+  - Automatic transition to ItemBrowser after package load
+  - State management tracks whether a package is loaded
+  - Creates proper package structure with `info.json`
+
 ### Item Creation System
 - **Implemented**: Full item creation workflow with separate window
 - **Features**:
