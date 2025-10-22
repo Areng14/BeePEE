@@ -1,5 +1,6 @@
 const openEditors = new Map()
 let createItemWindow = null // Track the create item window
+let createPackageWindow = null // Track the create package window
 const { BrowserWindow } = require("electron")
 const path = require("path")
 
@@ -102,10 +103,53 @@ function createItemCreationWindow(mainWindow) {
     createItemWindow.setMenuBarVisibility(false)
 }
 
-module.exports = { 
-    createItemEditor, 
-    sendItemUpdateToEditor, 
+function createPackageCreationWindow(mainWindow) {
+    // If window already exists, focus it
+    if (createPackageWindow && !createPackageWindow.isDestroyed()) {
+        createPackageWindow.focus()
+        return
+    }
+
+    const isDev = !require("electron").app.isPackaged
+
+    createPackageWindow = new BrowserWindow({
+        width: 500,
+        height: 500,
+        title: "BeePEE - Create New Package",
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, "..", "preload.js"),
+        },
+        devTools: isDev,
+        skipTaskbar: false,
+        minimizable: true,
+        maximizable: false,
+        resizable: false,
+        autoHideMenuBar: true,
+    })
+
+    createPackageWindow.on("closed", () => {
+        createPackageWindow = null
+    })
+
+    if (isDev) {
+        createPackageWindow.loadURL(`http://localhost:5173/create-package`)
+    } else {
+        createPackageWindow.loadFile(path.join(__dirname, "../dist/index.html"), { 
+            query: { route: "create-package" } 
+        })
+    }
+
+    createPackageWindow.setMenuBarVisibility(false)
+}
+
+module.exports = {
+    createItemEditor,
+    sendItemUpdateToEditor,
     openEditors,
     createItemCreationWindow,
-    getCreateItemWindow: () => createItemWindow
+    getCreateItemWindow: () => createItemWindow,
+    createPackageCreationWindow,
+    getCreatePackageWindow: () => createPackageWindow
 }

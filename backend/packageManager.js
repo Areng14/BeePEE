@@ -555,18 +555,33 @@ const unloadPackage = async (packageName, remove = false) => {
 }
 
 const extractPackage = async (pathToPackage, packageDir) => {
-    console.log("Extracting package...")
+    console.log("Extracting package from:", pathToPackage)
+    console.log("Extracting to:", packageDir)
+    
     const stream = extractFull(pathToPackage, packageDir, {
         $bin: path7za,
         recursive: true,
     })
 
+    // Log extraction progress
+    stream.on("progress", (progress) => {
+        console.log("Extraction progress:", progress.percent + "%")
+    })
+
+    stream.on("data", (data) => {
+        console.log("Extracted:", data.file)
+    })
+
     await new Promise((resolve, reject) => {
-        stream.on("end", resolve)
+        stream.on("end", () => {
+            console.log("Extraction stream ended successfully")
+            resolve()
+        })
         stream.on("error", (error) => {
+            console.error("Extraction error details:", error)
             reject(
                 new Error(
-                    `[package : ${path.basename(pathToPackage)}]: Extraction failed - ${error.message}`,
+                    `[package : ${path.basename(pathToPackage)}]: Extraction failed - ${error.message || error}`,
                 ),
             )
         })
@@ -578,13 +593,29 @@ const importPackage = async (pathToPackage) => {
     return timeOperation("Import package", async () => {
         let tempPkg = null
         try {
+            console.log("Importing package from:", pathToPackage)
+            
+            // Validate that the file exists and is an archive
+            if (!fs.existsSync(pathToPackage)) {
+                throw new Error(`Package file not found: ${pathToPackage}`)
+            }
+            
+            const ext = path.extname(pathToPackage).toLowerCase()
+            if (ext !== '.bee_pack' && ext !== '.zip') {
+                throw new Error(`Invalid package format. Expected .bee_pack or .zip, got: ${ext}`)
+            }
+            
             sendProgressUpdate(0, "Starting package import...")
 
             tempPkg = new Package(pathToPackage)
+            console.log("Package name:", tempPkg.name)
+            console.log("Package will be extracted to:", tempPkg.packageDir)
+            
             sendProgressUpdate(10, "Preparing package directory...")
 
             // Extract package - wipe existing directory first
             if (fs.existsSync(tempPkg.packageDir)) {
+                console.log("Removing existing package directory:", tempPkg.packageDir)
                 fs.rmSync(tempPkg.packageDir, { recursive: true, force: true })
                 console.log(
                     "Wiped existing package directory before import extraction",
@@ -648,12 +679,6 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
                 sendProgressUpdate(0, "Starting package load...")
             }
 
-            // Create package instance
-            const pkg = new Package(pathToPackage)
-            if (!skipProgressReset) {
-                sendProgressUpdate(10, "Preparing package directory...")
-            }
-
             // Check if the package file exists
             if (!fs.existsSync(pathToPackage)) {
                 throw new Error(
@@ -661,28 +686,60 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
                 )
             }
 
-            // Always extract fresh - wipe existing directory first
-            if (fs.existsSync(pkg.packageDir)) {
-                fs.rmSync(pkg.packageDir, { recursive: true, force: true })
-                console.log(
-                    "Wiped existing package directory before extraction",
-                )
-            }
-            fs.mkdirSync(pkg.packageDir, { recursive: true })
+            // Determine if we're loading from an already-extracted package (info.json) or an archive
+            const isInfoJson = path.basename(pathToPackage) === "info.json"
+            
+            let pkg
+            let packageDir
 
-            if (!skipProgressReset) {
-                sendProgressUpdate(20, "Extracting package files...")
-            }
-            await extractPackage(pathToPackage, pkg.packageDir)
+            if (isInfoJson) {
+                // Loading from already-extracted package directory
+                console.log("Loading from already-extracted package:", pathToPackage)
+                packageDir = path.dirname(pathToPackage)
+                
+                // Create a temporary Package instance just to get the packageDir path structure
+                // We'll use the actual directory path instead
+                pkg = new Package(pathToPackage)
+                pkg.packageDir = packageDir // Override with the actual directory
+                
+                if (!skipProgressReset) {
+                    sendProgressUpdate(50, "Loading extracted package...")
+                }
+            } else {
+                // Loading from archive - need to extract
+                console.log("Loading from archive:", pathToPackage)
+                
+                // Create package instance
+                pkg = new Package(pathToPackage)
+                packageDir = pkg.packageDir
+                
+                if (!skipProgressReset) {
+                    sendProgressUpdate(10, "Preparing package directory...")
+                }
 
-            if (!skipProgressReset) {
-                sendProgressUpdate(50, "Processing VDF files...")
+                // Always extract fresh - wipe existing directory first
+                if (fs.existsSync(packageDir)) {
+                    fs.rmSync(packageDir, { recursive: true, force: true })
+                    console.log(
+                        "Wiped existing package directory before extraction",
+                    )
+                }
+                fs.mkdirSync(packageDir, { recursive: true })
+
+                if (!skipProgressReset) {
+                    sendProgressUpdate(20, "Extracting package files...")
+                }
+                await extractPackage(pathToPackage, packageDir)
+
+                if (!skipProgressReset) {
+                    sendProgressUpdate(50, "Processing VDF files...")
+                }
+                // Process all VDF files recursively (convert .txt to .json)
+                await timeOperation("Process VDF files", () => {
+                    processVdfFiles(packageDir)
+                    return Promise.resolve()
+                })
             }
-            // Process all VDF files recursively (convert .txt to .json)
-            await timeOperation("Process VDF files", () => {
-                processVdfFiles(pkg.packageDir)
-                return Promise.resolve()
-            })
 
             if (!skipProgressReset) {
                 sendProgressUpdate(80, "Loading package data...")
@@ -723,11 +780,23 @@ const reg_loadPackagePopup = () => {
     ipcMain.handle("dialog:loadPackage", async () => {
         const result = await dialog.showOpenDialog({
             properties: ["openFile"],
+            filters: [
+                {
+                    name: "BeePEE Package",
+                    extensions: ["bpee"],
+                },
+            ],
         })
 
         if (result.canceled) return null
 
         const pkg = await loadPackage(result.filePaths[0])
+        
+        // Send package loaded event to main window
+        if (mainWindow) {
+            mainWindow.webContents.send("package:loaded", pkg.items.map(item => item.toJSONWithExistence()))
+        }
+        
         return pkg.items // return the package's items
     })
 }
@@ -893,6 +962,7 @@ module.exports = {
     importPackage,
     unloadPackage,
     packages,
+    Package,
     savePackageAsBpee,
     exportPackageAsBeePack,
     clearPackagesDirectory,

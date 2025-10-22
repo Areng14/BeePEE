@@ -3,6 +3,8 @@ import { useState, useEffect } from "react"
 import ItemBrowser from "./components/ItemBrowser"
 import ItemEditor from "./components/ItemEditor"
 import CreateItemPage from "./pages/CreateItemPage"
+import CreatePackagePage from "./pages/CreatePackagePage"
+import WelcomePage from "./pages/WelcomePage"
 import LoadingPopup from "./components/LoadingPopup"
 import { ItemProvider } from "./contexts/ItemContext"
 import "./global.css"
@@ -13,6 +15,8 @@ function App() {
     const routeParam = urlParams.get('route')
     const showEditor = routeParam === 'editor'
     const showCreateItem = routeParam === 'create-item'
+    const showCreatePackage = routeParam === 'create-package'
+    const [packageLoaded, setPackageLoaded] = useState(false)
     const [loadingState, setLoadingState] = useState({
         open: false,
         progress: 0,
@@ -36,8 +40,31 @@ function App() {
             }
         }
 
+        // Listen for package loaded event
+        const handlePackageLoaded = (items) => {
+            console.log("Package loaded in App.jsx, items:", items?.length)
+            console.log("Setting packageLoaded to true")
+            setPackageLoaded(true)
+        }
+
+        // Listen for package closed event
+        const handlePackageClosed = () => {
+            console.log("Package closed in App.jsx")
+            console.log("Setting packageLoaded to false")
+            setPackageLoaded(false)
+            console.log("packageLoaded is now:", false)
+        }
+
         if (window.package?.onPackageLoadingProgress) {
             window.package.onPackageLoadingProgress(handleProgress)
+        }
+
+        if (window.package?.onPackageLoaded) {
+            window.package.onPackageLoaded(handlePackageLoaded)
+        }
+
+        if (window.package?.onPackageClosed) {
+            window.package.onPackageClosed(handlePackageClosed)
         }
 
         return () => {
@@ -68,14 +95,33 @@ function App() {
             ) : showCreateItem ? (
                 // Show CreateItemPage directly for production create windows
                 <CreateItemPage />
+            ) : showCreatePackage ? (
+                // Show CreatePackagePage directly for production create windows
+                <CreatePackagePage />
             ) : (
                 // Use normal routing for main window and development
                 <>
                     <BrowserRouter>
                         <Routes>
-                            <Route path="/" element={<ItemBrowser />} />
+                            <Route 
+                                path="/" 
+                                element={
+                                    packageLoaded ? (
+                                        (() => {
+                                            console.log("Rendering ItemBrowser (packageLoaded=true)")
+                                            return <ItemBrowser />
+                                        })()
+                                    ) : (
+                                        (() => {
+                                            console.log("Rendering WelcomePage (packageLoaded=false)")
+                                            return <WelcomePage />
+                                        })()
+                                    )
+                                } 
+                            />
                             <Route path="/editor" element={<ItemEditor />} />
                             <Route path="/create-item" element={<CreateItemPage />} />
+                            <Route path="/create-package" element={<CreatePackagePage />} />
                         </Routes>
                     </BrowserRouter>
                     <LoadingPopup

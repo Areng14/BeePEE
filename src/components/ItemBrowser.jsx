@@ -12,6 +12,20 @@ function ItemBrowser() {
     useEffect(() => {
         console.log("Component mounted, setting up package listener")
 
+        // Fetch current items on mount (in case package was already loaded)
+        const fetchCurrentItems = async () => {
+            try {
+                const currentItems = await window.package.getCurrentItems?.()
+                if (currentItems && currentItems.length > 0) {
+                    console.log("ItemBrowser: Fetched current items on mount:", currentItems.length)
+                    setItems(currentItems)
+                }
+            } catch (error) {
+                console.log("ItemBrowser: No current items available (this is normal for new packages)")
+            }
+        }
+        fetchCurrentItems()
+
         // Handle initial package load and updates (includes create/delete)
         const handlePackageLoaded = (loadedItems) => {
             console.log("Package loaded callback fired")
@@ -24,6 +38,7 @@ function ItemBrowser() {
 
         // Handle package close
         const handlePackageClosed = () => {
+            console.log("ItemBrowser: Package closed, clearing items")
             setItems([])
         }
 
