@@ -6,6 +6,7 @@ const vdf = require("vdf-parser")
 const path7za = require("7zip-bin").path7za
 const { extractFull } = require("node-7z")
 const { add } = require("node-7z")
+const { spawn } = require("child_process")
 const { timeOperation } = require("./utils/timing")
 const { vmfStatsCache } = require("./utils/vmfParser")
 
@@ -184,15 +185,32 @@ function convertJsonToVdf(jsonData, indent = 0, parentKey = null) {
             (a, b) => parseInt(a, 10) - parseInt(b, 10),
         )
 
-        for (const key of sortedKeys) {
+        // Check if all values are simple (non-object) types
+        const allSimpleValues = sortedKeys.every(key => {
             const value = jsonData[key]
-            if (typeof value === "object" && value !== null) {
-                // Write array element as a separate block
-                // Use the parent key name for each array element
-                if (parentKey) {
-                    vdfString += `${indentStr}"${parentKey}"\n${indentStr}{\n`
-                    vdfString += convertJsonToVdf(value, indent + 1, null)
-                    vdfString += `${indentStr}}\n`
+            return typeof value !== "object" || value === null
+        })
+
+        if (allSimpleValues && parentKey) {
+            // For simple values with a parentKey (like Description or Icon),
+            // wrap them in a block with the parent key
+            for (const key of sortedKeys) {
+                const value = jsonData[key]
+                // Use empty string as key for desc_ prefixed keys, otherwise use the numeric key
+                vdfString += `${indentStr}"${key}" "${value}"\n`
+            }
+        } else {
+            // For object values, create separate blocks for each element
+            for (const key of sortedKeys) {
+                const value = jsonData[key]
+                if (typeof value === "object" && value !== null) {
+                    // Write array element as a separate block
+                    // Use the parent key name for each array element
+                    if (parentKey) {
+                        vdfString += `${indentStr}"${parentKey}"\n${indentStr}{\n`
+                        vdfString += convertJsonToVdf(value, indent + 1, null)
+                        vdfString += `${indentStr}}\n`
+                    }
                 }
             }
         }
@@ -205,8 +223,41 @@ function convertJsonToVdf(jsonData, indent = 0, parentKey = null) {
             if (typeof value === "object" && value !== null) {
                 // Check if the value is an array-like object
                 if (isArrayLikeObject(value)) {
-                    // Write array elements with the current key as parent
-                    vdfString += convertJsonToVdf(value, indent, vdfKey)
+                    // Check if all values are simple types
+                    const allSimple = Object.values(value).every(v => typeof v !== "object" || v === null)
+                    
+                    if (allSimple) {
+                        // For simple values, write as a block with key-value pairs inside
+                        vdfString += `${indentStr}"${vdfKey}"\n${indentStr}{\n`
+                        const sortedKeys = Object.keys(value).sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+                        for (const k of sortedKeys) {
+                            // Handle desc_ prefix - convert to empty string
+                            const innerKey = k.startsWith("desc_") ? "" : k
+                            vdfString += `${"\t".repeat(indent + 1)}"${innerKey}" "${value[k]}"\n`
+                        }
+                        vdfString += `${indentStr}}\n`
+                    } else if (vdfKey === "Instances") {
+                        // Special handling for Instances: write as numbered sub-blocks
+                        vdfString += `${indentStr}"${vdfKey}"\n${indentStr}{\n`
+                        const sortedKeys = Object.keys(value).sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+                        for (const k of sortedKeys) {
+                            vdfString += `${"\t".repeat(indent + 1)}"${k}"\n${"\t".repeat(indent + 1)}{\n`
+                            vdfString += convertJsonToVdf(value[k], indent + 2, null)
+                            vdfString += `${"\t".repeat(indent + 1)}}\n`
+                        }
+                        vdfString += `${indentStr}}\n`
+                    } else if (vdfKey === "SubType") {
+                        // Special handling for SubType array: write as repeated "SubType" keys
+                        const sortedKeys = Object.keys(value).sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+                        for (const k of sortedKeys) {
+                            vdfString += `${indentStr}"${vdfKey}"\n${indentStr}{\n`
+                            vdfString += convertJsonToVdf(value[k], indent + 1, null)
+                            vdfString += `${indentStr}}\n`
+                        }
+                    } else {
+                        // For other array-like objects with object values, write with repeated parent key
+                        vdfString += convertJsonToVdf(value, indent, vdfKey)
+                    }
                 } else {
                     // Nested object
                     vdfString += `${indentStr}"${vdfKey}"\n${indentStr}{\n`
@@ -754,10 +805,13 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
             // Now load the package
             await pkg.load()
             packages.push(pkg)
+            
+            // Set the current package directory
+            currentPackageDir = pkg.packageDir
 
             // Update window title with package name
             if (global.titleManager) {
-                global.titleManager.setCurrentPackage(pathToPackage)
+                global.titleManager.setCurrentPackage(pkg.name)
             }
 
             if (!skipProgressReset) {
@@ -816,14 +870,40 @@ function savePackageAsBpee(packageDir, outputBpeePath) {
         if (!fs.existsSync(outDir)) {
             fs.mkdirSync(outDir, { recursive: true })
         }
-        // Use 7z to zip the directory
-        const archiveStream = add(
+        
+        // Delete existing file if it exists
+        if (fs.existsSync(outputBpeePath)) {
+            fs.unlinkSync(outputBpeePath)
+        }
+        
+        // Use 7z command directly to create ZIP format
+        // Command: 7za a -tzip output.bpee packageDir\*
+        const args = [
+            'a',           // add to archive
+            '-tzip',       // use ZIP format
+            '-r',          // recursive
             outputBpeePath,
-            [packageDir + path.sep + "*"], // Add all contents, not the folder itself
-            { $bin: path7za, recursive: true },
-        )
-        archiveStream.on("end", resolve)
-        archiveStream.on("error", reject)
+            path.join(packageDir, '*')
+        ]
+        
+        const process = spawn(path7za, args)
+        
+        let errorOutput = ''
+        process.stderr.on('data', (data) => {
+            errorOutput += data.toString()
+        })
+        
+        process.on('close', (code) => {
+            if (code === 0) {
+                resolve()
+            } else {
+                reject(new Error(`7zip failed with code ${code}: ${errorOutput}`))
+            }
+        })
+        
+        process.on('error', (error) => {
+            reject(error)
+        })
     })
 }
 
@@ -884,15 +964,41 @@ async function exportPackageAsBeePack(packageDir, outputBeePackPath) {
                 fs.mkdirSync(outDir, { recursive: true })
             }
 
-            // Zip the temporary directory as .bee_pack
+            // Zip the temporary directory as .bee_pack (must be ZIP format)
+            // Delete existing file if it exists
+            if (fs.existsSync(outputBeePackPath)) {
+                fs.unlinkSync(outputBeePackPath)
+            }
+            
             await new Promise((resolve, reject) => {
-                const archiveStream = add(
+                // Use 7z command directly to create ZIP format
+                // Command: 7za a -tzip output.bee_pack tempDir\*
+                const args = [
+                    'a',           // add to archive
+                    '-tzip',       // use ZIP format
+                    '-r',          // recursive
                     outputBeePackPath,
-                    [tempExportDir + path.sep + "*"],
-                    { $bin: path7za, recursive: true },
-                )
-                archiveStream.on("end", resolve)
-                archiveStream.on("error", reject)
+                    path.join(tempExportDir, '*')
+                ]
+                
+                const process = spawn(path7za, args)
+                
+                let errorOutput = ''
+                process.stderr.on('data', (data) => {
+                    errorOutput += data.toString()
+                })
+                
+                process.on('close', (code) => {
+                    if (code === 0) {
+                        resolve()
+                    } else {
+                        reject(new Error(`7zip failed with code ${code}: ${errorOutput}`))
+                    }
+                })
+                
+                process.on('error', (error) => {
+                    reject(error)
+                })
             })
 
             sendProgressUpdate(90, "Cleaning up temporary files...")
@@ -956,6 +1062,9 @@ const setMainWindow = (window) => {
     mainWindow = window
 }
 
+// Getter for currentPackageDir
+const getCurrentPackageDir = () => currentPackageDir
+
 module.exports = {
     reg_loadPackagePopup,
     loadPackage,
@@ -968,4 +1077,5 @@ module.exports = {
     clearPackagesDirectory,
     closePackage,
     setMainWindow,
+    getCurrentPackageDir,
 }

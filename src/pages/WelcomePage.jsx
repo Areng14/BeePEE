@@ -82,7 +82,7 @@ function WelcomePage() {
                     onClick={handleCreatePackage}>
                     <Add sx={{ fontSize: 48, color: "primary.main" }} />
                     <Typography variant="body1" fontWeight={600}>
-                        New Package
+                        Create Package
                     </Typography>
                 </Paper>
 

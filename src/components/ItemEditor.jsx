@@ -198,6 +198,12 @@ function ItemEditor() {
                         window.package.getConditions(item.id),
                     ])
 
+                    // Handle conditions - can be either blocks or VBSP format
+                    const conditionsData = conditionsResult.success
+                        ? conditionsResult.conditions
+                        : {}
+                    const hasBlocks = conditionsData.blocks && Array.isArray(conditionsData.blocks)
+                    
                     setFormData((prev) => ({
                         ...prev,
                         name: item.name || "",
@@ -214,9 +220,9 @@ function ItemEditor() {
                         variables: variablesResult.success
                             ? variablesResult.variables
                             : {},
-                        conditions: conditionsResult.success
-                            ? conditionsResult.conditions
-                            : {},
+                        // If blocks are present, use them directly, otherwise use VBSP format
+                        blocks: hasBlocks ? conditionsData.blocks : undefined,
+                        conditions: hasBlocks ? {} : conditionsData,
                         other: item.other || {},
                         _modified: {
                             basicInfo: false,
@@ -243,6 +249,7 @@ function ItemEditor() {
                             ? prev.instances
                             : item.instances || {},
                         variables: {},
+                        blocks: undefined,
                         conditions: {},
                         other: item.other || {},
                         _modified: {
@@ -386,12 +393,18 @@ function ItemEditor() {
     }
 
     const importConditionsData = (blocks) => {
-        // Import conditions without marking as modified (for VBSP conversion)
+        // Import conditions and mark as modified so they get saved to meta.json
+        // This happens when auto-converting from VBSP format to blocks
         setFormData((prev) => ({
             ...prev,
             blocks, // Store as blocks instead of conditions
+            _modified: {
+                ...prev._modified,
+                conditions: true, // Mark as modified so it gets saved
+            },
         }))
-        // Don't mark as modified or add to undo stack since this is just a format conversion
+        window.package?.setUnsavedChanges?.(true)
+        // Don't add to undo stack since this is an automatic conversion
     }
 
     const updateOtherData = (other) => {

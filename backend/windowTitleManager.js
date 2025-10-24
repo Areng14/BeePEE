@@ -1,15 +1,13 @@
-const path = require("path")
-
 class WindowTitleManager {
     constructor(mainWindow) {
         this.mainWindow = mainWindow
-        this.currentPackagePath = null
+        this.currentPackageName = null
         this.hasUnsavedChanges = false
         this.updateTitle()
     }
 
-    setCurrentPackage(packagePath) {
-        this.currentPackagePath = packagePath
+    setCurrentPackage(packageName) {
+        this.currentPackageName = packageName
         this.updateTitle()
     }
 
@@ -21,10 +19,9 @@ class WindowTitleManager {
     updateTitle() {
         let title = "BeePEE"
 
-        if (this.currentPackagePath) {
-            // Get the package name from the path
-            const packageName = path.basename(this.currentPackagePath)
-            title = `${packageName} - BeePEE`
+        if (this.currentPackageName) {
+            // Use the package name directly
+            title = `${this.currentPackageName} - BeePEE`
         }
 
         if (this.hasUnsavedChanges) {
@@ -35,7 +32,7 @@ class WindowTitleManager {
     }
 
     clearPackage() {
-        this.currentPackagePath = null
+        this.currentPackageName = null
         this.hasUnsavedChanges = false
         this.updateTitle()
     }

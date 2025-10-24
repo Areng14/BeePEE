@@ -3645,7 +3645,7 @@ function Conditions({
                 case "case":
                     return {
                         Case: {
-                            Value: block.value || "",
+                            Value: block.value !== undefined && block.value !== null ? block.value : "",
                             Result: processChildBlocks(
                                 block.thenBlocks,
                                 "thenBlocks",
@@ -3890,7 +3890,7 @@ function Conditions({
                     result.blocks,
                 )
                 setBlocks(result.blocks)
-                onImportConditions(result.blocks) // Use import function to avoid marking as modified
+                onImportConditions(result.blocks) // Auto-import and save to meta.json
             } else {
                 console.error("Conversion failed:", result.error)
             }
