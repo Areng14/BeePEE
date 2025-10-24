@@ -8,6 +8,7 @@ const {
 
 /**
  * Handles VTF conversion for palette images referenced in editoritems.json
+ * Always uses the standard path: palette/bpee/item/item
  * @param {Object} editorItems - The editoritems JSON object
  * @param {string} iconPath - Path to the icon file that was just saved
  * @param {string} packagePath - Path to the package directory
@@ -25,72 +26,37 @@ async function handleVTFConversion(
     const subType = Array.isArray(editor.SubType)
         ? editor.SubType[0]
         : editor.SubType
-    const paletteImage = subType?.Palette?.Image
 
-    if (!paletteImage) return
+    // Always use the standard path for BeePEE items
+    const standardVTFPath = path.join(
+        packagePath,
+        "resources",
+        "materials",
+        "models",
+        "props_map_editor",
+        "palette",
+        "bpee",
+        "item",
+        "item.vtf",
+    )
 
-    console.log(`Found palette image reference: ${paletteImage}`)
+    try {
+        // Convert the icon to VTF format at the standard location
+        await convertImageToVTF(iconPath, standardVTFPath, {
+            format: "DXT5",
+            generateMipmaps: true,
+        })
 
-    // Check if this is a palette image path that needs VTF conversion
-    // Handle both original palette paths and already-converted material paths
-    const needsVTFConversion =
-        paletteImage.startsWith("palette/") ||
-        paletteImage.startsWith("models/props_map_editor/palette/")
+        // Update editoritems to use the standard path
+        if (!subType.Palette) subType.Palette = {}
+        subType.Palette.Image = "palette/bpee/item/item"
 
-    if (needsVTFConversion) {
-        // For already-converted paths, extract the original palette path
-        let originalPalettePath = paletteImage
-        if (paletteImage.startsWith("models/props_map_editor/")) {
-            // Convert "models/props_map_editor/palette/beepkg/item" back to "palette/beepkg/item.png"
-            originalPalettePath =
-                paletteImage.replace("models/props_map_editor/", "") + ".png"
-        }
-        try {
-            // Get the VTF output path using the original palette path
-            const vtfPath = getVTFPathFromImagePath(
-                packagePath,
-                originalPalettePath,
-            )
-
-            // Convert the icon to VTF format
-            await convertImageToVTF(iconPath, vtfPath, {
-                format: "DXT5",
-                generateMipmaps: true,
-            })
-
-            // Update the editoritems.json to reference the VTF path instead of the palette image
-            const updatedEditorItems = updateEditorItemsWithVTF(
-                editorItemsPath,
-                originalPalettePath,
-                vtfPath,
-                packagePath,
-            )
-
-            // Update the editorItems object that will be saved
-            if (updatedEditorItems.Item?.Editor?.SubType) {
-                const updatedSubType = Array.isArray(
-                    updatedEditorItems.Item.Editor.SubType,
-                )
-                    ? updatedEditorItems.Item.Editor.SubType[0]
-                    : updatedEditorItems.Item.Editor.SubType
-
-                if (Array.isArray(editor.SubType)) {
-                    editor.SubType[0].Palette = updatedSubType.Palette
-                } else {
-                    editor.SubType.Palette = updatedSubType.Palette
-                }
-            }
-
-            console.log(
-                `Successfully converted and updated VTF reference: ${vtfPath}`,
-            )
-        } catch (error) {
-            console.error(
-                `Failed to handle VTF conversion for ${paletteImage}:`,
-                error,
-            )
-            throw error
-        }
+        console.log(
+            `Successfully converted icon to VTF and updated reference: ${standardVTFPath}`,
+        )
+    } catch (error) {
+        console.error(`Failed to handle VTF conversion:`, error)
+        throw error
     }
 }
 

@@ -13,6 +13,10 @@ const { vmfStatsCache } = require("./utils/vmfParser")
 // Global reference to main window for progress updates
 let mainWindow = null
 
+// Track current package directory and last saved path
+let currentPackageDir = null
+let lastSavedBpeePath = null
+
 // Helper function to send progress updates
 function sendProgressUpdate(progress, message, error = null) {
     if (mainWindow && !mainWindow.isDestroyed()) {

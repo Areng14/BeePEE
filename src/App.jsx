@@ -4,6 +4,7 @@ import ItemBrowser from "./components/ItemBrowser"
 import ItemEditor from "./components/ItemEditor"
 import CreateItemPage from "./pages/CreateItemPage"
 import CreatePackagePage from "./pages/CreatePackagePage"
+import PackageInformationPage from "./pages/PackageInformationPage"
 import WelcomePage from "./pages/WelcomePage"
 import LoadingPopup from "./components/LoadingPopup"
 import { ItemProvider } from "./contexts/ItemContext"
@@ -16,6 +17,7 @@ function App() {
     const showEditor = routeParam === 'editor'
     const showCreateItem = routeParam === 'create-item'
     const showCreatePackage = routeParam === 'create-package'
+    const showPackageInformation = routeParam === 'package-information'
     const [packageLoaded, setPackageLoaded] = useState(false)
     const [loadingState, setLoadingState] = useState({
         open: false,
@@ -98,6 +100,9 @@ function App() {
             ) : showCreatePackage ? (
                 // Show CreatePackagePage directly for production create windows
                 <CreatePackagePage />
+            ) : showPackageInformation ? (
+                // Show PackageInformationPage directly for production windows
+                <PackageInformationPage />
             ) : (
                 // Use normal routing for main window and development
                 <>
@@ -122,6 +127,7 @@ function App() {
                             <Route path="/editor" element={<ItemEditor />} />
                             <Route path="/create-item" element={<CreateItemPage />} />
                             <Route path="/create-package" element={<CreatePackagePage />} />
+                            <Route path="/package-information" element={<PackageInformationPage />} />
                         </Routes>
                     </BrowserRouter>
                     <LoadingPopup
