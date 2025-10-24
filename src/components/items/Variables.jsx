@@ -281,12 +281,6 @@ function SortableVariableItem({ variable, onUpdateValue, onDelete }) {
 }
 
 // Enum definitions for specific types
-const BUTTON_TYPES = {
-    0: "Weighted",
-    1: "Cube",
-    2: "Sphere",
-}
-
 const CUBE_TYPES = {
     0: "Standard",
     1: "Companion",
@@ -352,14 +346,6 @@ const VARIABLE_PRESETS = {
         description: "2 Conditions",
         defaultValue: "0",
         type: "boolean",
-    },
-    ButtonType: {
-        displayName: "Button Type",
-        fixupName: "$button_type",
-        description: "3 Conditions",
-        defaultValue: "0",
-        type: "enum",
-        enumValues: BUTTON_TYPES,
     },
     CubeType: {
         displayName: "Cube Type",

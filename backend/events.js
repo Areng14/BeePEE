@@ -4,6 +4,7 @@ const {
     loadPackage,
     importPackage,
     Package,
+    getCurrentPackageDir,
 } = require("./packageManager")
 const {
     createItemEditor,
@@ -36,7 +37,7 @@ const {
 
 // Track last saved .bpee path in memory (could be improved with persistent storage)
 let lastSavedBpeePath = null
-let currentPackageDir = null // This should be set when a package is loaded
+// currentPackageDir is now managed in packageManager.js via getCurrentPackageDir()
 
 // Helper to load original itemJSON from info.json
 function loadOriginalItemJSON(packagePath, itemId) {
@@ -889,80 +890,154 @@ function reg_events(mainWindow) {
 
             fs.mkdirSync(fullItemPath, { recursive: true })
 
+            // Generate a safe item type ID
+            const itemType = `BPEE_${cleanName}_${cleanAuthor}`.toUpperCase()
+
             // Create editoritems.json
             const editoritems = {
                 Item: {
-                    Type: "ITEM_BUTTON_FLOOR",
+                    ItemClass: "ItemBase",
+                    Type: itemType,
                     Editor: {
-                        SubType: {
-                            Name: name,
-                            Palette: {
-                                Image: iconPath ? `palette/${path.basename(iconPath)}` : "BEE2/blank.png"
-                            }
-                        },
-                        MovementHandle: "HANDLE_NONE"
-                    },
-                    Exporting: {
-                        Instances: {}
+                        MovementHandle: "HANDLE_4_DIRECTIONS",
+                        InvalidSurface: "",
+                        DesiredFacing: "DESIRES_ANYTHING",
+                        CanAnchorOnGoo: "0",
+                        CanAnchorOnBarriers: "0"
                     },
                     Properties: {
                         ConnectionCount: {
-                            DefaultValue: 0,
-                            Index: 1
+                            DefaultValue: "0",
+                            Index: "1"
                         }
+                    },
+                    Exporting: {
+                        Inputs: {},
+                        Outputs: {},
+                        Instances: {},
+                        TargetName: "item",
+                        Offset: "64 64 64"
                     }
+                }
+            }
+
+            // Create SubType - always single SubType at creation
+            editoritems.Item.Editor.SubType = {
+                Name: name,
+                Model: {
+                    ModelName: "turret.3ds"
+                },
+                Palette: {
+                    Tooltip: name.toUpperCase(),
+                    Image: iconPath ? `palette/bpee/${path.basename(iconPath)}` : "BEE2/blank.png",
+                    Position: "0 0 0"
+                },
+                Sounds: {
+                    SOUND_CREATED: "P2Editor.PlaceOther",
+                    SOUND_EDITING_ACTIVATE: "P2Editor.ExpandOther",
+                    SOUND_EDITING_DEACTIVATE: "P2Editor.CollapseOther",
+                    SOUND_DELETED: "P2Editor.RemoveOther"
+                },
+                Animations: {
+                    ANIM_IDLE: "0",
+                    ANIM_EDITING_ACTIVATE: "1",
+                    ANIM_EDITING_DEACTIVATE: "2"
                 }
             }
 
             // Add instances to editoritems
             instancePaths.forEach((instancePath, index) => {
+                // Use new path structure: instances/BEE2/bpee/itemId/instance.vmf (or instance_N.vmf for multiple)
+                const instanceFileName = index === 0 ? 'instance.vmf' : `instance_${index}.vmf`
+                const relativeInstancePath = `instances/BEE2/bpee/${itemId}/${instanceFileName}`
+                
                 editoritems.Item.Exporting.Instances[index.toString()] = {
-                    Name: instancePath,
-                    EntityCount: 0,
-                    BrushCount: 0,
-                    BrushSideCount: 0
+                    Name: relativeInstancePath,
+                    EntityCount: "0",
+                    BrushCount: "0",
+                    BrushSideCount: "0"
                 }
             })
 
-            const editorItemsPath = path.join(fullItemPath, "editoritems.json")
-            fs.writeFileSync(editorItemsPath, JSON.stringify(editoritems, null, 4))
+            // Don't write editoritems yet - we need to calculate VMF stats first
 
             // Create properties.json
             const properties = {
                 Properties: {
-                    Authors: author,
-                    Description: description || "",
-                    Icon: {
-                        "0": iconPath ? path.basename(iconPath) : "blank.png"
-                    }
+                    Authors: author
+                }
+            }
+
+            // Format description as VDF-style with empty keys for each line
+            if (description && description.trim()) {
+                const descriptionLines = description.split('\n')
+                properties.Properties.Description = {}
+                descriptionLines.forEach((line, index) => {
+                    // Use desc_ prefix for keys that should be converted to empty strings in VDF
+                    properties.Properties.Description[`desc_${index}`] = line.trim()
+                })
+            }
+
+            // Copy icon if provided and set path
+            if (iconPath && fs.existsSync(iconPath)) {
+                const iconFileName = path.basename(iconPath)
+                
+                // Copy to BEE2/items/bpee for properties.json
+                const iconDestPath = path.join(
+                    currentPackage.packageDir,
+                    "resources/BEE2/items/bpee",
+                    iconFileName
+                )
+                fs.mkdirSync(path.dirname(iconDestPath), { recursive: true })
+                fs.copyFileSync(iconPath, iconDestPath)
+
+                // Also copy to palette/bpee for editoritems.json
+                const paletteDestPath = path.join(
+                    currentPackage.packageDir,
+                    "resources/palette/bpee",
+                    iconFileName
+                )
+                fs.mkdirSync(path.dirname(paletteDestPath), { recursive: true })
+                fs.copyFileSync(iconPath, paletteDestPath)
+
+                // Set icon path relative to resources/BEE2/items/
+                properties.Properties.Icon = {
+                    "0": `bpee/${iconFileName}`
                 }
             }
 
             const propertiesPath = path.join(fullItemPath, "properties.json")
             fs.writeFileSync(propertiesPath, JSON.stringify(properties, null, 4))
 
-            // Copy icon if provided
-            if (iconPath && fs.existsSync(iconPath)) {
-                const iconDestPath = path.join(
-                    currentPackage.packageDir,
-                    "resources/BEE2/items",
-                    path.basename(iconPath)
-                )
-                fs.mkdirSync(path.dirname(iconDestPath), { recursive: true })
-                fs.copyFileSync(iconPath, iconDestPath)
-            }
-
-            // Copy instance files to the package
-            const instancesDir = path.join(currentPackage.packageDir, "resources/instances")
+            // Copy instance files to the package and calculate VMF stats
+            const instancesDir = path.join(currentPackage.packageDir, "resources/instances/bpee", itemId)
             fs.mkdirSync(instancesDir, { recursive: true })
 
-            for (const instancePath of instancePaths) {
+            instancePaths.forEach((instancePath, index) => {
                 if (fs.existsSync(instancePath)) {
-                    const instanceFileName = path.basename(instancePath)
+                    const instanceFileName = index === 0 ? 'instance.vmf' : `instance_${index}.vmf`
                     const instanceDestPath = path.join(instancesDir, instanceFileName)
                     fs.copyFileSync(instancePath, instanceDestPath)
+                    
+                    // Calculate VMF stats for the copied instance
+                    try {
+                        const vmfStats = vmfStatsCache.getStats(instanceDestPath)
+                        editoritems.Item.Exporting.Instances[index.toString()] = {
+                            ...editoritems.Item.Exporting.Instances[index.toString()],
+                            EntityCount: vmfStats.EntityCount.toString(),
+                            BrushCount: vmfStats.BrushCount.toString(),
+                            BrushSideCount: vmfStats.BrushSideCount.toString()
+                        }
+                        console.log(`Calculated VMF stats for ${instanceFileName}:`, vmfStats)
+                    } catch (error) {
+                        console.warn(`Could not calculate VMF stats for ${instanceFileName}:`, error.message)
+                    }
                 }
-            }
+            })
+
+            // Now write editoritems.json with updated VMF stats
+            const editorItemsPath = path.join(fullItemPath, "editoritems.json")
+            fs.writeFileSync(editorItemsPath, JSON.stringify(editoritems, null, 4))
 
             // Add item to info.json
             const infoPath = path.join(currentPackage.packageDir, "info.json")
@@ -1006,7 +1081,7 @@ function reg_events(mainWindow) {
             const updatedItems = currentPackage.items.map((item) =>
                 item.toJSONWithExistence(),
             )
-            mainWindow.webContents.send("package-loaded", updatedItems)
+            mainWindow.webContents.send("package:loaded", updatedItems)
 
             // Close the create item window if it's open
             const createWindow = getCreateItemWindow()
@@ -1019,6 +1094,93 @@ function reg_events(mainWindow) {
         } catch (error) {
             console.error("Failed to create item:", error)
             throw error
+        }
+    })
+
+    // Register item deletion
+    ipcMain.handle("delete-item", async (event, { itemId }) => {
+        try {
+            // Find the package that contains this item
+            const pkg = packages.find(p => p.items.some(i => i.id === itemId))
+            if (!pkg) {
+                throw new Error("Package containing item not found")
+            }
+
+            // Find the item
+            const item = pkg.items.find(i => i.id === itemId)
+            if (!item) {
+                throw new Error("Item not found")
+            }
+
+            console.log(`Deleting item: ${item.name} (${itemId})`)
+
+            // Get the item folder path
+            const itemFolderPath = path.dirname(item.paths.editorItems)
+            
+            // Delete the item folder and all its contents
+            if (fs.existsSync(itemFolderPath)) {
+                fs.rmSync(itemFolderPath, { recursive: true, force: true })
+                console.log(`Deleted item folder: ${itemFolderPath}`)
+            }
+
+            // Delete instance files directory (resources/instances/bpee/{itemId}/)
+            const instancesDir = path.join(pkg.packageDir, "resources/instances/bpee", itemId)
+            if (fs.existsSync(instancesDir)) {
+                fs.rmSync(instancesDir, { recursive: true, force: true })
+                console.log(`Deleted instances directory: ${instancesDir}`)
+            }
+
+            // Delete icon files if they exist
+            if (item.icon) {
+                // Delete from BEE2/items/
+                if (fs.existsSync(item.icon)) {
+                    fs.unlinkSync(item.icon)
+                    console.log(`Deleted icon: ${item.icon}`)
+                }
+                
+                // Delete from palette/bpee/ if it exists
+                const paletteIcon = item.icon.replace(/BEE2[\\\/]items/, "palette")
+                if (fs.existsSync(paletteIcon)) {
+                    fs.unlinkSync(paletteIcon)
+                    console.log(`Deleted palette icon: ${paletteIcon}`)
+                }
+            }
+
+            // Remove from package info.json
+            const infoPath = path.join(pkg.packageDir, "info.json")
+            if (fs.existsSync(infoPath)) {
+                const info = JSON.parse(fs.readFileSync(infoPath, "utf-8"))
+                if (info.Item) {
+                    // info.Item is an array - filter out the deleted item
+                    if (Array.isArray(info.Item)) {
+                        info.Item = info.Item.filter(item => item.ID !== itemId)
+                    } else {
+                        // Single item - remove if it matches
+                        if (info.Item.ID === itemId) {
+                            delete info.Item
+                        }
+                    }
+                    fs.writeFileSync(infoPath, JSON.stringify(info, null, 4), "utf-8")
+                    console.log(`Removed item from info.json`)
+                }
+            }
+
+            // Remove from in-memory package
+            pkg.removeItem(itemId)
+
+            // Send updated package to frontend
+            const updatedItems = pkg.items.map((item) => item.toJSONWithExistence())
+            mainWindow.webContents.send("package:loaded", updatedItems)
+
+            console.log(`Successfully deleted item: ${item.name}`)
+            return { success: true }
+        } catch (error) {
+            console.error("Failed to delete item:", error)
+            dialog.showErrorBox(
+                "Failed to Delete Item",
+                `Could not delete item: ${error.message}`
+            )
+            return { success: false, error: error.message }
         }
     })
 
@@ -1139,7 +1301,7 @@ function reg_events(mainWindow) {
 
             console.log(`Package created successfully: ${packageId}`)
 
-            // Load the new package
+            // Load the new package (this will set currentPackageDir in packageManager.js)
             const pkg = await loadPackage(path.join(packageDir, "info.json"))
 
             // Send package loaded event to main window
@@ -1454,6 +1616,7 @@ function reg_events(mainWindow) {
     // IPC handler for Save Package
     ipcMain.on("save-package", async (event) => {
         try {
+            const currentPackageDir = getCurrentPackageDir()
             if (!currentPackageDir) throw new Error("No package loaded")
             if (!lastSavedBpeePath) {
                 // If no previous path, fall back to Save As
@@ -1475,6 +1638,7 @@ function reg_events(mainWindow) {
     // IPC handler for Save Package As
     ipcMain.on("save-package-as", async (event) => {
         try {
+            const currentPackageDir = getCurrentPackageDir()
             if (!currentPackageDir) throw new Error("No package loaded")
             const { canceled, filePath } = await dialog.showSaveDialog({
                 title: "Save Package As",
@@ -1679,62 +1843,12 @@ function reg_events(mainWindow) {
             }
 
             // Calculate what the instance name would be (same logic as add-instance-file-dialog)
-            let instanceName
-
-            // Check if this item has existing instances to use as template
+            // Use new structure: instances/BEE2/bpee/ITEMID/instance.vmf
+            // Generate instance filename based on existing instance count
             const existingInstances = Object.values(item.instances)
-            if (existingInstances.length > 0) {
-                // Use the first existing instance path as template
-                const templatePath = existingInstances[0].Name
-                const templateDir = path.dirname(templatePath)
-
-                // Create the new instance path using the template structure (keep BEE2/ for display)
-                instanceName = templateDir + "/" + fileName
-            } else {
-                // No existing instances - reconstruct path from source file
-                const selectedDir = path.dirname(selectedFilePath)
-                const pathParts = selectedDir.split(path.sep)
-
-                // Find the index of 'instances' in the source path
-                const instancesIndex = pathParts.findIndex(
-                    (part) => part.toLowerCase() === "instances",
-                )
-
-                if (
-                    instancesIndex !== -1 &&
-                    instancesIndex + 1 < pathParts.length
-                ) {
-                    // Get everything after 'instances' in the source path
-                    const pathAfterInstances = pathParts.slice(
-                        instancesIndex + 1,
-                    )
-
-                    // Skip 'bee' if it's the first part after instances
-                    let finalPathParts = pathAfterInstances
-                    if (
-                        pathAfterInstances.length > 0 &&
-                        pathAfterInstances[0].toLowerCase() === "bee"
-                    ) {
-                        finalPathParts = pathAfterInstances.slice(1)
-                    }
-
-                    if (finalPathParts.length > 0) {
-                        // Reconstruct the path: instances/rest/of/path/filename
-                        instanceName =
-                            "instances/" +
-                            finalPathParts.join("/") +
-                            "/" +
-                            fileName
-                    } else {
-                        // Fallback to simple instances/filename
-                        instanceName = "instances/" + fileName
-                    }
-                } else {
-                    // No instances found in path - create simple structure
-                    const itemId = item.id.toLowerCase()
-                    instanceName = `instances/${itemId}/${fileName}`
-                }
-            }
+            const instanceIndex = existingInstances.length
+            const instanceFileName = instanceIndex === 0 ? 'instance.vmf' : `instance_${instanceIndex}.vmf`
+            const instanceName = `instances/BEE2/bpee/${item.id}/${instanceFileName}`
 
             // Return file info without actually adding to backend
             return {
@@ -1791,64 +1905,12 @@ function reg_events(mainWindow) {
                 throw new Error("Selected file must be a VMF file")
             }
 
-            // Always save new instances in the instances/ directory directly
-            // Use existing instance paths as template, or reconstruct from source file path
-            let instanceName
-
-            // Check if this item has existing instances to use as template
+            // Use new structure: instances/BEE2/bpee/ITEMID/instance.vmf
+            // Generate instance filename based on existing instance count
             const existingInstances = Object.values(item.instances)
-            if (existingInstances.length > 0) {
-                // Use the first existing instance path as template
-                const templatePath = existingInstances[0].Name
-                const templateDir = path.dirname(templatePath)
-
-                // Create the new instance path using the template structure (keep BEE2/ for display)
-                instanceName = templateDir + "/" + fileName
-            } else {
-                // No existing instances - reconstruct path from source file
-                const selectedDir = path.dirname(selectedFilePath)
-                const pathParts = selectedDir.split(path.sep)
-
-                // Find the index of 'instances' in the source path
-                const instancesIndex = pathParts.findIndex(
-                    (part) => part.toLowerCase() === "instances",
-                )
-
-                if (
-                    instancesIndex !== -1 &&
-                    instancesIndex + 1 < pathParts.length
-                ) {
-                    // Get everything after 'instances' in the source path
-                    const pathAfterInstances = pathParts.slice(
-                        instancesIndex + 1,
-                    )
-
-                    // Skip 'bee' if it's the first part after instances
-                    let finalPathParts = pathAfterInstances
-                    if (
-                        pathAfterInstances.length > 0 &&
-                        pathAfterInstances[0].toLowerCase() === "bee"
-                    ) {
-                        finalPathParts = pathAfterInstances.slice(1)
-                    }
-
-                    if (finalPathParts.length > 0) {
-                        // Reconstruct the path: instances/rest/of/path/filename
-                        instanceName =
-                            "instances/" +
-                            finalPathParts.join("/") +
-                            "/" +
-                            fileName
-                    } else {
-                        // Fallback to simple instances/filename
-                        instanceName = "instances/" + fileName
-                    }
-                } else {
-                    // No instances found in path - create simple structure
-                    const itemId = item.id.toLowerCase()
-                    instanceName = `instances/${itemId}/${fileName}`
-                }
-            }
+            const instanceIndex = existingInstances.length
+            const instanceFileName = instanceIndex === 0 ? 'instance.vmf' : `instance_${instanceIndex}.vmf`
+            const instanceName = `instances/BEE2/bpee/${item.id}/${instanceFileName}`
 
             // Copy the file to the package resources directory
             // Apply path fixing to remove BEE2/ prefix for actual file structure

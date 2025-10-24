@@ -12,8 +12,10 @@ import {
     Alert,
     Stack,
     Divider,
+    Paper,
 } from "@mui/material"
 import { Delete, Add, Folder, Close, CheckCircle } from "@mui/icons-material"
+import ReactMarkdown from "react-markdown"
 
 function CreateItemPage() {
     const [name, setName] = useState("")
@@ -29,7 +31,7 @@ function CreateItemPage() {
             const result = await window.electron.showOpenDialog({
                 title: "Select Item Icon",
                 filters: [
-                    { name: "Images", extensions: ["png", "jpg", "jpeg", "tga", "vtf"] },
+                    { name: "Images", extensions: ["png", "jpg", "jpeg"] },
                 ],
                 properties: ["openFile"],
             })
@@ -171,10 +173,37 @@ function CreateItemPage() {
                                 onChange={(e) => setDescription(e.target.value)}
                                 fullWidth
                                 multiline
-                                rows={3}
-                                helperText="Optional description of your item"
+                                rows={4}
+                                helperText="Optional description of your item (supports Markdown)"
                                 variant="outlined"
                             />
+
+                            {description && (
+                                <Box>
+                                    <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                                        Preview:
+                                    </Typography>
+                                    <Paper
+                                        variant="outlined"
+                                        sx={{
+                                            p: 2,
+                                            bgcolor: "background.default",
+                                            "& p": { mt: 0, mb: 1 },
+                                            "& p:last-child": { mb: 0 },
+                                            "& ul, & ol": { mt: 0, mb: 1, pl: 3 },
+                                            "& h1, & h2, & h3": { mt: 1, mb: 1 },
+                                            "& code": {
+                                                bgcolor: "action.hover",
+                                                px: 0.5,
+                                                py: 0.25,
+                                                borderRadius: 0.5,
+                                                fontFamily: "monospace",
+                                            },
+                                        }}>
+                                        <ReactMarkdown>{description}</ReactMarkdown>
+                                    </Paper>
+                                </Box>
+                            )}
                         </Stack>
                     </Box>
 
@@ -207,7 +236,7 @@ function CreateItemPage() {
                             </Button>
                         </Box>
                         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
-                            Optional - Select a PNG, TGA, or VTF image file
+                            Optional - Select a PNG or JPEG image file
                         </Typography>
                     </Box>
 

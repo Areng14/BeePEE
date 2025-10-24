@@ -28,7 +28,8 @@ BeePEE is an Electron-based application for creating and editing Portal 2 Puzzle
     - `items/{itemName}_{author}/editoritems.json`
     - `items/{itemName}_{author}/properties.json`
     - `resources/BEE2/items/{packageId}/{itemName}.png` (icon)
-    - `resources/instances/{instanceFiles}.vmf`
+    - `resources/instances/bpee/{itemId}/instance.vmf` (and instance_1.vmf, instance_2.vmf, etc. for multiple instances)
+    - Instance paths in editoritems: `instances/BEE2/bpee/{itemId}/instance.vmf`
   - Updates package `info.json` with new item entry
   - Window automatically closes on successful creation
 
@@ -40,7 +41,7 @@ BeePEE is an Electron-based application for creating and editing Portal 2 Puzzle
   - Shows what will be deleted (configuration, instances, conditions, etc.)
   - Cleans up all associated files:
     - Item folder (`items/{itemName}_{author}/`)
-    - Instance files in `resources/instances/`
+    - Instance files in `resources/instances/bpee/{itemId}/`
     - Icon file in `resources/BEE2/items/`
     - Entry in package `info.json`
   - Updates in-memory package data
@@ -141,9 +142,9 @@ onPackageLoaded: (callback) => {
 
 **Solution**: Modified `create-item` handler to use relative paths:
 ```javascript
-const instanceFileName = path.basename(instancePath)
+const instanceFileName = index === 0 ? 'instance.vmf' : `instance_${index}.vmf`
 editoritems.Item.Exporting.Instances[index.toString()] = {
-    Name: `instances/${instanceFileName}`, // Relative path
+    Name: `instances/BEE2/bpee/${itemId}/${instanceFileName}`, // Relative path with BEE2 prefix
     EntityCount: 0,
     BrushCount: 0,
     BrushSideCount: 0

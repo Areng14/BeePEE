@@ -73,7 +73,7 @@ function createItemCreationWindow(mainWindow) {
 
     createItemWindow = new BrowserWindow({
         width: 600,
-        height: 750,
+        height: 900,
         title: "BeePEE - Create New Item",
         webPreferences: {
             nodeIntegration: false,
@@ -114,7 +114,7 @@ function createPackageCreationWindow(mainWindow) {
 
     createPackageWindow = new BrowserWindow({
         width: 500,
-        height: 500,
+        height: 650,
         title: "BeePEE - Create New Package",
         webPreferences: {
             nodeIntegration: false,

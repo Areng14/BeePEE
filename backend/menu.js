@@ -6,17 +6,18 @@ const {
     exportPackageAsBeePack,
     clearPackagesDirectory,
     closePackage,
+    getCurrentPackageDir,
 } = require("./packageManager")
 const { dialog, BrowserWindow } = require("electron")
 const path = require("path")
 const fs = require("fs")
 
-// Track last saved .bpee path and current package dir in memory
+// Track last saved .bpee path in memory
 let lastSavedBpeePath = null
-let currentPackageDir = null // This should be set when a package is loaded/imported
 
 // Helper to get the current package name for saving
 function getCurrentPackageName() {
+    const currentPackageDir = getCurrentPackageDir()
     if (currentPackageDir) {
         return path.basename(currentPackageDir)
     }
@@ -62,7 +63,7 @@ function createMainMenu(mainWindow) {
                             }
 
                             const pkg = await loadPackage(result.filePaths[0])
-                            currentPackageDir = pkg.packageDir
+                            // currentPackageDir is now managed in packageManager.js
                             mainWindow.webContents.send(
                                 "package:loaded",
                                 pkg.items,
@@ -103,7 +104,7 @@ function createMainMenu(mainWindow) {
                                 result.filePaths[0],
                                 true,
                             ) // Skip progress reset since we're continuing from import
-                            currentPackageDir = pkg.packageDir
+                            // currentPackageDir is now managed in packageManager.js
 
                             // Send final completion message
                             mainWindow.webContents.send(
@@ -132,7 +133,7 @@ function createMainMenu(mainWindow) {
                     click: async () => {
                         try {
                             await closePackage()
-                            currentPackageDir = null
+                            // currentPackageDir is now managed in packageManager.js
                             lastSavedBpeePath = null
                             mainWindow.webContents.send("package:closed")
                         } catch (error) {
@@ -149,6 +150,7 @@ function createMainMenu(mainWindow) {
                     accelerator: "Ctrl+S",
                     click: async () => {
                         try {
+                            const currentPackageDir = getCurrentPackageDir()
                             if (!currentPackageDir)
                                 throw new Error("No package loaded")
                             if (!lastSavedBpeePath) {
@@ -186,6 +188,7 @@ function createMainMenu(mainWindow) {
                     accelerator: "Ctrl+Shift+S",
                     click: async () => {
                         try {
+                            const currentPackageDir = getCurrentPackageDir()
                             if (!currentPackageDir)
                                 throw new Error("No package loaded")
                             const { canceled, filePath } =
@@ -218,6 +221,7 @@ function createMainMenu(mainWindow) {
                     accelerator: "Ctrl+E",
                     click: async () => {
                         try {
+                            const currentPackageDir = getCurrentPackageDir()
                             if (!currentPackageDir)
                                 throw new Error("No package loaded")
                             const { canceled, filePath } =
@@ -304,7 +308,7 @@ function createMainMenu(mainWindow) {
                             try {
                                 // Close any open packages first
                                 await closePackage()
-                                currentPackageDir = null
+                                // currentPackageDir is now managed in packageManager.js
                                 lastSavedBpeePath = null
                                 mainWindow.webContents.send("package:closed")
 

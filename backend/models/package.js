@@ -32,6 +32,13 @@ class Package {
 
             // Read and parse info.json
             const parsedInfo = JSON.parse(fs.readFileSync(infoPath, "utf-8"))
+            
+            // Use the actual package name from info.json if available
+            if (parsedInfo.Name) {
+                this.name = parsedInfo.Name
+            } else if (parsedInfo.ID) {
+                this.name = parsedInfo.ID
+            }
 
             // Items
             let rawitems = parsedInfo["Item"]
