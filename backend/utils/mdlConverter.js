@@ -4,6 +4,7 @@ const path = require("path")
 const { exec, spawn } = require("child_process")
 const { promisify } = require("util")
 const { app } = require("electron")
+const sharp = require("sharp")
 const { findPortal2Resources } = require("../data")
 const { convertImageToVTF } = require("./vtfConverter")
 
@@ -49,11 +50,12 @@ async function generateQCFile(objPath, outputPath, options = {}) {
     
     // Generate QC content
     // Each item gets its own folder: bpee/{itemID}/
+    // $cdmaterials should point to where VMT files are stored (relative to materials/ folder)
     const qcContent = `$modelname "props_map_editor/bpee/${modelName}/${modelName}.mdl"
 $staticprop
 $body body "${objFileName}"
 $surfaceprop "default"
-$cdmaterials "models/props_map_editor/"
+$cdmaterials "models/props_map_editor/bpee/${modelName}/"
 $scale ${scale}
 $sequence idle "${objFileName}" fps 30
 `
@@ -73,20 +75,31 @@ $sequence idle "${objFileName}" fps 30
  * @param {string} outputPath - Path for the cartoonified output
  */
 async function applyCartoonification(inputPath, outputPath) {
-    const cartoonExePath = path.join(__dirname, '..', 'libs', 'areng_cartoonify', 'cartoon.exe')
+    const isDev = !app.isPackaged
+    const cartoonExePath = isDev
+        ? path.join(__dirname, '..', 'libs', 'areng_cartoonify', 'cartoon.exe')
+        : path.join(process.resourcesPath, 'extraResources', 'areng_cartoonify', 'cartoon.exe')
     
     if (!fs.existsSync(cartoonExePath)) {
-        console.warn(`⚠️ Cartoon.exe not found at: ${cartoonExePath}`)
+        console.error(`❌ CARTOON.EXE NOT FOUND at: ${cartoonExePath}`)
+        console.error(`   Cartoonification will be SKIPPED - using original textures`)
         // Copy original file as fallback
         fs.copyFileSync(inputPath, outputPath)
         return
     }
+    
+    console.log(`   🎨 Using cartoon.exe from: ${cartoonExePath}`)
     
     // Copy original file to output path FIRST
     // Cartoon.exe modifies files IN-PLACE!
     fs.copyFileSync(inputPath, outputPath)
     
     return new Promise((resolve, reject) => {
+        // Get file size and modified time BEFORE cartoonification for validation
+        const statsBefore = fs.statSync(outputPath)
+        const sizeBefore = statsBefore.size
+        const mtimeBefore = statsBefore.mtime.getTime()
+        
         // Run cartoon.exe on the OUTPUT file (not the original)
         const child = spawn(cartoonExePath, [outputPath], {
             cwd: path.dirname(cartoonExePath),
@@ -107,18 +120,37 @@ async function applyCartoonification(inputPath, outputPath) {
         
         child.on('close', (code) => {
             if (code === 0) {
-                // File was modified in-place, already at outputPath
-                console.log(`    ✅ Cartoonified: ${path.basename(outputPath)}`)
+                // Verify the file was actually modified
+                const statsAfter = fs.statSync(outputPath)
+                const sizeAfter = statsAfter.size
+                const mtimeAfter = statsAfter.mtime.getTime()
+                
+                // Check if file was actually modified (size or mtime changed)
+                if (sizeAfter !== sizeBefore || mtimeAfter !== mtimeBefore) {
+                    console.log(`    ✅ Cartoonified: ${path.basename(outputPath)} (${sizeBefore}→${sizeAfter} bytes)`)
+                    if (stdout) console.log(`       stdout: ${stdout.trim()}`)
+                } else {
+                    console.error(`    ⚠️  CARTOON WARNING: File not modified despite exit code 0`)
+                    console.error(`       File: ${path.basename(outputPath)}`)
+                    console.error(`       stdout: ${stdout.trim() || '(empty)'}`)
+                    console.error(`       stderr: ${stderr.trim() || '(empty)'}`)
+                    console.error(`       Using original texture (no cartoonification applied)`)
+                }
                 resolve()
             } else {
-                console.warn(`⚠️ Cartoon.exe failed with code ${code}: ${stderr}`)
+                console.error(`❌ CARTOON.EXE FAILED with exit code ${code}`)
+                console.error(`   File: ${path.basename(outputPath)}`)
+                console.error(`   stderr: ${stderr}`)
+                console.error(`   stdout: ${stdout}`)
+                console.error(`   Using original non-cartoonified texture as fallback`)
                 // File was already copied, just use the original
                 resolve()
             }
         })
         
         child.on('error', (error) => {
-            console.warn(`⚠️ Cartoon.exe error: ${error.message}`)
+            console.error(`❌ CARTOON.EXE SPAWN ERROR: ${error.message}`)
+            console.error(`   Using original non-cartoonified texture as fallback`)
             // File was already copied, just use the original
             resolve()
         })
@@ -202,6 +234,7 @@ function reverseSourceEngineRotation(objPath, outputPath) {
  * @param {string} objPath - Path to the source OBJ file (rotated for Three.js viewing)
  * @param {string} outputDir - Directory where MDL files should be created (temp location)
  * @param {Object} options - Conversion options
+ * @param {string} options.packageMaterialsDir - Directory containing the VTF/VMT materials for this model
  * @returns {Promise<{mdlPath: string, vvdPath: string, vtxPath: string}>}
  */
 async function convertObjToMDL(objPath, outputDir, options = {}) {
@@ -250,6 +283,7 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
     }
 
     // Copy materials to Portal 2 game directory for STUDIOMDL compilation
+    // Materials should ALREADY be converted to VTF/VMT format before calling this function
     const gameMaterialsDir = path.join(gameDir, "materials", "models", "props_map_editor")
     console.log(`📁 Copying materials to Portal 2 for STUDIOMDL: ${gameMaterialsDir}`)
     
@@ -257,9 +291,9 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
         fs.mkdirSync(gameMaterialsDir, { recursive: true })
     }
     
-    // Copy materials from package to Portal 2 (temporarily for compilation)
-    const packageMaterialsDir = path.join(process.cwd(), "packages", "PieCreeper's Items", "resources", "materials", "models", "props_map_editor")
-    if (fs.existsSync(packageMaterialsDir)) {
+    // Copy materials from package resources to Portal 2 (temporarily for compilation)
+    const packageMaterialsDir = options.packageMaterialsDir
+    if (packageMaterialsDir && fs.existsSync(packageMaterialsDir)) {
         console.log(`📋 Copying materials from: ${packageMaterialsDir}`)
         // Copy all VTF/VMT files to Portal 2
         const copyDir = (src, dest) => {
@@ -278,7 +312,7 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
         copyDir(packageMaterialsDir, gameMaterialsDir)
         console.log(`✅ Materials copied to Portal 2 for STUDIOMDL compilation`)
     } else {
-        console.warn(`⚠️ Package materials directory not found: ${packageMaterialsDir}`)
+        console.warn(`⚠️ Package materials directory not provided or not found: ${packageMaterialsDir}`)
     }
 
     // Run STUDIOMDL
@@ -354,11 +388,141 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
 }
 
 /**
+ * Convert materials from PNG to VTF/VMT format and copy to package resources
+ * @param {string} materialsSourceDir - Directory containing PNG materials from VMF2OBJ
+ * @param {string} materialTargetDir - Target directory in package resources
+ * @param {string} tempDir - Temporary models directory (for MTL file)
+ * @param {string} itemName - Name of the item
+ */
+async function convertMaterialsToPackage(materialsSourceDir, materialTargetDir, tempDir, itemName) {
+    if (!materialsSourceDir || !fs.existsSync(materialsSourceDir)) {
+        console.warn(`⚠️ Materials source directory not found: ${materialsSourceDir}`)
+        return
+    }
+
+    console.log("📦 Converting and copying materials to VTF/VMT format...")
+
+    // Find all PNG/TGA files and convert them to VTF + create VMT
+    // FLAT structure - all VTFs go directly in materialTargetDir
+    const convertMaterials = async (src, flatDest) => {
+        if (!fs.existsSync(src)) {
+            console.warn(`⚠️ Source materials directory not found: ${src}`)
+            return
+        }
+        
+        if (!fs.existsSync(flatDest)) {
+            fs.mkdirSync(flatDest, { recursive: true })
+        }
+        
+        const entries = fs.readdirSync(src, { withFileTypes: true })
+        for (const entry of entries) {
+            const srcPath = path.join(src, entry.name)
+            
+            if (entry.isDirectory()) {
+                // Recurse into subdirectories but keep output FLAT
+                await convertMaterials(srcPath, flatDest)
+            } else if (entry.name.match(/\.png$/i)) {
+                // Only process PNG files (TGAs were already converted to PNG by VMF2OBJ)
+                // Textures are ALREADY cartoonified by VMF2OBJ stage, just convert to VTF
+                // Extract just the filename, ignore any directory structure
+                const baseFileName = path.basename(entry.name, '.png')
+                const vtfPath = path.join(flatDest, baseFileName + '.vtf')
+                
+                try {
+                    console.log(`  Converting ${entry.name}...`)
+                    console.log(`    Source: ${srcPath}`)
+                    console.log(`    Target VTF: ${vtfPath}`)
+                    
+                    // Convert PNG directly to VTF (already cartoonified by VMF2OBJ)
+                    await convertImageToVTF(srcPath, vtfPath, {
+                        format: "DXT5",
+                        generateMipmaps: true
+                    })
+                    
+                    console.log(`    ✅ VTF created`)
+                    console.log(`  ✅ Converted: ${entry.name} → VTF`)
+                } catch (error) {
+                    console.error(`  ❌ FAILED to convert ${entry.name}:`)
+                    console.error(`     Error: ${error.message}`)
+                    console.error(`     Stack: ${error.stack}`)
+                }
+            }
+        }
+    }
+    
+    // Parse MTL file to get material names and their texture paths
+    const mtlFilePath = path.join(tempDir, itemName + '_0.mtl')
+    
+    const materialMap = {}
+    if (fs.existsSync(mtlFilePath)) {
+        console.log(`📖 Parsing MTL file: ${mtlFilePath}`)
+        const mtlContent = fs.readFileSync(mtlFilePath, 'utf-8')
+        const lines = mtlContent.split('\n')
+        let currentMaterial = null
+        
+        for (const line of lines) {
+            if (line.startsWith('newmtl ')) {
+                currentMaterial = line.substring(7).trim()
+            } else if (currentMaterial && line.startsWith('map_Kd ')) {
+                const texturePath = line.substring(7).trim().replace('materials/', '')
+                materialMap[currentMaterial] = texturePath
+            }
+        }
+        console.log(`Found ${Object.keys(materialMap).length} materials in MTL file`)
+    } else {
+        console.warn(`⚠️ MTL file not found: ${mtlFilePath}`)
+    }
+    
+    // Convert all materials from temp_models/materials/ to resources/materials/models/props_map_editor/
+    // And create VMT files based on MATERIAL NAMES, not file paths
+    try {
+        await convertMaterials(materialsSourceDir, materialTargetDir)
+        
+        // Now create VMT files FLAT in materialTargetDir based on material names
+        // STUDIOMDL strips out subdirectory paths, so materials are referenced by base name only
+        for (const [materialName, texturePath] of Object.entries(materialMap)) {
+            try {
+                // Extract just the base filename from materialName (no subdirs)
+                // Use split on BOTH / and \ since MTL files use forward slashes
+                // STUDIOMDL stores materials as just "black_floor_metal_001a", not "metal/black_floor_metal_001a"
+                const baseMatName = materialName.split(/[/\\]/).pop()
+                const vmtPath = path.join(materialTargetDir, baseMatName + '.vmt')
+                
+                // Extract just the texture filename (no path, no extension)
+                // Use split on BOTH / and \ since MTL files use forward slashes
+                const textureFileName = texturePath.split(/[/\\]/).pop().replace(/\.(png|tga)$/i, '')
+                
+                const vmtContent = `patch
+{
+include "materials/models/props_map_editor/item_lighting_common.vmt"
+insert
+{
+$basetexture "models/props_map_editor/bpee/${itemName}/${textureFileName}"
+$selfillum 1
+$model 1
+}
+}
+`
+                fs.writeFileSync(vmtPath, vmtContent, 'utf-8')
+                console.log(`  ✅ Created VMT: ${baseMatName}.vmt → texture: ${textureFileName}`)
+            } catch (error) {
+                console.error(`  ❌ Failed to create VMT for material ${materialName}: ${error.message}`)
+            }
+        }
+        
+        console.log(`✅ Materials converted and copied to: ${materialTargetDir}`)
+    } catch (error) {
+        console.warn(`⚠️  Failed to convert materials: ${error.message}`)
+        throw error
+    }
+}
+
+/**
  * Copy compiled MDL files to package resources directory and clean up Portal 2 directory
  * @param {Object} compiledFiles - Object containing paths to compiled MDL files
  * @param {string} packagePath - Root path of the package
  * @param {string} itemName - Name of the item (for the model filename)
- * @param {string} materialsSourceDir - Directory containing extracted materials
+ * @param {string} materialsSourceDir - DEPRECATED: Materials should be converted before calling this
  * @returns {Promise<Object>} - Object containing final paths
  */
 async function copyMDLToPackage(compiledFiles, packagePath, itemName, materialsSourceDir = null) {
@@ -378,138 +542,8 @@ async function copyMDLToPackage(compiledFiles, packagePath, itemName, materialsS
         console.log(`Created directory: ${targetDir}`)
     }
     
-    // Convert and copy materials if they exist
-    if (materialsSourceDir && fs.existsSync(materialsSourceDir)) {
-        console.log("📦 Converting and copying materials to VTF/VMT format...")
-        const materialTargetDir = path.join(
-            packagePath,
-            "resources",
-            "materials",
-            "models",
-            "props_map_editor"
-        )
-        
-        // Find all PNG/TGA files and convert them to VTF + create VMT
-        const convertMaterials = async (src, dest) => {
-            if (!fs.existsSync(src)) {
-                console.warn(`⚠️ Source materials directory not found: ${src}`)
-                return
-            }
-            
-            if (!fs.existsSync(dest)) {
-                fs.mkdirSync(dest, { recursive: true })
-            }
-            
-            const entries = fs.readdirSync(src, { withFileTypes: true })
-            for (const entry of entries) {
-                const srcPath = path.join(src, entry.name)
-                const destPath = path.join(dest, entry.name)
-                
-                if (entry.isDirectory()) {
-                    await convertMaterials(srcPath, destPath)
-                } else if (entry.name.match(/\.(png|tga)$/i)) {
-                    // Convert PNG/TGA to VTF (VMT created later based on MTL material names)
-                    const vtfPath = destPath.replace(/\.(png|tga)$/i, '.vtf')
-                    
-                    try {
-                        console.log(`  Converting ${entry.name}...`)
-                        console.log(`    Source: ${srcPath}`)
-                        console.log(`    Target VTF: ${vtfPath}`)
-                        
-                        // CARTOONIFY the source image BEFORE converting to VTF
-                        const cartoonifiedPath = srcPath.replace(/\.(png|tga)$/i, '_cartoonified.png')
-                        console.log(`    Cartoonifying: ${cartoonifiedPath}`)
-                        
-                        // Apply cartoonification
-                        await applyCartoonification(srcPath, cartoonifiedPath)
-                        
-                        // Convert cartoonified image to VTF
-                        await convertImageToVTF(cartoonifiedPath, vtfPath, {
-                            format: "DXT5",
-                            generateMipmaps: true
-                        })
-                        
-                        // Clean up temporary cartoonified file
-                        if (fs.existsSync(cartoonifiedPath)) {
-                            fs.unlinkSync(cartoonifiedPath)
-                        }
-                        
-                        console.log(`    ✅ VTF created`)
-                        console.log(`  ✅ Converted: ${entry.name} → VTF`)
-                    } catch (error) {
-                        console.error(`  ❌ FAILED to convert ${entry.name}:`)
-                        console.error(`     Error: ${error.message}`)
-                        console.error(`     Stack: ${error.stack}`)
-                    }
-                }
-            }
-        }
-        
-        // Parse MTL file to get material names and their texture paths
-        const mtlFilePath = path.join(packagePath, 'temp_models', itemName + '_0.mtl')
-        
-        const materialMap = {}
-        if (fs.existsSync(mtlFilePath)) {
-            console.log(`📖 Parsing MTL file: ${mtlFilePath}`)
-            const mtlContent = fs.readFileSync(mtlFilePath, 'utf-8')
-            const lines = mtlContent.split('\n')
-            let currentMaterial = null
-            
-            for (const line of lines) {
-                if (line.startsWith('newmtl ')) {
-                    currentMaterial = line.substring(7).trim()
-                } else if (currentMaterial && line.startsWith('map_Kd ')) {
-                    const texturePath = line.substring(7).trim().replace('materials/', '')
-                    materialMap[currentMaterial] = texturePath
-                }
-            }
-            console.log(`Found ${Object.keys(materialMap).length} materials in MTL file`)
-        } else {
-            console.warn(`⚠️ MTL file not found: ${mtlFilePath}`)
-        }
-        
-        // Convert all materials from temp_models/materials/ to resources/materials/models/props_map_editor/
-        // And create VMT files based on MATERIAL NAMES, not file paths
-        try {
-            await convertMaterials(materialsSourceDir, materialTargetDir)
-            
-            // Now create VMT files in the correct locations based on material names
-            for (const [materialName, texturePath] of Object.entries(materialMap)) {
-                try {
-                    const vmtPath = path.join(materialTargetDir, materialName + '.vmt')
-                    const vmtDir = path.dirname(vmtPath)
-                    
-                    if (!fs.existsSync(vmtDir)) {
-                        fs.mkdirSync(vmtDir, { recursive: true })
-                    }
-                    
-                    // Use texture PATH (not material name) for $baseTexture
-                    // Remove .png/.tga extension from texture path
-                    const textureNameWithoutExt = texturePath.replace(/\.(png|tga)$/i, '')
-                    
-                    const vmtContent = `patch
-{
-include "materials/models/props_map_editor/item_lighting_common.vmt"
-insert
-{
-$basetexture "models/props_map_editor/${textureNameWithoutExt}"
-$selfillum 1
-$model 1
-}
-}
-`
-                    fs.writeFileSync(vmtPath, vmtContent, 'utf-8')
-                    console.log(`  ✅ Created VMT for material: ${materialName} → texture: ${textureNameWithoutExt}`)
-                } catch (error) {
-                    console.error(`  ❌ Failed to create VMT for material ${materialName}: ${error.message}`)
-                }
-            }
-            
-            console.log(`✅ Materials converted and copied to: ${materialTargetDir}`)
-        } catch (error) {
-            console.warn(`⚠️  Failed to convert materials: ${error.message}`)
-        }
-    }
+    // Materials are now converted BEFORE this function is called
+    // (Legacy parameter materialsSourceDir is kept for backward compatibility but ignored)
 
     const copiedFiles = {}
     const filesToDelete = []
@@ -596,16 +630,34 @@ async function convertAndInstallMDL(objPath, packagePath, itemName, options = {}
     console.log(`  Package: ${packagePath}`)
     console.log(`  Item: ${itemName}`)
 
-    // Step 1: Compile OBJ to MDL using STUDIOMDL
     const tempDir = path.join(packagePath, "temp_models")
+
+    // Step 1: Convert materials from PNG to VTF/VMT FIRST (before STUDIOMDL needs them!)
+    console.log(`📦 Step 1: Converting materials to VTF/VMT format...`)
+    const materialsSourceDir = path.join(tempDir, "materials")
+    const materialTargetDir = path.join(
+        packagePath,
+        "resources",
+        "materials",
+        "models",
+        "props_map_editor",
+        "bpee",
+        itemName
+    )
+    
+    await convertMaterialsToPackage(materialsSourceDir, materialTargetDir, tempDir, itemName)
+
+    // Step 2: Compile OBJ to MDL using STUDIOMDL (now materials are ready!)
+    console.log(`🔨 Step 2: Compiling MDL with STUDIOMDL...`)
     const compiledFiles = await convertObjToMDL(objPath, tempDir, {
         modelName: itemName,
-        scale: options.scale || 1.0
+        scale: options.scale || 1.0,
+        packageMaterialsDir: materialTargetDir // Pass the materials location
     })
 
-    // Step 2: Copy MDL files AND materials to package resources
-    const materialsDir = path.join(tempDir, "materials")
-    const result = await copyMDLToPackage(compiledFiles, packagePath, itemName, materialsDir)
+    // Step 3: Copy MDL files to package resources (materials are already there)
+    console.log(`📋 Step 3: Copying compiled MDL to package...`)
+    const result = await copyMDLToPackage(compiledFiles, packagePath, itemName, null)
 
     console.log(`✅ MDL conversion and installation complete!`)
     console.log(`  Model path for editoritems: ${result.relativeModelPath}`)
@@ -621,6 +673,7 @@ module.exports = {
     getStudioMDLPath,
     generateQCFile,
     convertObjToMDL,
+    convertMaterialsToPackage,
     copyMDLToPackage,
     convertAndInstallMDL
 }
