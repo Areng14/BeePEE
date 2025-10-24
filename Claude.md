@@ -161,6 +161,19 @@ editoritems.Item.Exporting.Instances[index.toString()] = {
 
 **Solution**: Changed to pass item IDs and look up fresh data from current state.
 
+### Issue 4: BEE2 "Unknown instance option error" when parsing editoritems
+**Problem**: When VMF files don't exist, `vmfParser.js` added an `"error": "File not found"` property to instance stats, which got saved to editoritems.json. BEE2's parser doesn't recognize "error" as a valid instance property.
+
+**Solution**: Modified `backend/models/items.js` to explicitly extract only valid properties (EntityCount, BrushCount, BrushSideCount) instead of using spread operator that includes error property:
+```javascript
+editoritems.Item.Exporting.Instances[nextIndex.toString()] = {
+    Name: instanceName,
+    EntityCount: vmfStats.EntityCount || 0,
+    BrushCount: vmfStats.BrushCount || 0,
+    BrushSideCount: vmfStats.BrushSideCount || 0,
+}
+```
+
 ## Item Creation Flow
 
 1. User clicks "+" button in ItemBrowser
@@ -235,4 +248,141 @@ const showCreateItem = routeParam === 'create-item'
 - Add batch operations (delete multiple items)
 - Export/import individual items between packages
 - Validation for instance file compatibility
+
+---
+
+## Custom Model Conversion System
+
+### Overview
+Automatically converts VMF instances → OBJ files → Source Engine MDL files, and integrates them into the package's editoritems.json.
+
+### What Happens When You Click "Make Model"
+
+1. **VMF → OBJ Conversion** (existing functionality)
+   - Converts the VMF instance file to OBJ format
+   - Extracts textures and applies optional cartoonish styling
+   - Outputs to: `{package}/temp_models/{instance}.obj`
+
+2. **OBJ → MDL Conversion** (NEW!)
+   - Generates a QC (QuakeC) file that describes the model compilation
+   - Uses STUDIOMDL from the Source SDK to compile the OBJ into MDL
+   - Compiles to Portal 2 directory (STUDIOMDL requirement)
+   - Creates multiple files: `.mdl`, `.vvd`, `.vtx` (various formats: plain, dx90, dx80, sw)
+   - **Copies ALL files** to: `{package}/resources/models/props_map_editor/bpee/item/`
+   - **Cleans up Portal 2 directory** - deletes compiled files and empty folders
+
+3. **editoritems.json Update** (NEW!)
+   - Automatically updates the item's editoritems.json
+   - Adds/updates the Model section:
+     ```json
+     "Model": {
+         "ModelName": "bpee/item/bpee_myitem_areng_a3f9.mdl"
+     }
+     ```
+   - Uses the item ID as the model filename to ensure each item has a unique model
+
+### Files Created
+
+**New Utility: `backend/utils/mdlConverter.js`**
+- `getStudioMDLPath()` - Locates STUDIOMDL executable
+- `generateQCFile()` - Creates QC compilation script
+- `convertObjToMDL()` - Runs STUDIOMDL compilation
+- `copyMDLToPackage()` - Copies compiled files to package and cleans up Portal 2 directory
+- `convertAndInstallMDL()` - Main orchestration function
+
+**Updated Files:**
+- `backend/events.js` - Enhanced `convert-instance-to-obj` handler with MDL conversion
+- `src/components/items/Info.jsx` - Added user feedback for MDL conversion
+- `package.json` - Added extraResources configuration for STUDIOMDL
+
+### QC File Structure
+
+```qc
+$modelname "props_map_editor/bpee/item/bpee_myitem_areng_a3f9.mdl"
+$staticprop
+$body body "instance.obj"
+$surfaceprop "default"
+$cdmaterials "models/props_map_editor/"
+$scale 1.0
+$sequence idle "instance.obj" fps 30
+```
+
+The model name uses the item ID (sanitized for filenames) to ensure uniqueness.
+
+**Path structure:** `props_map_editor/bpee/item/` - Simple and clean!
+
+### Directory Structure
+
+**During Compilation (temporary):**
+```
+C:\...\Portal 2\portal2\models\props_map_editor\bpee\item\
+├── bpee_myitem_areng_a3f9.mdl        (compiled here by STUDIOMDL)
+├── bpee_myitem_areng_a3f9.vvd        
+├── bpee_myitem_areng_a3f9.vtx        (can be .vtx, .dx90.vtx, .dx80.vtx, .sw.vtx)
+```
+
+**After Copy & Cleanup (Portal 2 files deleted):**
+```
+{package}/
+├── temp_models/                    (temporary build files)
+│   ├── instance.obj
+│   ├── instance.mtl
+│   ├── instance.qc
+│   └── materials/                  (extracted textures)
+└── resources/
+    └── models/
+        └── props_map_editor/
+            └── bpee/
+                └── item/
+                    ├── bpee_myitem_areng_a3f9.mdl  (Source model - COPIED)
+                    ├── bpee_myitem_areng_a3f9.vvd  (Vertex data - COPIED)
+                    └── bpee_myitem_areng_a3f9.vtx  (Vertex indices - COPIED, any format)
+```
+
+**Note:** Each item gets its own uniquely named model based on the item ID to prevent conflicts!
+
+**⚠️ All files are needed!** Source Engine requires all file types (.mdl, .vvd, .vtx) to load the model correctly.
+
+### Requirements
+
+1. **STUDIOMDL** - Located in `backend/libs/studiomdl/studiomdl.exe`
+2. **Portal 2 Installation** - Required for STUDIOMDL's `-game` parameter (points to `gameinfo.txt`)
+3. **Valid OBJ File** - Must be generated from VMF first
+
+### User Experience
+
+**Success Messages:**
+- ✅ Full Success: "Model generated successfully! OBJ: ... MDL: ... The editoritems.json has been updated."
+- ⚠️ Partial Success: "OBJ created but MDL conversion failed" (OBJ preview still works)
+- ❌ Failure: Specific error message with details
+
+### Error Handling
+
+Graceful degradation:
+- If MDL conversion fails, OBJ file is still available for preview
+- Error messages include specific failure reasons
+- editoritems.json is only updated if MDL conversion succeeds
+- Portal 2 directory cleanup continues even if individual file deletion fails
+
+### Compilation Flow
+
+1. **Compile**: STUDIOMDL must output to `{Portal 2}/portal2/models/props_map_editor/bpee/item/` (hardcoded by Source SDK)
+2. **Copy**: All `.mdl`, `.vvd`, and any `.vtx` files copied to package `resources/models/props_map_editor/bpee/item/`
+3. **Cleanup**: Delete all compiled files from Portal 2 directory
+4. **Cleanup Directories**: Remove empty `item/` and `bpee/` folders if empty
+5. **Update**: Add Model section to editoritems.json with path `bpee/item/{itemId}.mdl`
+
+### Why Portal 2 Directory is Used
+
+- STUDIOMDL's `-game` parameter requires the folder containing `gameinfo.txt`
+- The tool **always** outputs relative to `{-game}/models/{$modelname}`
+- There's no way to specify a custom output directory
+- We copy the files out and clean up immediately after compilation
+
+### Export Behavior
+
+When exporting packages:
+- `temp_models/` directory is **automatically excluded** from exports
+- This folder only contains temporary build files (QC, OBJ, MTL, extracted textures)
+- Final MDL files are already in `resources/models/` and will be included
 
