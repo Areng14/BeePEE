@@ -2861,12 +2861,62 @@ function reg_events(mainWindow) {
                 const fileBase = path.basename(vmfPath, path.extname(vmfPath))
                 const objPath = path.join(tempDir, `${fileBase}.obj`)
                 const mtlPath = path.join(tempDir, `${fileBase}.mtl`)
+
+                // ===== NEW: Convert OBJ to MDL and update editoritems =====
+                let mdlResult = null
+                try {
+                    console.log("🎯 Starting MDL conversion process...")
+                    const { convertAndInstallMDL } = require("./utils/mdlConverter")
+                    
+                    // Use item ID as the model name to ensure uniqueness
+                    // Remove any special characters and make it safe for file names
+                    const itemName = item.id.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase()
+                    
+                    // Convert OBJ to MDL and install in package
+                    mdlResult = await convertAndInstallMDL(
+                        objPath,
+                        item.packagePath,
+                        itemName,
+                        { scale: options.scale || 1.0 }
+                    )
+
+                    // Update editoritems.json to reference the custom model
+                    if (mdlResult.success && mdlResult.relativeModelPath) {
+                        console.log("📝 Updating editoritems.json with custom model...")
+                        
+                        const editorItems = item.getEditorItems()
+                        const subType = Array.isArray(editorItems.Item.Editor.SubType)
+                            ? editorItems.Item.Editor.SubType[0]
+                            : editorItems.Item.Editor.SubType
+
+                        // Add or update the Model section
+                        if (!subType.Model) {
+                            subType.Model = {}
+                        }
+                        subType.Model.ModelName = mdlResult.relativeModelPath
+
+                        // Save the updated editoritems
+                        item.saveEditorItems(editorItems)
+                        
+                        console.log(`✅ Updated editoritems with model: ${mdlResult.relativeModelPath}`)
+                    }
+                } catch (mdlError) {
+                    console.error("❌ MDL conversion failed:", mdlError)
+                    // Don't throw - allow OBJ generation to succeed even if MDL fails
+                    mdlResult = {
+                        success: false,
+                        error: mdlError.message
+                    }
+                }
+                // ===== END MDL CONVERSION =====
+
                 return {
                     success: true,
                     vmfPath,
                     tempDir,
                     objPath,
                     mtlPath,
+                    mdlResult,
                     ...result,
                 }
             } catch (error) {

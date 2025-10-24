@@ -175,14 +175,25 @@ function Info({ item, formData, onUpdate }) {
             )
             if (result?.success) {
                 console.log("VMF2OBJ conversion completed successfully")
-                // Could add a success notification here
+                
+                // Check MDL conversion result
+                if (result.mdlResult?.success) {
+                    console.log("✅ MDL conversion successful!")
+                    console.log(`   Model path: ${result.mdlResult.relativeModelPath}`)
+                    alert(`Model generated successfully!\n\nOBJ: ${result.objPath}\nMDL: ${result.mdlResult.relativeModelPath}\n\nThe editoritems.json has been updated with your custom model.`)
+                } else if (result.mdlResult?.error) {
+                    console.warn("⚠️ OBJ created but MDL conversion failed:", result.mdlResult.error)
+                    alert(`OBJ model created successfully, but MDL conversion failed:\n\n${result.mdlResult.error}\n\nYou can still preview the OBJ model.`)
+                } else {
+                    console.log("OBJ created (MDL conversion skipped)")
+                }
             } else {
                 console.error("VMF2OBJ failed:", result?.error)
-                // Could add an error notification here
+                alert(`Model generation failed:\n\n${result?.error || "Unknown error"}`)
             }
         } catch (error) {
             console.error("Failed to make model:", error)
-            // Could add an error notification here
+            alert(`Failed to make model:\n\n${error.message || error}`)
         } finally {
             setIsConverting(false)
         }

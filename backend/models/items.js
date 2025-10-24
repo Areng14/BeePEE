@@ -582,7 +582,9 @@ class Item {
 
         editoritems.Item.Exporting.Instances[nextIndex.toString()] = {
             Name: instanceName,
-            ...vmfStats,
+            EntityCount: vmfStats.EntityCount || 0,
+            BrushCount: vmfStats.BrushCount || 0,
+            BrushSideCount: vmfStats.BrushSideCount || 0,
         }
         this.saveEditorItems(editoritems)
 

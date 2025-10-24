@@ -11,6 +11,26 @@
         "lint": "eslint . --fix",
         "test": "jest"
     },
+    "build": {
+        "extraResources": [
+            {
+                "from": "backend/libs/studiomdl",
+                "to": "extraResources/studiomdl"
+            },
+            {
+                "from": "backend/libs/maretf",
+                "to": "extraResources/maretf"
+            },
+            {
+                "from": "backend/libs/VMF2OBJ",
+                "to": "extraResources/VMF2OBJ"
+            },
+            {
+                "from": "backend/libs/areng_cartoonify",
+                "to": "extraResources/areng_cartoonify"
+            }
+        ]
+    },
     "jest": {
         "setupFilesAfterEnv": [
             "<rootDir>/backend/__tests__/jest.setup.js"

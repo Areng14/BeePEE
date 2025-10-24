@@ -206,6 +206,10 @@ async function convertImageToVTF(imagePath, outputPath, options = {}) {
                         }
                     }
 
+                    // Create corresponding VMT file
+                    const vmtPath = outputPath.replace('.vtf', '.vmt')
+                    await createVMTFile(vmtPath, outputPath)
+                    
                     return
                 } else {
                     throw new Error(
@@ -270,6 +274,40 @@ async function convertImageToVTF(imagePath, outputPath, options = {}) {
         }
 
         throw error // Don't fallback to PNG since Source engine won't accept it
+    }
+}
+
+/**
+ * Creates a VMT file for a VTF texture
+ * @param {string} vmtPath - Path where the VMT file should be created
+ * @param {string} vtfPath - Path to the corresponding VTF file
+ */
+async function createVMTFile(vmtPath, vtfPath) {
+    try {
+        // Get the texture name relative to the materials directory
+        // The $basetexture path is ABSOLUTE from materials/ directory
+        const materialsDir = path.join(process.cwd(), "packages", "PieCreeper's Items", "resources", "materials")
+        const relativePath = path.relative(materialsDir, vtfPath)
+            .replace(/\\/g, '/')
+            .replace('.vtf', '')
+        
+        const vmtContent = `patch
+{
+include "materials/models/props_map_editor/item_lighting_common.vmt"
+insert
+{
+$baseTexture "${relativePath}"
+$selfillum 1
+$model 1
+}
+}
+`
+        
+        fs.writeFileSync(vmtPath, vmtContent, 'utf-8')
+        console.log(`✅ Created VMT file: ${vmtPath}`)
+    } catch (error) {
+        console.error(`Failed to create VMT file: ${error.message}`)
+        throw error
     }
 }
 
@@ -369,4 +407,5 @@ module.exports = {
     convertImageToVTF,
     getVTFPathFromImagePath,
     updateEditorItemsWithVTF,
+    createVMTFile,
 }
