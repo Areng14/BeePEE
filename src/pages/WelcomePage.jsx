@@ -4,6 +4,17 @@ import { Add, FolderOpen, Unarchive } from "@mui/icons-material"
 function WelcomePage() {
     const handleCreatePackage = async () => {
         try {
+            // Check if there's a package already open
+            const hasPackage = await window.electron.invoke("check-package-loaded")
+            
+            if (hasPackage) {
+                // Show confirmation via backend (so we can use native dialog)
+                const confirmed = await window.electron.invoke("confirm-close-for-new-package")
+                if (!confirmed) {
+                    return
+                }
+            }
+            
             await window.electron.invoke("open-create-package-window")
         } catch (error) {
             console.error("Failed to open create package window:", error)

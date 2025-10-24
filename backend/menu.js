@@ -11,6 +11,10 @@ const {
 const { dialog, BrowserWindow } = require("electron")
 const path = require("path")
 const fs = require("fs")
+const {
+    createPackageCreationWindow,
+    createPackageInformationWindow,
+} = require("./items/itemEditor")
 
 // Track last saved .bpee path in memory
 let lastSavedBpeePath = null
@@ -28,15 +32,84 @@ function createMainMenu(mainWindow) {
     const isDev = !require("electron").app.isPackaged
 
     const template = [
-        {
-            label: "File",
-            submenu: [
-                {
-                    label: "New Package",
-                    accelerator: "Ctrl+N",
-                    enabled: false,
-                    click: () => {},
-                },
+            {
+                label: "File",
+                submenu: [
+                    {
+                        label: "New Package",
+                        accelerator: "Ctrl+N",
+                        click: async () => {
+                            // Check if a package is currently loaded
+                            const currentPackageDir = getCurrentPackageDir()
+                            if (currentPackageDir) {
+                                // Show confirmation dialog with save option
+                                const { response } = await dialog.showMessageBox(
+                                    mainWindow,
+                                    {
+                                        type: "warning",
+                                        buttons: ["Discard", "Save", "Cancel"],
+                                        defaultId: 2,
+                                        cancelId: 0,
+                                        title: "Save Changes?",
+                                        message:
+                                            "Do you want to save the current package before creating a new one?",
+                                        detail:
+                                            "Your changes will be lost if you don't save them.",
+                                    },
+                                )
+                                
+                                if (response === 3) {
+                                    // User chose 'Cancel'
+                                    return
+                                }
+                                
+                                if (response === 2) {
+                                    // User chose 'Save & Continue' - save first
+                                    try {
+                                        if (!lastSavedBpeePath) {
+                                            // Prompt for path if not previously saved
+                                            const { canceled, filePath } =
+                                                await dialog.showSaveDialog(mainWindow, {
+                                                    title: "Save Package As",
+                                                    defaultPath:
+                                                        getCurrentPackageName() + ".bpee",
+                                                    filters: [
+                                                        {
+                                                            name: "BeePEE Package",
+                                                            extensions: ["bpee"],
+                                                        },
+                                                    ],
+                                                })
+                                            if (canceled || !filePath) return
+                                            lastSavedBpeePath = filePath
+                                        }
+                                        await savePackageAsBpee(
+                                            currentPackageDir,
+                                            lastSavedBpeePath,
+                                        )
+                                    } catch (err) {
+                                        dialog.showErrorBox("Save Failed", err.message)
+                                        return
+                                    }
+                                }
+                                
+                                // Close current package (response === 1 "Don't Save" or response === 2 after saving)
+                                try {
+                                    await closePackage()
+                                    lastSavedBpeePath = null
+                                    mainWindow.webContents.send("package:closed")
+                                } catch (error) {
+                                    dialog.showErrorBox(
+                                        "Close Failed",
+                                        `Failed to close package: ${error.message}`,
+                                    )
+                                    return
+                                }
+                            }
+                            // Open create package window
+                            createPackageCreationWindow(mainWindow)
+                        },
+                    },
                 {
                     label: "Load Package...",
                     accelerator: "Ctrl+O",
@@ -269,6 +342,23 @@ function createMainMenu(mainWindow) {
                 { role: "copy", accelerator: "Ctrl+C" },
                 { role: "paste", accelerator: "Ctrl+V" },
                 { role: "selectAll", accelerator: "Ctrl+A" },
+                { type: "separator" },
+                {
+                    label: "Package Information...",
+                    accelerator: "Ctrl+Shift+I",
+                    click: () => {
+                        const currentPackageDir = getCurrentPackageDir()
+                        if (!currentPackageDir) {
+                            dialog.showMessageBox(mainWindow, {
+                                type: "info",
+                                message: "No package is currently open",
+                                detail: "Please open or create a package first",
+                            })
+                            return
+                        }
+                        createPackageInformationWindow(mainWindow)
+                    },
+                },
             ],
         },
     ]

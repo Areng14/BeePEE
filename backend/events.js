@@ -929,7 +929,7 @@ function reg_events(mainWindow) {
                 },
                 Palette: {
                     Tooltip: name.toUpperCase(),
-                    Image: iconPath ? `palette/bpee/${path.basename(iconPath)}` : "BEE2/blank.png",
+                    Image: iconPath ? "palette/bpee/item/item" : "BEE2/blank.png",
                     Position: "0 0 0"
                 },
                 Sounds: {
@@ -991,14 +991,23 @@ function reg_events(mainWindow) {
                 fs.mkdirSync(path.dirname(iconDestPath), { recursive: true })
                 fs.copyFileSync(iconPath, iconDestPath)
 
-                // Also copy to palette/bpee for editoritems.json
-                const paletteDestPath = path.join(
+                // Convert icon to VTF at standard location
+                const { convertImageToVTF } = require("./utils/vtfConverter")
+                const vtfPath = path.join(
                     currentPackage.packageDir,
-                    "resources/palette/bpee",
-                    iconFileName
+                    "resources/materials/models/props_map_editor/palette/bpee/item",
+                    "item.vtf"
                 )
-                fs.mkdirSync(path.dirname(paletteDestPath), { recursive: true })
-                fs.copyFileSync(iconPath, paletteDestPath)
+                try {
+                    await convertImageToVTF(iconPath, vtfPath, {
+                        format: "DXT5",
+                        generateMipmaps: true,
+                    })
+                    console.log(`Created VTF icon at: ${vtfPath}`)
+                } catch (error) {
+                    console.error("Failed to convert icon to VTF during item creation:", error)
+                    // Don't throw - let item creation continue
+                }
 
                 // Set icon path relative to resources/BEE2/items/
                 properties.Properties.Icon = {
@@ -1243,6 +1252,37 @@ function reg_events(mainWindow) {
     })
 
     // Register create package window opener
+    // Check if a package is currently loaded
+    ipcMain.handle("check-package-loaded", async () => {
+        const currentPackageDir = getCurrentPackageDir()
+        return !!currentPackageDir
+    })
+
+    // Confirm and close current package for new package creation
+    ipcMain.handle("confirm-close-for-new-package", async () => {
+        try {
+            const currentPackageDir = getCurrentPackageDir()
+            if (!currentPackageDir) {
+                return true // No package loaded, proceed
+            }
+
+            // No need to do the save or not because to be at menu screen, you must not have a active package.
+
+            const { closePackage } = require("./packageManager")
+            await closePackage()
+            lastSavedBpeePath = null
+            mainWindow.webContents.send("package:closed")
+            return true
+        } catch (error) {
+            console.error("Failed to close package:", error)
+            dialog.showErrorBox(
+                "Close Failed",
+                `Failed to close package: ${error.message}`,
+            )
+            return false
+        }
+    })
+
     ipcMain.handle("open-create-package-window", async () => {
         try {
             createPackageCreationWindow(mainWindow)
@@ -1317,6 +1357,84 @@ function reg_events(mainWindow) {
         } catch (error) {
             console.error("Failed to create package:", error)
             throw error
+        }
+    })
+
+    // Register get package info handler
+    ipcMain.handle("get-package-info", async () => {
+        try {
+            const currentPackageDir = getCurrentPackageDir()
+            if (!currentPackageDir) {
+                return { 
+                    success: false, 
+                    error: "No package is currently loaded" 
+                }
+            }
+
+            const infoPath = path.join(currentPackageDir, "info.json")
+            if (!fs.existsSync(infoPath)) {
+                return { 
+                    success: false, 
+                    error: "Package info.json not found" 
+                }
+            }
+
+            const info = JSON.parse(fs.readFileSync(infoPath, "utf-8"))
+            return { success: true, info }
+        } catch (error) {
+            console.error("Failed to get package info:", error)
+            return { 
+                success: false, 
+                error: error.message || "Failed to load package information" 
+            }
+        }
+    })
+
+    // Register update package info handler
+    ipcMain.handle("update-package-info", async (event, { name, description }) => {
+        try {
+            const currentPackageDir = getCurrentPackageDir()
+            if (!currentPackageDir) {
+                return { 
+                    success: false, 
+                    error: "No package is currently loaded" 
+                }
+            }
+
+            // Validate inputs
+            if (!name || !name.trim()) {
+                return { 
+                    success: false, 
+                    error: "Package name is required" 
+                }
+            }
+
+            const infoPath = path.join(currentPackageDir, "info.json")
+            if (!fs.existsSync(infoPath)) {
+                return { 
+                    success: false, 
+                    error: "Package info.json not found" 
+                }
+            }
+
+            // Read existing info
+            const info = JSON.parse(fs.readFileSync(infoPath, "utf-8"))
+
+            // Update name and description (preserve ID and other fields)
+            info.Name = name.trim()
+            info.Desc = description.trim() || ""
+
+            // Write back to file
+            fs.writeFileSync(infoPath, JSON.stringify(info, null, 4))
+
+            console.log(`Package info updated: ${info.Name}`)
+            return { success: true }
+        } catch (error) {
+            console.error("Failed to update package info:", error)
+            return { 
+                success: false, 
+                error: error.message || "Failed to update package information" 
+            }
         }
     })
 
@@ -1552,6 +1670,24 @@ function reg_events(mainWindow) {
             // Copy the new icon file
             fs.copyFileSync(selectedFilePath, targetIconPath)
 
+            // Convert icon to VTF at standard location
+            const { convertImageToVTF } = require("./utils/vtfConverter")
+            const vtfPath = path.join(
+                item.packagePath,
+                "resources/materials/models/props_map_editor/palette/bpee/item",
+                "item.vtf"
+            )
+            try {
+                await convertImageToVTF(selectedFilePath, vtfPath, {
+                    format: "DXT5",
+                    generateMipmaps: true,
+                })
+                console.log(`Created VTF icon at: ${vtfPath}`)
+            } catch (error) {
+                console.error("Failed to convert icon to VTF:", error)
+                // Don't throw - let icon update continue
+            }
+
             // Update the item's icon path in the properties file (where Item class actually reads it)
             const propertiesPath = path.join(
                 item.fullItemPath,
@@ -1585,6 +1721,32 @@ function reg_events(mainWindow) {
                     propertiesPath,
                     JSON.stringify(properties, null, 2),
                 )
+            }
+
+            // Update editoritems.json to use standard palette path
+            const editorItemsPath = path.join(
+                item.fullItemPath,
+                "editoritems.json",
+            )
+            if (fs.existsSync(editorItemsPath)) {
+                const editorItems = JSON.parse(
+                    fs.readFileSync(editorItemsPath, "utf-8"),
+                )
+
+                const editor = editorItems.Item?.Editor
+                if (editor?.SubType) {
+                    const subType = Array.isArray(editor.SubType)
+                        ? editor.SubType[0]
+                        : editor.SubType
+                    
+                    if (!subType.Palette) subType.Palette = {}
+                    subType.Palette.Image = "palette/bpee/item/item"
+                    
+                    fs.writeFileSync(
+                        editorItemsPath,
+                        JSON.stringify(editorItems, null, 2),
+                    )
+                }
             }
 
             // Reload the item to get updated data

@@ -1,6 +1,7 @@
 const openEditors = new Map()
 let createItemWindow = null // Track the create item window
 let createPackageWindow = null // Track the create package window
+let packageInformationWindow = null // Track the package information window
 const { BrowserWindow } = require("electron")
 const path = require("path")
 
@@ -144,6 +145,47 @@ function createPackageCreationWindow(mainWindow) {
     createPackageWindow.setMenuBarVisibility(false)
 }
 
+function createPackageInformationWindow(mainWindow) {
+    // If window already exists, focus it
+    if (packageInformationWindow && !packageInformationWindow.isDestroyed()) {
+        packageInformationWindow.focus()
+        return
+    }
+
+    const isDev = !require("electron").app.isPackaged
+
+    packageInformationWindow = new BrowserWindow({
+        width: 500,
+        height: 650,
+        title: "BeePEE - Package Information",
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, "..", "preload.js"),
+        },
+        devTools: isDev,
+        skipTaskbar: false,
+        minimizable: true,
+        maximizable: false,
+        resizable: false,
+        autoHideMenuBar: true,
+    })
+
+    packageInformationWindow.on("closed", () => {
+        packageInformationWindow = null
+    })
+
+    if (isDev) {
+        packageInformationWindow.loadURL(`http://localhost:5173/package-information`)
+    } else {
+        packageInformationWindow.loadFile(path.join(__dirname, "../dist/index.html"), { 
+            query: { route: "package-information" } 
+        })
+    }
+
+    packageInformationWindow.setMenuBarVisibility(false)
+}
+
 module.exports = {
     createItemEditor,
     sendItemUpdateToEditor,
@@ -151,5 +193,7 @@ module.exports = {
     createItemCreationWindow,
     getCreateItemWindow: () => createItemWindow,
     createPackageCreationWindow,
-    getCreatePackageWindow: () => createPackageWindow
+    getCreatePackageWindow: () => createPackageWindow,
+    createPackageInformationWindow,
+    getPackageInformationWindow: () => packageInformationWindow
 }
