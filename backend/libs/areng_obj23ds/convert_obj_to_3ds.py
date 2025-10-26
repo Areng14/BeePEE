@@ -4,7 +4,15 @@ OBJ to 3DS Converter - No External Dependencies
 Converts OBJ files to 3DS format for Portal 2 Puzzle Maker collision models
 
 Usage:
-    python convert_obj_to_3ds.py input.obj output.3ds
+    python convert_obj_to_3ds.py input.obj output.3ds [scale] [roll] [pitch] [yaw]
+
+Arguments:
+    input.obj  - Path to input OBJ file
+    output.3ds - Path to output 3DS file  
+    scale      - Optional scale factor (default: 1.0, use 0.8-0.9 for smaller collision)
+    roll       - Optional roll rotation in degrees around X-axis (default: 0)
+    pitch      - Optional pitch rotation in degrees around Y-axis (default: 0)
+    yaw        - Optional yaw rotation in degrees around Z-axis (default: 0)
 
 Requirements:
     None - uses only Python standard library
@@ -13,14 +21,52 @@ Requirements:
 import sys
 import os
 import struct
+import math
 
 
-def parse_obj_file(obj_path):
+def rotate_vertex(x, y, z, roll=0.0, pitch=0.0, yaw=0.0):
+    """
+    Apply rotation to a vertex using Euler angles (in degrees)
+    Roll: rotation around X-axis
+    Pitch: rotation around Y-axis  
+    Yaw: rotation around Z-axis
+    """
+    # Convert degrees to radians
+    roll_rad = math.radians(roll)
+    pitch_rad = math.radians(pitch)
+    yaw_rad = math.radians(yaw)
+    
+    # Roll rotation (around X-axis)
+    cos_roll = math.cos(roll_rad)
+    sin_roll = math.sin(roll_rad)
+    y_rolled = y * cos_roll - z * sin_roll
+    z_rolled = y * sin_roll + z * cos_roll
+    
+    # Pitch rotation (around Y-axis)
+    cos_pitch = math.cos(pitch_rad)
+    sin_pitch = math.sin(pitch_rad)
+    x_pitched = x * cos_pitch + z_rolled * sin_pitch
+    z_pitched = -x * sin_pitch + z_rolled * cos_pitch
+    
+    # Yaw rotation (around Z-axis)
+    cos_yaw = math.cos(yaw_rad)
+    sin_yaw = math.sin(yaw_rad)
+    x_final = x_pitched * cos_yaw - y_rolled * sin_yaw
+    y_final = x_pitched * sin_yaw + y_rolled * cos_yaw
+    
+    return x_final, y_final, z_pitched
+
+
+def parse_obj_file(obj_path, scale=1.0, roll=0.0, pitch=0.0, yaw=0.0):
     """
     Parse an OBJ file and extract vertices and faces.
     Returns a tuple of (vertices, faces) where:
     - vertices is a list of [x, y, z] coordinates
     - faces is a list of [v1, v2, v3] vertex indices
+    - scale: scale factor to apply to vertices (default: 1.0)
+    - roll: roll rotation in degrees around X-axis (default: 0)
+    - pitch: pitch rotation in degrees around Y-axis (default: 0)
+    - yaw: yaw rotation in degrees around Z-axis (default: 0)
     """
     vertices = []
     faces = []
@@ -36,7 +82,11 @@ def parse_obj_file(obj_path):
                 parts = line.split()
                 if len(parts) >= 4:
                     x, y, z = float(parts[1]), float(parts[2]), float(parts[3])
-                    vertices.append([x, y, z])
+                    # Apply scale factor to vertices
+                    x_scaled, y_scaled, z_scaled = x * scale, y * scale, z * scale
+                    # Apply rotation
+                    x_rotated, y_rotated, z_rotated = rotate_vertex(x_scaled, y_scaled, z_scaled, roll, pitch, yaw)
+                    vertices.append([x_rotated, y_rotated, z_rotated])
 
             elif line.startswith('f '):
                 # Face line: f v1[/vt1][/vn1] v2[/vt2][/vn2] v3[/vt3][/vn3] ...
@@ -148,19 +198,27 @@ def write_3ds_file(vertices, faces, output_path):
     print(f"  3DS file written successfully")
 
 
-def convert_obj_to_3ds(input_path, output_path):
+def convert_obj_to_3ds(input_path, output_path, scale=1.0, roll=0.0, pitch=0.0, yaw=0.0):
     """
     Convert an OBJ file to 3DS format
 
     Args:
         input_path: Path to input OBJ file
         output_path: Path to output 3DS file
+        scale: Scale factor to apply to vertices (default: 1.0)
+        roll: Roll rotation in degrees around X-axis (default: 0)
+        pitch: Pitch rotation in degrees around Y-axis (default: 0)
+        yaw: Yaw rotation in degrees around Z-axis (default: 0)
     """
     print(f"Converting {input_path} to {output_path}...")
+    if scale != 1.0:
+        print(f"  Applying scale factor: {scale}")
+    if roll != 0 or pitch != 0 or yaw != 0:
+        print(f"  Applying rotation: roll={roll}deg, pitch={pitch}deg, yaw={yaw}deg")
 
     # Parse OBJ file
     try:
-        vertices, faces = parse_obj_file(input_path)
+        vertices, faces = parse_obj_file(input_path, scale, roll, pitch, yaw)
     except Exception as e:
         print(f"ERROR: Failed to parse OBJ file: {e}")
         sys.exit(1)
@@ -188,11 +246,48 @@ def main():
     """Parse command line arguments and run conversion"""
     if len(sys.argv) < 3:
         print("ERROR: Missing arguments")
-        print("Usage: python convert_obj_to_3ds.py input.obj output.3ds")
+        print("Usage: python convert_obj_to_3ds.py input.obj output.3ds [scale] [roll] [pitch] [yaw]")
         sys.exit(1)
 
     input_path = sys.argv[1]
     output_path = sys.argv[2]
+    
+    # Parse optional parameters
+    scale = 1.0
+    roll = 0
+    pitch = 0
+    yaw = 0
+    
+    if len(sys.argv) >= 4:
+        try:
+            scale = float(sys.argv[3])
+            if scale <= 0:
+                print("ERROR: Scale factor must be positive")
+                sys.exit(1)
+        except ValueError:
+            print("ERROR: Scale factor must be a number")
+            sys.exit(1)
+    
+    if len(sys.argv) >= 5:
+        try:
+            roll = float(sys.argv[4])
+        except ValueError:
+            print("ERROR: Roll rotation must be a number")
+            sys.exit(1)
+    
+    if len(sys.argv) >= 6:
+        try:
+            pitch = float(sys.argv[5])
+        except ValueError:
+            print("ERROR: Pitch rotation must be a number")
+            sys.exit(1)
+    
+    if len(sys.argv) >= 7:
+        try:
+            yaw = float(sys.argv[6])
+        except ValueError:
+            print("ERROR: Yaw rotation must be a number")
+            sys.exit(1)
 
     # Validate input file exists
     if not os.path.exists(input_path):
@@ -205,7 +300,7 @@ def main():
         os.makedirs(output_dir, exist_ok=True)
 
     # Run conversion
-    convert_obj_to_3ds(input_path, output_path)
+    convert_obj_to_3ds(input_path, output_path, scale, roll, pitch, yaw)
 
 
 if __name__ == "__main__":

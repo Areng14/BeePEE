@@ -710,13 +710,17 @@ async function convertAndInstallMDL(objPath, packagePath, itemName, options = {}
         const threeDSFileName = `${itemName}.3ds`
         const threeDSPath = path.join(tempDir, threeDSFileName)
 
-        // Convert OBJ to 3DS
-        await convertObjTo3DS(objPath, threeDSPath)
+        // Convert OBJ to 3DS with collision scale and rotation (default 0.0078 scale, 90deg roll)
+        const collisionScale = options.collisionScale || 0.0078
+        const collisionRoll = options.collisionRoll || 90
+        const collisionPitch = options.collisionPitch || 0
+        const collisionYaw = options.collisionYaw || 0
+        await convertObjTo3DS(objPath, threeDSPath, collisionScale, collisionRoll, collisionPitch, collisionYaw)
 
         // Copy 3DS to package resources
         // Use sharedModelFolder if provided (for multi-model items), otherwise use itemName
         const folderName = options.sharedModelFolder || itemName
-        threeDSResult = await copy3DSToPackage(threeDSPath, packagePath, folderName)
+        threeDSResult = await copy3DSToPackage(threeDSPath, packagePath, folderName, itemName)
 
         console.log(`✅ 3DS collision model created!`)
         console.log(`  Path for editoritems: ${threeDSResult.relativeModelPath}`)
@@ -854,9 +858,13 @@ function mapVariableValuesToInstances(blocks, targetVariable) {
  * Convert OBJ file to 3DS format using Trimesh
  * @param {string} objPath - Path to the source OBJ file
  * @param {string} outputPath - Path where 3DS should be saved
+ * @param {number} scale - Scale factor for collision model (default: 0.9 for smaller collision)
+ * @param {number} roll - Roll rotation in degrees around X-axis (default: 90)
+ * @param {number} pitch - Pitch rotation in degrees around Y-axis (default: 0)
+ * @param {number} yaw - Yaw rotation in degrees around Z-axis (default: 0)
  * @returns {Promise<string>} - Path to the created 3DS file
  */
-async function convertObjTo3DS(objPath, outputPath) {
+async function convertObjTo3DS(objPath, outputPath, scale = 0.9, roll = 90, pitch = 0, yaw = 0) {
     if (!objPath || !fs.existsSync(objPath)) {
         throw new Error(`OBJ file not found: ${objPath}`)
     }
@@ -884,10 +892,12 @@ async function convertObjTo3DS(objPath, outputPath) {
     console.log(`🔷 Converting OBJ to 3DS using Trimesh...`)
     console.log(`  Input: ${objPath}`)
     console.log(`  Output: ${outputPath}`)
+    console.log(`  Scale: ${scale}`)
+    console.log(`  Rotation: roll=${roll}deg, pitch=${pitch}deg, yaw=${yaw}deg`)
     console.log(`  Converter: ${converterExe}`)
 
-    // Run the converter executable
-    const cmd = `"${converterExe}" "${objPath}" "${outputPath}"`
+    // Run the converter executable with scale and rotation parameters
+    const cmd = `"${converterExe}" "${objPath}" "${outputPath}" ${scale} ${roll} ${pitch} ${yaw}`
     console.log(`Executing: ${cmd}`)
 
     try {
@@ -918,23 +928,24 @@ async function convertObjTo3DS(objPath, outputPath) {
  * Copy 3DS collision model to package resources
  * @param {string} threeDSPath - Path to the source 3DS file
  * @param {string} packagePath - Root path of the package
- * @param {string} itemName - Name of the item (for folder structure)
+ * @param {string} folderName - Folder name (matches MDL folder structure)
+ * @param {string} itemName - Name of the item (for filename)
  * @returns {Promise<Object>} - Object with copied file info and relative path
  */
-async function copy3DSToPackage(threeDSPath, packagePath, itemName) {
+async function copy3DSToPackage(threeDSPath, packagePath, folderName, itemName) {
     if (!threeDSPath || !fs.existsSync(threeDSPath)) {
         throw new Error(`3DS file not found: ${threeDSPath}`)
     }
 
-    // Target directory: resources/models/puzzlemaker/selection_bee2/bpee/{itemName}/
+    // Target directory: resources/models/puzzlemaker/selection_bpee/{folderName}/
+    // This matches the Portal 2 selection mesh pattern where "selection_" is added to the start of the path
     const targetDir = path.join(
         packagePath,
         "resources",
         "models",
         "puzzlemaker",
-        "selection_bee2",
-        "bpee",
-        itemName
+        "selection_bpee",
+        folderName
     )
 
     // Ensure target directory exists
@@ -943,8 +954,8 @@ async function copy3DSToPackage(threeDSPath, packagePath, itemName) {
         console.log(`Created directory: ${targetDir}`)
     }
 
-    // Copy the 3DS file
-    const fileName = path.basename(threeDSPath)
+    // Copy the 3DS file with the correct name
+    const fileName = `${itemName}.3ds`
     const targetPath = path.join(targetDir, fileName)
 
     fs.copyFileSync(threeDSPath, targetPath)
@@ -952,7 +963,8 @@ async function copy3DSToPackage(threeDSPath, packagePath, itemName) {
 
     // Return the relative path for editoritems
     // Path should be relative to resources/models/
-    const relativeModelPath = `puzzlemaker/selection_bee2/bpee/${itemName}/${fileName}`
+    // This creates the path that Portal 2 expects: puzzlemaker/selection_bpee/{folderName}/{itemName}.3ds
+    const relativeModelPath = `puzzlemaker/selection_bpee/${folderName}/${fileName}`
 
     return {
         targetPath,
