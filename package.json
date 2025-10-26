@@ -28,6 +28,10 @@
             {
                 "from": "backend/libs/areng_cartoonify",
                 "to": "extraResources/areng_cartoonify"
+            },
+            {
+                "from": "backend/libs/areng_obj23ds",
+                "to": "extraResources/areng_obj23ds"
             }
         ]
     },

@@ -702,10 +702,36 @@ async function convertAndInstallMDL(objPath, packagePath, itemName, options = {}
     console.log(`✅ MDL conversion and installation complete!`)
     console.log(`  Model path for editoritems: ${result.relativeModelPath}`)
 
+    // Step 4: Generate 3DS collision model
+    console.log(`🔷 Step 4: Generating 3DS collision model...`)
+    let threeDSResult = null
+    try {
+        // 3DS file should be named after the item (same as MDL)
+        const threeDSFileName = `${itemName}.3ds`
+        const threeDSPath = path.join(tempDir, threeDSFileName)
+
+        // Convert OBJ to 3DS
+        await convertObjTo3DS(objPath, threeDSPath)
+
+        // Copy 3DS to package resources
+        // Use sharedModelFolder if provided (for multi-model items), otherwise use itemName
+        const folderName = options.sharedModelFolder || itemName
+        threeDSResult = await copy3DSToPackage(threeDSPath, packagePath, folderName)
+
+        console.log(`✅ 3DS collision model created!`)
+        console.log(`  Path for editoritems: ${threeDSResult.relativeModelPath}`)
+    } catch (threeDSError) {
+        console.error(`⚠️  3DS collision model generation failed:`, threeDSError.message)
+        console.error(`   MDL model was still created successfully.`)
+        // Don't throw - 3DS is optional, MDL is the main output
+        threeDSResult = { success: false, error: threeDSError.message }
+    }
+
     return {
         success: true,
         ...result,
-        compiledFiles
+        compiledFiles,
+        threeDSResult
     }
 }
 
@@ -824,6 +850,117 @@ function mapVariableValuesToInstances(blocks, targetVariable) {
     return valueInstanceMap
 }
 
+/**
+ * Convert OBJ file to 3DS format using Trimesh
+ * @param {string} objPath - Path to the source OBJ file
+ * @param {string} outputPath - Path where 3DS should be saved
+ * @returns {Promise<string>} - Path to the created 3DS file
+ */
+async function convertObjTo3DS(objPath, outputPath) {
+    if (!objPath || !fs.existsSync(objPath)) {
+        throw new Error(`OBJ file not found: ${objPath}`)
+    }
+
+    const isDev = !app.isPackaged
+    const converterExe = isDev
+        ? path.join(__dirname, "..", "libs", "areng_obj23ds", "convert_obj_to_3ds.exe")
+        : path.join(
+              process.resourcesPath,
+              "extraResources",
+              "areng_obj23ds",
+              "convert_obj_to_3ds.exe",
+          )
+
+    if (!fs.existsSync(converterExe)) {
+        throw new Error(`Trimesh converter not found at: ${converterExe}`)
+    }
+
+    // Ensure output directory exists
+    const outputDir = path.dirname(outputPath)
+    if (!fs.existsSync(outputDir)) {
+        fs.mkdirSync(outputDir, { recursive: true })
+    }
+
+    console.log(`🔷 Converting OBJ to 3DS using Trimesh...`)
+    console.log(`  Input: ${objPath}`)
+    console.log(`  Output: ${outputPath}`)
+    console.log(`  Converter: ${converterExe}`)
+
+    // Run the converter executable
+    const cmd = `"${converterExe}" "${objPath}" "${outputPath}"`
+    console.log(`Executing: ${cmd}`)
+
+    try {
+        const { stdout, stderr } = await execAsync(cmd, {
+            maxBuffer: 1024 * 1024 * 10, // 10MB buffer
+            timeout: 60000, // 1 minute timeout
+        })
+
+        console.log("Converter stdout:", stdout)
+        if (stderr) console.warn("Converter stderr:", stderr)
+
+        // Verify the file was created
+        if (!fs.existsSync(outputPath)) {
+            throw new Error(`3DS file was not created at: ${outputPath}`)
+        }
+
+        const fileSize = fs.statSync(outputPath).size
+        console.log(`✅ 3DS conversion successful! File size: ${fileSize} bytes`)
+
+        return outputPath
+    } catch (error) {
+        console.error("3DS conversion failed:", error)
+        throw new Error(`3DS conversion failed: ${error.message}`)
+    }
+}
+
+/**
+ * Copy 3DS collision model to package resources
+ * @param {string} threeDSPath - Path to the source 3DS file
+ * @param {string} packagePath - Root path of the package
+ * @param {string} itemName - Name of the item (for folder structure)
+ * @returns {Promise<Object>} - Object with copied file info and relative path
+ */
+async function copy3DSToPackage(threeDSPath, packagePath, itemName) {
+    if (!threeDSPath || !fs.existsSync(threeDSPath)) {
+        throw new Error(`3DS file not found: ${threeDSPath}`)
+    }
+
+    // Target directory: resources/models/puzzlemaker/selection_bee2/bpee/{itemName}/
+    const targetDir = path.join(
+        packagePath,
+        "resources",
+        "models",
+        "puzzlemaker",
+        "selection_bee2",
+        "bpee",
+        itemName
+    )
+
+    // Ensure target directory exists
+    if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true })
+        console.log(`Created directory: ${targetDir}`)
+    }
+
+    // Copy the 3DS file
+    const fileName = path.basename(threeDSPath)
+    const targetPath = path.join(targetDir, fileName)
+
+    fs.copyFileSync(threeDSPath, targetPath)
+    console.log(`Copied 3DS: ${threeDSPath} -> ${targetPath}`)
+
+    // Return the relative path for editoritems
+    // Path should be relative to resources/models/
+    const relativeModelPath = `puzzlemaker/selection_bee2/bpee/${itemName}/${fileName}`
+
+    return {
+        targetPath,
+        relativeModelPath,
+        targetDir,
+    }
+}
+
 module.exports = {
     getStudioMDLPath,
     generateQCFile,
@@ -831,6 +968,8 @@ module.exports = {
     convertMaterialsToPackage,
     copyMDLToPackage,
     convertAndInstallMDL,
-    mapVariableValuesToInstances
+    mapVariableValuesToInstances,
+    convertObjTo3DS,
+    copy3DSToPackage,
 }
 
