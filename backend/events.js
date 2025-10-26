@@ -2930,9 +2930,10 @@ function reg_events(mainWindow) {
                                 subType.Model.ModelName = mdlResult.relativeModelPath
 
                                 // Add 3DS collision model if available
-                                if (mdlResult.threeDSResult?.relativeModelPath) {
-                                    subType.Model.CollisionModelName = mdlResult.threeDSResult.relativeModelPath
-                                }
+                                // DISABLED: Don't include 3DS files in editoritems.txt
+                                // if (mdlResult.threeDSResult?.relativeModelPath) {
+                                //     subType.Model.CollisionModelName = mdlResult.threeDSResult.relativeModelPath
+                                // }
 
                                 if (!Array.isArray(editorItems.Item.Editor.SubType)) {
                                     editorItems.Item.Editor.SubType = [subType]
@@ -3254,9 +3255,10 @@ function reg_events(mainWindow) {
                         newSubType.Model.ModelName = result.modelPath
 
                         // Add 3DS collision model if available
-                        if (result.threeDSPath) {
-                            newSubType.Model.CollisionModelName = result.threeDSPath
-                        }
+                        // DISABLED: Don't include 3DS files in editoritems.txt
+                        // if (result.threeDSPath) {
+                        //     newSubType.Model.CollisionModelName = result.threeDSPath
+                        // }
                         
                         // Keep the name as-is (don't add variant number)
                         newSubType.Name = baseSubType.Name
@@ -3349,9 +3351,10 @@ function reg_events(mainWindow) {
                     subType.Model.ModelName = mdlResult.relativeModelPath
 
                     // Add 3DS collision model if available
-                    if (mdlResult.threeDSResult?.relativeModelPath) {
-                        subType.Model.CollisionModelName = mdlResult.threeDSResult.relativeModelPath
-                    }
+                    // DISABLED: Don't include 3DS files in editoritems.txt
+                    // if (mdlResult.threeDSResult?.relativeModelPath) {
+                    //     subType.Model.CollisionModelName = mdlResult.threeDSResult.relativeModelPath
+                    // }
 
                     // If SubType was not an array, convert it to an array
                     if (!Array.isArray(editorItems.Item.Editor.SubType)) {
