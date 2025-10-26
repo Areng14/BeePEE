@@ -34,6 +34,7 @@ const {
     setExtraResourcePaths,
     getExtraResourcePaths,
 } = require("./utils/vmf2obj")
+const pLimit = require('p-limit')
 
 // Track last saved .bpee path in memory (could be improved with persistent storage)
 let lastSavedBpeePath = null
@@ -1533,7 +1534,35 @@ function reg_events(mainWindow) {
                 if (!objPath || !fs.existsSync(objPath)) {
                     throw new Error("OBJ file not found")
                 }
-                createModelPreviewWindow(objPath, mtlPath, title)
+                
+                // If objPath is a directory, find the first OBJ file in it
+                let actualObjPath = objPath
+                let actualMtlPath = mtlPath
+                
+                const stats = fs.statSync(objPath)
+                if (stats.isDirectory()) {
+                    // Look for the combined OBJ file (has all models in grid layout)
+                    const files = fs.readdirSync(objPath)
+                    
+                    // First, try to find the combined file (contains "_combined")
+                    let objFile = files.find(f => f.includes('_combined.obj') && !f.includes('_sourcecoords'))
+                    
+                    // If no combined file, fall back to any .obj file
+                    if (!objFile) {
+                        objFile = files.find(f => f.endsWith('.obj') && !f.includes('_sourcecoords'))
+                    }
+                    
+                    if (!objFile) {
+                        throw new Error("No OBJ files found in temp_models directory")
+                    }
+                    
+                    actualObjPath = path.join(objPath, objFile)
+                    actualMtlPath = actualObjPath.replace('.obj', '.mtl')
+                    
+                    console.log(`Found OBJ file for preview: ${objFile}`)
+                }
+                
+                createModelPreviewWindow(actualObjPath, actualMtlPath, title)
                 return { success: true }
             } catch (error) {
                 console.error("Failed to show model preview:", error)
@@ -2838,6 +2867,287 @@ function reg_events(mainWindow) {
                     .find((i) => i.id === itemId)
                 if (!item) throw new Error("Item not found")
 
+                // If this is a variable-based conversion, handle it differently
+                if (options.isVariable) {
+                    console.log(`🚀 Starting variable-based model conversion for item "${item.name}"`)
+                    console.log(`   Variable: "${instanceKey}"`)
+                    
+                    // Step 1: Parse VBSP blocks to get value -> instance mapping
+                    const { mapVariableValuesToInstances } = require("./utils/mdlConverter")
+                    const conditions = item.getConditions()
+                    
+                    console.log('Conditions structure:', JSON.stringify(conditions, null, 2))
+                    console.log('Conditions.blocks type:', typeof conditions.blocks, 'isArray:', Array.isArray(conditions.blocks))
+                    
+                    const valueInstanceMap = mapVariableValuesToInstances(conditions.blocks, instanceKey)
+                    
+                    console.log('Value to instance map:', valueInstanceMap)
+                    
+                    if (valueInstanceMap.size === 0) {
+                        dialog.showMessageBox({
+                            type: 'warning',
+                            title: 'No Instances Found',
+                            message: `No instances found for variable "${instanceKey}".`,
+                            detail: 'Make sure the VBSP blocks are configured correctly.'
+                        })
+                        return { success: false, error: `No instances found for variable "${instanceKey}"` }
+                    }
+                    
+                    // Step 2: Use VMF Atlas - merge all VMFs into a grid, convert once, then split
+                    console.log(`📐 Using VMF Atlas approach (grid layout)...`)
+                    
+                    const uniqueInstances = [...new Set(valueInstanceMap.values())]
+                    
+                    // Send initial progress
+                    event.sender.send('conversion-progress', {
+                        stage: 'merge',
+                        message: `Preparing to merge ${uniqueInstances.length} instances into grid...`,
+                    })
+                    const tempDir = path.join(item.packagePath, "temp_models")
+                    if (!fs.existsSync(tempDir)) {
+                        fs.mkdirSync(tempDir, { recursive: true })
+                    }
+                    
+                    // Prepare VMF file list for atlas
+                    const vmfFiles = []
+                    for (const instancePath of uniqueInstances) {
+                        const vmfPath = Instance.getCleanPath(item.packagePath, instancePath)
+                        const fileBase = path.basename(instancePath, path.extname(instancePath))
+                        
+                        if (!fs.existsSync(vmfPath)) {
+                            console.warn(`   ⚠️ VMF file not found: ${vmfPath}`)
+                            continue
+                        }
+                        
+                        vmfFiles.push({
+                            path: vmfPath,
+                            name: fileBase,
+                            instancePath
+                        })
+                    }
+                    
+                    if (vmfFiles.length === 0) {
+                        return { success: false, error: 'No valid VMF files found' }
+                    }
+                    
+                    // Merge VMFs into grid layout
+                    const { mergeVMFsIntoGrid, splitOBJByGrid } = require("./utils/vmfAtlas")
+                    const combinedVmfPath = path.join(tempDir, `${item.id}_combined.vmf`)
+                    
+                    const atlasResult = await mergeVMFsIntoGrid(vmfFiles, combinedVmfPath, {
+                        spacing: 256
+                    })
+                    
+                    console.log(`✅ VMF Atlas created: ${combinedVmfPath}`)
+                    console.log(`   Grid: ${atlasResult.bounds.cols}×${atlasResult.bounds.rows}, Cell: ${Math.round(atlasResult.bounds.cellSize)}`)
+                    
+                    // Convert the combined VMF to OBJ (single VMF2OBJ call!)
+                    // This is a BIG VMF with multiple models - needs longer timeout!
+                    console.log(`🔄 Converting combined VMF to OBJ (${vmfFiles.length} models)...`)
+                    console.log(`⏱️  This may take several minutes...`)
+                    
+                    // Send progress update to frontend
+                    event.sender.send('conversion-progress', {
+                        stage: 'vmf2obj',
+                        message: `Converting ${vmfFiles.length} models in grid layout...`,
+                        detail: 'This may take several minutes'
+                    })
+                    
+                    const combinedResult = await convertVmfToObj(combinedVmfPath, {
+                        outputDir: tempDir,
+                        textureStyle: options.textureStyle || "cartoon",
+                        timeoutMs: 600000, // 10 minutes for combined VMF (20+ models takes time!)
+                    })
+                    
+                    // Use the actual OBJ path from VMF2OBJ result
+                    const combinedObjPath = combinedResult.objPath || path.join(tempDir, `${item.id}_combined.obj`)
+                    
+                    if (!fs.existsSync(combinedObjPath)) {
+                        throw new Error(`VMF2OBJ did not create expected output: ${combinedObjPath}`)
+                    }
+                    
+                    console.log(`✅ Combined OBJ created: ${combinedObjPath}`)
+                    
+                    // Split the combined OBJ back into individual models
+                    console.log(`✂️  Splitting combined OBJ into individual models...`)
+                    event.sender.send('conversion-progress', {
+                        stage: 'split',
+                        message: 'Splitting combined model into individual variants...',
+                    })
+                    
+                    const splitResults = await splitOBJByGrid(combinedObjPath, atlasResult.gridLayout, tempDir, atlasResult.bounds.cellSize)
+                    
+                    // Convert materials ONCE to a shared folder (all models use the same textures)
+                    console.log(`🎨 Converting materials to VTF/VMT format (shared)...`)
+                    const { convertMaterialsToPackage } = require("./utils/mdlConverter")
+                    const materialsSourceDir = path.join(tempDir, "materials")
+                    
+                    // Shared folder name - lowercase item ID
+                    const sharedFolderName = item.id.toLowerCase()
+                    
+                    const sharedMaterialsPath = path.join(
+                        item.packagePath,
+                        "resources",
+                        "materials",
+                        "models",
+                        "props_map_editor",
+                        "bpee",
+                        sharedFolderName
+                    )
+                    
+                    try {
+                        await convertMaterialsToPackage(materialsSourceDir, sharedMaterialsPath, tempDir, sharedFolderName)
+                        console.log(`✅ Shared materials converted to: ${sharedMaterialsPath}`)
+                    } catch (error) {
+                        console.error(`❌ Failed to convert shared materials:`, error)
+                        throw error
+                    }
+                    
+                    // Convert each split OBJ to MDL (skip material conversion, use shared)
+                    console.log(`🔨 Converting split OBJs to MDL...`)
+                    event.sender.send('conversion-progress', {
+                        stage: 'mdl',
+                        message: `Converting ${splitResults.length} models to MDL format...`,
+                    })
+                    const conversionPromises = splitResults.map(async (split) => {
+                        const instancePath = vmfFiles.find(v => v.name === split.name)?.instancePath
+                        if (!instancePath) {
+                            return { instancePath: split.name, error: 'Instance path not found' }
+                        }
+                        
+                        try {
+                            console.log(`  -> Converting ${split.name} to MDL...`)
+                            
+                            const { convertAndInstallMDL } = require("./utils/mdlConverter")
+                            const mdlResult = await convertAndInstallMDL(
+                                split.objPath,
+                                item.packagePath,
+                                split.name,
+                                { 
+                                    scale: options.scale || 1.0,
+                                    skipMaterialConversion: true,
+                                    sharedMaterialsPath: sharedMaterialsPath,
+                                    sharedModelFolder: sharedFolderName // All models go in same folder
+                                }
+                            )
+                            
+                            console.log(`   ✅ Converted: ${split.name}`)
+                            return { instancePath, modelPath: mdlResult.relativeModelPath, value: instancePath }
+                        } catch (error) {
+                            console.error(`   ❌ FAILED to convert ${split.name}:`, error.message)
+                            return { instancePath, error: error.message }
+                        }
+                    })
+                    
+                    const conversionResults = await Promise.all(conversionPromises)
+                    console.log('Atlas conversion results:', conversionResults)
+                    
+                    // Check for errors
+                    const successfulResults = conversionResults.filter(r => r.modelPath)
+                    const failedResults = conversionResults.filter(r => r.error)
+                    
+                    console.log(`✅ Successful: ${successfulResults.length}`)
+                    console.log(`❌ Failed: ${failedResults.length}`)
+                    
+                    if (successfulResults.length === 0) {
+                        dialog.showMessageBox({
+                            type: 'error',
+                            title: 'All Conversions Failed',
+                            message: 'No models could be generated.',
+                            detail: failedResults.map(r => `${path.basename(r.instancePath)}: ${r.error}`).join('\n')
+                        })
+                        return { success: false, results: conversionResults }
+                    }
+                    
+                    // Step 3: Update editoritems.json with new SubType structure
+                    const editorItems = item.getEditorItems()
+                    
+                    // Ensure SubType is an array
+                    if (!Array.isArray(editorItems.Item.Editor.SubType)) {
+                        editorItems.Item.Editor.SubType = [editorItems.Item.Editor.SubType]
+                    }
+                    
+                    // Get the base SubType to clone
+                    const baseSubType = JSON.parse(JSON.stringify(editorItems.Item.Editor.SubType[0]))
+                    
+                    // Add SubTypeProperty - convert to PascalCase (e.g., "CUBE TYPE" -> "CubeType")
+                    const toPascalCase = (str) => {
+                        return str
+                            .split(/[\s_]+/) // Split on spaces or underscores
+                            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                            .join('')
+                    }
+                    editorItems.Item.Editor.SubTypeProperty = toPascalCase(instanceKey)
+                    
+                    // Create new SubTypes for each converted model
+                    const newSubTypes = []
+                    let isFirstSubType = true
+                    for (const [value, instancePath] of valueInstanceMap.entries()) {
+                        const result = conversionResults.find(r => r.instancePath === instancePath)
+                        if (result && result.modelPath) {
+                            let newSubType
+                            
+                            if (isFirstSubType) {
+                                // First SubType: Keep everything (Palette, Sounds, Animations, etc.)
+                                newSubType = JSON.parse(JSON.stringify(baseSubType)) // Deep clone
+                                isFirstSubType = false
+                            } else {
+                                // Other SubTypes: Name, Model, Sounds, Animations (NO Palette)
+                                newSubType = {
+                                    Name: baseSubType.Name,
+                                    Model: {}
+                                }
+                                
+                                // Copy Sounds if present
+                                if (baseSubType.Sounds) {
+                                    newSubType.Sounds = JSON.parse(JSON.stringify(baseSubType.Sounds))
+                                }
+                                
+                                // Copy Animations if present
+                                if (baseSubType.Animations) {
+                                    newSubType.Animations = JSON.parse(JSON.stringify(baseSubType.Animations))
+                                }
+                            }
+                            
+                            // Update model path
+                            if (!newSubType.Model) {
+                                newSubType.Model = {}
+                            }
+                            newSubType.Model.ModelName = result.modelPath
+                            
+                            // Keep the name as-is (don't add variant number)
+                            newSubType.Name = baseSubType.Name
+                            
+                            newSubTypes.push(newSubType)
+                        }
+                    }
+                    
+                    // Replace existing SubTypes with the new ones
+                    editorItems.Item.Editor.SubType = newSubTypes
+                    item.saveEditorItems(editorItems)
+                    
+                    console.log(`📝 Updated editoritems.json with ${newSubTypes.length} SubTypes`)
+                    
+                    // Show summary dialog
+                    const dialogOptions = {
+                        title: 'Multi-Model Generation Complete',
+                        message: `Successfully converted ${successfulResults.length} of ${conversionResults.length} models.`,
+                    }
+                    
+                    if (failedResults.length > 0) {
+                        dialogOptions.type = 'warning'
+                        dialogOptions.detail = `Failed conversions:\n${failedResults.map(r => `• ${path.basename(r.instancePath)}: ${r.error}`).join('\n')}`
+                    } else {
+                        dialogOptions.type = 'info'
+                        dialogOptions.detail = `All models converted successfully and editoritems.json has been updated with ${newSubTypes.length} SubTypes.`
+                    }
+                    
+                    dialog.showMessageBox(dialogOptions)
+                    
+                    return { success: true, results: conversionResults }
+                }
+
+                // --- Original single-instance conversion logic ---
                 const instance = item.instances?.[instanceKey]
                 if (!instance?.Name) throw new Error("Instance not found")
 
@@ -2894,8 +3204,12 @@ function reg_events(mainWindow) {
                             subType.Model = {}
                         }
                         subType.Model.ModelName = mdlResult.relativeModelPath
-
-                        // Save the updated editoritems
+                        
+                        // If SubType was not an array, convert it to an array
+                        if (!Array.isArray(editorItems.Item.Editor.SubType)) {
+                            editorItems.Item.Editor.SubType = [subType]
+                        }
+                        
                         item.saveEditorItems(editorItems)
                         
                         console.log(`✅ Updated editoritems with model: ${mdlResult.relativeModelPath}`)

@@ -206,9 +206,11 @@ async function convertImageToVTF(imagePath, outputPath, options = {}) {
                         }
                     }
 
-                    // Create corresponding VMT file
-                    const vmtPath = outputPath.replace('.vtf', '.vmt')
-                    await createVMTFile(vmtPath, outputPath)
+                    // Create corresponding VMT file (unless skipVMT option is set)
+                    if (options.skipVMT !== true) {
+                        const vmtPath = outputPath.replace('.vtf', '.vmt')
+                        await createVMTFile(vmtPath, outputPath)
+                    }
                     
                     return
                 } else {

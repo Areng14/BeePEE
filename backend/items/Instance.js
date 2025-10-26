@@ -27,10 +27,10 @@ class Instance {
         // First normalize the instance name to use OS-specific path separators
         const normalizedName = instanceName.replace(/[/\\]/g, path.sep)
 
-        // Remove any BEE2 prefix and ensure proper instances prefix
+        // Remove any BEE2 prefix (case-insensitive) and ensure proper instances prefix
         const cleanInstanceName = normalizedName
             .split(path.sep)
-            .filter((part) => part !== "BEE2")
+            .filter((part) => part.toUpperCase() !== "BEE2")
             .join(path.sep)
 
         // Ensure the path starts with "instances"

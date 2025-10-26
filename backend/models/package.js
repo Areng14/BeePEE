@@ -62,6 +62,20 @@ class Package {
                     }),
             )
 
+            // Auto-import VBSP instances for all items (runs once per item)
+            console.log(`\n🔍 Checking for VBSP instances to auto-import...`)
+            let totalImported = 0
+            for (const item of this.items) {
+                if (item.autoImportVBSPInstances()) {
+                    totalImported++
+                }
+            }
+            if (totalImported > 0) {
+                console.log(`✅ Auto-imported VBSP instances for ${totalImported} item(s) in ${this.name}\n`)
+            } else {
+                console.log(`⏭️ No VBSP instances to import in ${this.name}\n`)
+            }
+
             return this.items
         } catch (error) {
             console.error(

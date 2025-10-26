@@ -393,18 +393,31 @@ function ItemEditor() {
     }
 
     const importConditionsData = (blocks) => {
-        // Import conditions and mark as modified so they get saved to meta.json
+        // Import conditions and save immediately to meta.json
         // This happens when auto-converting from VBSP format to blocks
         setFormData((prev) => ({
             ...prev,
             blocks, // Store as blocks instead of conditions
             _modified: {
                 ...prev._modified,
-                conditions: true, // Mark as modified so it gets saved
+                conditions: false, // Don't mark as modified - we'll save immediately
             },
         }))
-        window.package?.setUnsavedChanges?.(true)
-        // Don't add to undo stack since this is an automatic conversion
+        
+        // Auto-save the converted blocks immediately to meta.json
+        // This prevents "unsaved changes" from appearing on first open
+        if (item?.id && blocks) {
+            console.log("Auto-saving converted VBSP blocks to meta.json...")
+            window.package.saveConditions(item.id, { blocks })
+                .then(() => {
+                    console.log("✅ Auto-saved converted VBSP blocks")
+                })
+                .catch((error) => {
+                    console.error("Failed to auto-save converted blocks:", error)
+                })
+        }
+        
+        // Don't set unsaved changes or add to undo stack since this is automatic
     }
 
     const updateOtherData = (other) => {

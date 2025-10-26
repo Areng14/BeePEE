@@ -3868,6 +3868,7 @@ function Conditions({
                 Object.keys(formData.conditions).length > 0
             ),
             conditionsKeys: Object.keys(formData.conditions || {}),
+            vbspConditionsImported: formData.conditions?._vbsp_conditions_imported,
         })
 
         // Initialize blocks from formData if available
@@ -3878,11 +3879,23 @@ function Conditions({
             formData.conditions &&
             Object.keys(formData.conditions).length > 0
         ) {
-            // Auto-import VBSP conditions if no blocks exist but VBSP conditions do
+            // Check for _vbsp_conditions_imported flag to prevent re-importing on every load
+            const vbspAlreadyImported = formData.conditions._vbsp_conditions_imported === true
+            
+            if (vbspAlreadyImported) {
+                console.log(
+                    "VBSP conditions already imported previously - skipping conversion to prevent unsaved changes",
+                )
+                // Do NOT convert or set blocks - they should already be in formData.blocks
+                // If we reach here, it means blocks were imported but not saved to meta.json properly
+                return
+            }
+            
             console.log(
-                "Converting VBSP conditions to blocks:",
+                "Converting VBSP conditions to blocks (first time):",
                 formData.conditions,
             )
+            
             const result = convertVbspToBlocks(formData.conditions)
             if (result.success) {
                 console.log(
@@ -3890,7 +3903,8 @@ function Conditions({
                     result.blocks,
                 )
                 setBlocks(result.blocks)
-                onImportConditions(result.blocks) // Auto-import and save to meta.json
+                // Auto-import and save to meta.json on first conversion
+                onImportConditions(result.blocks)
             } else {
                 console.error("Conversion failed:", result.error)
             }

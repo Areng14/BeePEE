@@ -28,3 +28,4 @@ packages
 backend/__tests__/package
 backend/libs/vmf2obj/jre
 backend/libs/areng_cartoonify/_internal
+backend/libs/areng_vmfmerge/_internal
