@@ -25,6 +25,9 @@ import {
     Alert,
     Avatar,
     Grid,
+    Accordion,
+    AccordionSummary,
+    AccordionDetails,
 } from "@mui/material"
 import {
     Add,
@@ -48,6 +51,8 @@ import {
     HelpOutline,
     FileCopy,
     Cancel,
+    ExpandMore,
+    Api,
 } from "@mui/icons-material"
 import {
     DndContext,
@@ -1358,12 +1363,24 @@ function IfBlock({ block, onUpdateProperty, availableVariables, formData }) {
                                                     : "text"
                                             }
                                             value={block.value || ""}
-                                            onChange={(e) =>
-                                                onUpdateProperty(
-                                                    "value",
-                                                    e.target.value,
-                                                )
-                                            }
+                                            onChange={(e) => {
+                                                let value = e.target.value
+                                                if (
+                                                    block.variable ===
+                                                        "$timer_delay" &&
+                                                    value !== ""
+                                                ) {
+                                                    const numValue = Number(value)
+                                                    if (
+                                                        !isNaN(numValue) &&
+                                                        numValue < 3 &&
+                                                        numValue !== -1
+                                                    ) {
+                                                        value = -1
+                                                    }
+                                                }
+                                                onUpdateProperty("value", value)
+                                            }}
                                             inputProps={{
                                                 min:
                                                     fullVariableData?.type ===
@@ -3489,7 +3506,7 @@ function Conditions({
                 const childContainers =
                     BLOCK_DEFINITIONS[block.type].childContainers || []
                 for (const container of childContainers) {
-                    if (block[container] && Array.isArray(block[container])) {
+                    if (block[container]) {
                         block[container] = deleteBlockRecursive(
                             block[container],
                             blockId,

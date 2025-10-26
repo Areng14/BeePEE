@@ -442,8 +442,25 @@ function Variables({ item, formData, onUpdateVariables }) {
     }
 
     const handleUpdateVariableValue = (variableId, newValue) => {
+        let processedValue = newValue;
+        const variable = variables.find((v) => v.id === variableId);
+
+        // Apply timer logic for TimerDelay
+        if (variable && variable.presetKey === 'TimerDelay') {
+            const numValue = Number(newValue);
+            if (!isNaN(numValue)) {
+                if (numValue === 0) {
+                    processedValue = '0';
+                } else if (numValue >= 1 && numValue <= 30) {
+                    processedValue = String(numValue);
+                } else {
+                    processedValue = '0';
+                }
+            }
+        }
+        
         const updatedVariables = variables.map((v) =>
-            v.id === variableId ? { ...v, customValue: newValue } : v,
+            v.id === variableId ? { ...v, customValue: processedValue } : v,
         )
         setVariables(updatedVariables)
         onUpdateVariables(updatedVariables)

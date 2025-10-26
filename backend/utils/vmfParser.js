@@ -7,24 +7,12 @@ const path = require("path")
  * @returns {Object} Statistics object with entity, brush, and brush side counts
  */
 function parseVMFStats(vmfPath) {
+    if (!fs.existsSync(vmfPath)) {
+        throw new Error("File not found")
+    }
+
     try {
-        if (!fs.existsSync(vmfPath)) {
-            return {
-                EntityCount: 0,
-                BrushCount: 0,
-                BrushSideCount: 0,
-                error: "File not found",
-            }
-        }
-
         const content = fs.readFileSync(vmfPath, "utf8")
-
-        // Initialize counters
-        let entityCount = 0
-        let brushCount = 0
-        let brushSideCount = 0
-
-        // Parse the VMF content
         const stats = parseVMFContent(content)
 
         return {
@@ -34,12 +22,7 @@ function parseVMFStats(vmfPath) {
         }
     } catch (error) {
         console.error(`Error parsing VMF file ${vmfPath}:`, error.message)
-        return {
-            EntityCount: 0,
-            BrushCount: 0,
-            BrushSideCount: 0,
-            error: error.message,
-        }
+        throw error
     }
 }
 
@@ -150,12 +133,8 @@ class VMFStatsCache {
     getStats(vmfPath) {
         try {
             if (!fs.existsSync(vmfPath)) {
-                return {
-                    EntityCount: 0,
-                    BrushCount: 0,
-                    BrushSideCount: 0,
-                    error: "File not found",
-                }
+                this.clearCache(vmfPath)
+                throw new Error("File not found")
             }
 
             const stat = fs.statSync(vmfPath)
@@ -178,12 +157,7 @@ class VMFStatsCache {
                 `Error getting VMF stats for ${vmfPath}:`,
                 error.message,
             )
-            return {
-                EntityCount: 0,
-                BrushCount: 0,
-                BrushSideCount: 0,
-                error: error.message,
-            }
+            throw error
         }
     }
 
