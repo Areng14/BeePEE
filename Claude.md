@@ -386,3 +386,126 @@ When exporting packages:
 - This folder only contains temporary build files (QC, OBJ, MTL, extracted textures)
 - Final MDL files are already in `resources/models/` and will be included
 
+---
+
+## 3DS Collision Model System
+
+### Overview
+Automatically generates 3DS collision models alongside MDL files for proper physics interaction in the Portal 2 Puzzle Editor.
+
+### What Happens When You Click "Make Model"
+
+1. **VMF → OBJ Conversion** (existing functionality)
+   - Converts the VMF instance file to OBJ format
+   - Extracts textures and applies optional cartoonish styling
+   - Outputs to: `{package}/temp_models/{instance}.obj`
+
+2. **OBJ → MDL Conversion** (existing functionality)
+   - Generates QC file and compiles with STUDIOMDL
+   - Creates MDL, VVD, VTX files
+   - Copies to: `{package}/resources/models/props_map_editor/bpee/{itemName}/`
+
+3. **OBJ → 3DS Conversion** (NEW!)
+   - Converts the same OBJ file to 3DS format for collision detection
+   - Uses PyAssimp with triangulation and normal generation
+   - Outputs to: `{package}/temp_models/{itemName}.3ds`
+
+4. **3DS Installation** (NEW!)
+   - Copies 3DS file to: `{package}/resources/models/puzzlemaker/selection_bee2/bpee/{itemName}/{itemName}.3ds`
+   - Updates `editoritems.json` with `CollisionModelName` field
+
+### Files Created
+
+**New Utility: `backend/libs/areng_obj23ds/convert_obj_to_3ds.py`**
+- Python script using PyAssimp for OBJ to 3DS conversion
+- Handles triangulation (3DS requirement)
+- Generates normals if missing
+- Optimizes vertex data
+
+**New Functions in `backend/utils/mdlConverter.js`:**
+- `convertObjTo3DS()` - Executes Python converter script
+- `copy3DSToPackage()` - Copies 3DS to correct package directory
+
+**Updated Files:**
+- `backend/utils/mdlConverter.js` - Added 3DS conversion to `convertAndInstallMDL()`
+- `backend/events.js` - Updated all model conversion handlers to include 3DS paths
+- `package.json` - Added `areng_obj23ds` to extraResources
+
+### Directory Structure
+
+```
+{package}/
+├── temp_models/                    (temporary build files)
+│   ├── instance.obj               (source geometry)
+│   ├── instance.mtl
+│   ├── instance.qc
+│   ├── {itemName}.3ds            (temporary 3DS file)
+│   └── materials/
+└── resources/
+    └── models/
+        ├── props_map_editor/       (MDL display models)
+        │   └── bpee/
+        │       └── {itemName}/
+        │           ├── {itemName}.mdl
+        │           ├── {itemName}.vvd
+        │           └── {itemName}.vtx
+        └── puzzlemaker/            (3DS collision models)
+            └── selection_bee2/
+                └── bpee/
+                    └── {itemName}/
+                        └── {itemName}.3ds
+```
+
+### editoritems.json Structure
+
+```json
+{
+  "Item": {
+    "Editor": {
+      "SubType": {
+        "Model": {
+          "ModelName": "bpee/{itemName}/{itemName}.mdl",
+          "CollisionModelName": "puzzlemaker/selection_bee2/bpee/{itemName}/{itemName}.3ds"
+        }
+      }
+    }
+  }
+}
+```
+
+### Requirements
+
+**Option A: Blender (Recommended)**
+1. **Blender** - Install from https://www.blender.org/
+2. No additional setup required
+3. Automatically detected in common installation paths
+
+**Option B: PyAssimp (Fallback)**
+1. **Python 3.x** - Must be available in system PATH
+2. **PyAssimp** - Install with: `pip install pyassimp`
+3. **Assimp Library DLL** - Must be in system PATH (not included with PyAssimp)
+
+**Automatic Fallback:** BeePEE tries Blender first, then falls back to PyAssimp if Blender is unavailable.
+
+### User Experience
+
+**Success Messages:**
+- ✅ Full Success: "MDL and 3DS collision models created successfully!"
+- ⚠️ Partial Success: "MDL created but 3DS collision model failed" (MDL still works)
+- ❌ Failure: Specific error message with details
+
+### Error Handling
+
+Graceful degradation:
+- If 3DS conversion fails, MDL model is still created successfully
+- Error messages include specific failure reasons
+- editoritems.json is only updated with CollisionModelName if 3DS succeeds
+- 3DS is optional - items will still work in-game with just MDL
+
+### Why Two Model Formats?
+
+- **MDL (.mdl, .vvd, .vtx)** - Source Engine display model with materials and shading
+- **3DS (.3ds)** - Simplified collision geometry for physics interaction in Puzzle Editor
+- Portal 2's Puzzle Editor uses 3DS for selection bounds and collision detection
+- This matches the standard BEE2 item format structure
+
