@@ -6,6 +6,18 @@ contextBridge.exposeInMainWorld("electron", {
     showOpenDialog: (options) => ipcRenderer.invoke("show-open-dialog", options),
 })
 
+// Expose general event API for progress updates, etc.
+contextBridge.exposeInMainWorld("api", {
+    on: (channel, callback) => {
+        const subscription = (event, ...args) => callback(event, ...args)
+        ipcRenderer.on(channel, subscription)
+        return subscription
+    },
+    off: (channel, callback) => {
+        ipcRenderer.removeListener(channel, callback)
+    },
+})
+
 contextBridge.exposeInMainWorld("package", {
     // ========================================
     // PACKAGE MANAGEMENT FUNCTIONS

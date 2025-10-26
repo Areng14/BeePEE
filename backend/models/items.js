@@ -117,46 +117,8 @@ class Item {
             }
         })
 
-        // Add VBSP instances if they exist
-        if (this.paths.vbsp_config && fs.existsSync(this.paths.vbsp_config)) {
-            try {
-                const vbspData = JSON.parse(
-                    fs.readFileSync(this.paths.vbsp_config, "utf-8"),
-                )
-
-                // Extract Changeinstance entries from the JSON structure
-                const changeInstances = []
-                this.extractChangeInstances(vbspData, changeInstances)
-
-                // Start index after the last editor instance
-                let nextIndex = Object.keys(this.instances).length
-
-                for (const instancePath of changeInstances) {
-                    // Only add if not already present (case-insensitive comparison)
-                    if (
-                        !Object.values(this.instances).some(
-                            (inst) =>
-                                inst.Name.toLowerCase() ===
-                                instancePath.toLowerCase(),
-                        )
-                    ) {
-                        this.instances[nextIndex.toString()] = {
-                            Name: instancePath,
-                            source: "vbsp",
-                        }
-                        nextIndex++
-                    }
-                }
-
-                // Auto-register VBSP instances in editoritems.json
-                this.autoRegisterVbspInstances(changeInstances)
-            } catch (error) {
-                console.error(
-                    `Failed to parse VBSP config for ${this.name}:`,
-                    error.message,
-                )
-            }
-        }
+        // VBSP instances are now imported on-demand via autoImportVBSPInstances()
+        // This is called during package import/load, not every time the item is created
 
         console.log(`Added item: ${this.name} (id: ${this.id})`)
     }
@@ -175,6 +137,80 @@ class Item {
                     this.extractChangeInstances(value, result)
                 }
             }
+        }
+    }
+
+    /**
+     * Auto-import VBSP instances into this item
+     * Called during package import/load, not every time the item is created
+     * Returns true if instances were imported, false if already imported or no VBSP config
+     */
+    autoImportVBSPInstances() {
+        // Check if already imported
+        const meta = this.getMetadata()
+        if (meta._vbsp_imported) {
+            console.log(`⏭️ VBSP instances already imported for ${this.name}`)
+            return false
+        }
+
+        // Check if VBSP config exists
+        if (!this.paths.vbsp_config || !fs.existsSync(this.paths.vbsp_config)) {
+            console.log(`⏭️ No VBSP config found for ${this.name}`)
+            return false
+        }
+
+        try {
+            const vbspData = JSON.parse(
+                fs.readFileSync(this.paths.vbsp_config, "utf-8"),
+            )
+
+            // Extract Changeinstance entries from the JSON structure
+            const changeInstances = []
+            this.extractChangeInstances(vbspData, changeInstances)
+
+            if (changeInstances.length === 0) {
+                console.log(`⏭️ No changeinstance blocks found in VBSP config for ${this.name}`)
+                return false
+            }
+
+            console.log(`🔄 Auto-importing ${changeInstances.length} VBSP instances for ${this.name}...`)
+
+            // Start index after the last editor instance
+            let nextIndex = Object.keys(this.instances).length
+
+            for (const instancePath of changeInstances) {
+                // Only add if not already present (case-insensitive comparison)
+                if (
+                    !Object.values(this.instances).some(
+                        (inst) =>
+                            inst.Name.toLowerCase() ===
+                            instancePath.toLowerCase(),
+                    )
+                ) {
+                    this.instances[nextIndex.toString()] = {
+                        Name: instancePath,
+                        source: "vbsp",
+                    }
+                    nextIndex++
+                }
+            }
+
+            // Auto-register VBSP instances in editoritems.json
+            this.autoRegisterVbspInstances(changeInstances)
+
+            // Mark as imported in meta.json
+            // Frontend will check this flag and skip auto-conversion
+            meta._vbsp_imported = true
+            this.saveMetadata(meta)
+            
+            console.log(`✅ Auto-imported and saved ${changeInstances.length} VBSP instances for ${this.name}`)
+            return true
+        } catch (error) {
+            console.error(
+                `❌ Failed to auto-import VBSP instances for ${this.name}:`,
+                error.message,
+            )
+            return false
         }
     }
 
@@ -1209,6 +1245,33 @@ class Item {
         }
     }
 
+    // Helper function to normalize blocks (ensure all case blocks have value property)
+    normalizeBlocks(blocks) {
+        const normalizeBlock = (block) => {
+            // Ensure case blocks always have a value property
+            // Use "0" as default since empty strings are now skipped during VBSP conversion
+            if (block.type === "case" && (block.value === undefined || block.value === "")) {
+                console.log(`⚠️  Normalizing case block ${block.id}: setting missing/empty value to "0" (you should change this to the correct value)`)
+                block.value = "0"
+            }
+            
+            // Recursively normalize child blocks
+            if (block.thenBlocks && Array.isArray(block.thenBlocks)) {
+                block.thenBlocks = block.thenBlocks.map(normalizeBlock)
+            }
+            if (block.elseBlocks && Array.isArray(block.elseBlocks)) {
+                block.elseBlocks = block.elseBlocks.map(normalizeBlock)
+            }
+            if (block.cases && Array.isArray(block.cases)) {
+                block.cases = block.cases.map(normalizeBlock)
+            }
+            
+            return block
+        }
+        
+        return blocks.map(normalizeBlock)
+    }
+
     // Conditions management functions
     getConditions() {
         try {
@@ -1220,7 +1283,9 @@ class Item {
                     )
                     if (metaData.vbsp_blocks && Array.isArray(metaData.vbsp_blocks)) {
                         console.log(`Loading blocks from meta.json for ${this.name}`)
-                        return { blocks: metaData.vbsp_blocks }
+                        // Normalize blocks to ensure all case blocks have a value property
+                        const normalizedBlocks = this.normalizeBlocks(metaData.vbsp_blocks)
+                        return { blocks: normalizedBlocks }
                     }
                 } catch (metaError) {
                     console.warn(
@@ -1242,8 +1307,22 @@ class Item {
                 const vbspData = JSON.parse(
                     fs.readFileSync(this.paths.vbsp_config, "utf-8"),
                 )
-                // Return VBSP data - frontend will convert and save it back with blocks
-                return vbspData
+                
+                // Check if conditions have already been imported (flag is set in meta.json)
+                let vbspImported = false
+                if (fs.existsSync(this.paths.meta)) {
+                    try {
+                        const metaData = JSON.parse(
+                            fs.readFileSync(this.paths.meta, "utf-8"),
+                        )
+                        vbspImported = metaData._vbsp_conditions_imported === true
+                    } catch (error) {
+                        console.warn(`Failed to check _vbsp_conditions_imported flag: ${error.message}`)
+                    }
+                }
+                
+                // Return VBSP data with flag - frontend will convert and save it back with blocks (only if not already imported)
+                return { ...vbspData, _vbsp_conditions_imported: vbspImported }
             }
             
             console.log(`No conditions found for ${this.name}`)
@@ -1280,19 +1359,25 @@ class Item {
                     if (fs.existsSync(this.paths.meta)) {
                         const metaData = JSON.parse(fs.readFileSync(this.paths.meta, "utf-8"))
                         delete metaData.vbsp_blocks
+                        delete metaData._vbsp_conditions_imported
                         fs.writeFileSync(this.paths.meta, JSON.stringify(metaData, null, 4), "utf-8")
                     }
                     return true
                 }
+                // Normalize blocks before converting/saving
+                const normalizedBlocks = this.normalizeBlocks(conditions.blocks)
+                
                 // Convert blocks to VBSP format
-                vbspData = this.convertBlocksToVbsp(conditions.blocks)
+                vbspData = this.convertBlocksToVbsp(normalizedBlocks)
                 
                 // Save the JSON block representation to meta.json
                 let metaData = {}
                 if (fs.existsSync(this.paths.meta)) {
                     metaData = JSON.parse(fs.readFileSync(this.paths.meta, "utf-8"))
                 }
-                metaData.vbsp_blocks = conditions.blocks
+                metaData.vbsp_blocks = normalizedBlocks
+                // Mark as imported so frontend won't auto-convert again
+                metaData._vbsp_conditions_imported = true
                 fs.writeFileSync(
                     this.paths.meta,
                     JSON.stringify(metaData, null, 4),
@@ -1509,12 +1594,25 @@ class Item {
                     }
 
                     if (Array.isArray(block.cases)) {
-                        // Only add cases that have actual values (including 0)
+                        // Process all cases that have actual values (including 0 and false, but NOT empty string)
                         for (const caseBlock of block.cases) {
-                            // Check if value exists (including 0, false, empty string as valid values)
+                            // Check if value exists - explicitly handle 0 and false as valid, but reject empty strings
+                            const valueStr = String(caseBlock?.value || "").trim()
                             const hasValue = caseBlock &&
                                 caseBlock.value !== undefined &&
-                                caseBlock.value !== null
+                                caseBlock.value !== null &&
+                                valueStr !== ""
+                            
+                            // Debug logging for case processing
+                            if (!hasValue) {
+                                console.log(`⚠️  Skipping case with invalid/empty value:`, {
+                                    caseBlock: { id: caseBlock?.id, type: caseBlock?.type },
+                                    value: caseBlock?.value,
+                                    valueStr,
+                                    hasValue,
+                                    reason: valueStr === "" ? "empty string" : "undefined/null"
+                                })
+                            }
                             
                             if (hasValue) {
                                 const arg = `${variableWithDollar} = ${convertBooleanValue(caseBlock.value, variableWithDollar)}`
@@ -1522,6 +1620,17 @@ class Item {
                                     caseBlock?.thenBlocks || [],
                                     "thenBlocks",
                                 )
+                                
+                                // Debug logging for case results
+                                console.log(`✓ Adding case "${arg}":`, {
+                                    value: caseBlock.value,
+                                    thenBlocks: caseBlock?.thenBlocks?.length || 0,
+                                    resultKeys: Object.keys(caseResults),
+                                    isEmpty: Object.keys(caseResults).length === 0
+                                })
+                                
+                                // Always add the case, even if result is empty
+                                // This makes the VBSP more explicit about all possible cases
                                 switchObj.Switch[arg] = caseResults
                             }
                         }
@@ -1540,12 +1649,25 @@ class Item {
                     }
 
                     if (Array.isArray(block.cases)) {
-                        // Only add cases that have actual values (including 0)
+                        // Process all cases that have actual values (including 0 and false, but NOT empty string)
                         for (const caseBlock of block.cases) {
-                            // Check if value exists (including 0, false, empty string as valid values)
+                            // Check if value exists - explicitly handle 0 and false as valid, but reject empty strings
+                            const valueStr = String(caseBlock?.value || "").trim()
                             const hasValue = caseBlock &&
                                 caseBlock.value !== undefined &&
-                                caseBlock.value !== null
+                                caseBlock.value !== null &&
+                                valueStr !== ""
+                            
+                            // Debug logging for case processing
+                            if (!hasValue) {
+                                console.log(`⚠️  Skipping global case with invalid/empty value:`, {
+                                    caseBlock: { id: caseBlock?.id, type: caseBlock?.type },
+                                    value: caseBlock?.value,
+                                    valueStr,
+                                    hasValue,
+                                    reason: valueStr === "" ? "empty string" : "undefined/null"
+                                })
+                            }
                             
                             if (hasValue) {
                                 const arg = `${caseBlock.value}`
@@ -1553,6 +1675,17 @@ class Item {
                                     caseBlock?.thenBlocks || [],
                                     "thenBlocks",
                                 )
+                                
+                                // Debug logging for case results
+                                console.log(`✓ Adding global case "${arg}":`, {
+                                    value: caseBlock.value,
+                                    thenBlocks: caseBlock?.thenBlocks?.length || 0,
+                                    resultKeys: Object.keys(caseResults),
+                                    isEmpty: Object.keys(caseResults).length === 0
+                                })
+                                
+                                // Always add the case, even if result is empty
+                                // This makes the VBSP more explicit about all possible cases
                                 switchObj.Switch[arg] = caseResults
                             }
                         }

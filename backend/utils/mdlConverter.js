@@ -44,18 +44,22 @@ function getStudioMDLPath() {
 async function generateQCFile(objPath, outputPath, options = {}) {
     const modelName = options.modelName || path.basename(objPath, path.extname(objPath))
     const scale = options.scale || 1.0
+    // Materials folder can be different from model name (for shared materials)
+    const materialsFolder = options.materialsFolder || modelName
+    // Parent folder for models - all variants go in same folder
+    const modelFolder = options.modelFolder || modelName
     
     // Get relative path from QC to OBJ (they should be in same directory)
     const objFileName = path.basename(objPath)
     
     // Generate QC content
-    // Each item gets its own folder: bpee/{itemID}/
+    // All models for an item go in the same folder: bpee/{itemID}/{variant}.mdl
     // $cdmaterials should point to where VMT files are stored (relative to materials/ folder)
-    const qcContent = `$modelname "props_map_editor/bpee/${modelName}/${modelName}.mdl"
+    const qcContent = `$modelname "props_map_editor/bpee/${modelFolder}/${modelName}.mdl"
 $staticprop
 $body body "${objFileName}"
 $surfaceprop "default"
-$cdmaterials "models/props_map_editor/bpee/${modelName}/"
+$cdmaterials "models/props_map_editor/bpee/${materialsFolder}/"
 $scale ${scale}
 $sequence idle "${objFileName}" fps 30
 `
@@ -261,7 +265,12 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
     
     // Generate QC file pointing to the UN-ROTATED OBJ (Source Engine coordinates)
     const qcPath = path.join(path.dirname(unrotatedObjPath), `${modelName}.qc`)
-    await generateQCFile(unrotatedObjPath, qcPath, { modelName, scale: options.scale })
+    await generateQCFile(unrotatedObjPath, qcPath, { 
+        modelName, 
+        scale: options.scale,
+        materialsFolder: options.materialsFolder, // Allow override for shared materials
+        modelFolder: options.modelFolder // Allow override for model parent folder
+    })
 
     console.log(`Starting STUDIOMDL compilation...`)
     console.log(`  QC File: ${qcPath}`)
@@ -332,8 +341,9 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
         if (stderr) console.warn("STUDIOMDL stderr:", stderr)
 
         // STUDIOMDL outputs to the game directory structure
-        // The model will be at: gameDir/models/props_map_editor/bpee/{itemID}/{itemID}.mdl
-        const compiledBasePath = path.join(gameDir, "models", "props_map_editor", "bpee", modelName, modelName)
+        // The model will be at: gameDir/models/props_map_editor/bpee/{modelFolder}/{modelName}.mdl
+        const modelFolder = options.modelFolder || modelName
+        const compiledBasePath = path.join(gameDir, "models", "props_map_editor", "bpee", modelFolder, modelName)
         const mdlPath = `${compiledBasePath}.mdl`
         const vvdPath = `${compiledBasePath}.vvd`
         
@@ -434,9 +444,11 @@ async function convertMaterialsToPackage(materialsSourceDir, materialTargetDir, 
                     console.log(`    Target VTF: ${vtfPath}`)
                     
                     // Convert PNG directly to VTF (already cartoonified by VMF2OBJ)
+                    // Skip automatic VMT creation - we'll create them ourselves with correct paths
                     await convertImageToVTF(srcPath, vtfPath, {
                         format: "DXT5",
-                        generateMipmaps: true
+                        generateMipmaps: true,
+                        skipVMT: true
                     })
                     
                     console.log(`    ✅ VTF created`)
@@ -451,7 +463,18 @@ async function convertMaterialsToPackage(materialsSourceDir, materialTargetDir, 
     }
     
     // Parse MTL file to get material names and their texture paths
-    const mtlFilePath = path.join(tempDir, itemName + '_0.mtl')
+    // Try to find the MTL file - it might have a different name than itemName
+    let mtlFilePath = path.join(tempDir, itemName + '_0.mtl')
+    
+    // If not found, search for any *_0.mtl file in temp directory
+    if (!fs.existsSync(mtlFilePath)) {
+        const tempFiles = fs.readdirSync(tempDir)
+        const mtlFile = tempFiles.find(f => f.endsWith('_0.mtl'))
+        if (mtlFile) {
+            mtlFilePath = path.join(tempDir, mtlFile)
+            console.log(`⚠️  Expected MTL file not found, using: ${mtlFile}`)
+        }
+    }
     
     const materialMap = {}
     if (fs.existsSync(mtlFilePath)) {
@@ -478,19 +501,16 @@ async function convertMaterialsToPackage(materialsSourceDir, materialTargetDir, 
     try {
         await convertMaterials(materialsSourceDir, materialTargetDir)
         
-        // Now create VMT files FLAT in materialTargetDir based on material names
-        // STUDIOMDL strips out subdirectory paths, so materials are referenced by base name only
+        // Now create VMT files based on TEXTURE filenames (not material names!)
+        // STUDIOMDL references materials by their TEXTURE filename, not the MTL material name
         for (const [materialName, texturePath] of Object.entries(materialMap)) {
             try {
-                // Extract just the base filename from materialName (no subdirs)
-                // Use split on BOTH / and \ since MTL files use forward slashes
-                // STUDIOMDL stores materials as just "black_floor_metal_001a", not "metal/black_floor_metal_001a"
-                const baseMatName = materialName.split(/[/\\]/).pop()
-                const vmtPath = path.join(materialTargetDir, baseMatName + '.vmt')
-                
                 // Extract just the texture filename (no path, no extension)
                 // Use split on BOTH / and \ since MTL files use forward slashes
                 const textureFileName = texturePath.split(/[/\\]/).pop().replace(/\.(png|tga)$/i, '')
+                
+                // VMT filename MUST match the texture filename (what STUDIOMDL uses)
+                const vmtPath = path.join(materialTargetDir, textureFileName + '.vmt')
                 
                 const vmtContent = `patch
 {
@@ -504,7 +524,7 @@ $model 1
 }
 `
                 fs.writeFileSync(vmtPath, vmtContent, 'utf-8')
-                console.log(`  ✅ Created VMT: ${baseMatName}.vmt → texture: ${textureFileName}`)
+                console.log(`  ✅ Created VMT: ${textureFileName}.vmt (for material: ${materialName.split(/[/\\]/).pop()})`)
             } catch (error) {
                 console.error(`  ❌ Failed to create VMT for material ${materialName}: ${error.message}`)
             }
@@ -525,15 +545,17 @@ $model 1
  * @param {string} materialsSourceDir - DEPRECATED: Materials should be converted before calling this
  * @returns {Promise<Object>} - Object containing final paths
  */
-async function copyMDLToPackage(compiledFiles, packagePath, itemName, materialsSourceDir = null) {
+async function copyMDLToPackage(compiledFiles, packagePath, itemName, materialsSourceDir = null, sharedFolder = null) {
     // Target directory in package: resources/models/props_map_editor/bpee/{itemID}/
+    // Use sharedFolder if provided (for multi-model items), otherwise use itemName
+    const folderName = sharedFolder || itemName
     const targetDir = path.join(
         packagePath,
         "resources",
         "models",
         "props_map_editor",
         "bpee",
-        itemName
+        folderName
     )
 
     // Ensure target directory exists
@@ -607,7 +629,8 @@ async function copyMDLToPackage(compiledFiles, packagePath, itemName, materialsS
     }
 
     // Return the relative path for editoritems (relative to resources/models/)
-    const relativeModelPath = `bpee/${itemName}/${itemName}.mdl`
+    // Use folderName (shared folder) not itemName
+    const relativeModelPath = `bpee/${folderName}/${itemName}.mdl`
     
     return {
         copiedFiles,
@@ -632,32 +655,49 @@ async function convertAndInstallMDL(objPath, packagePath, itemName, options = {}
 
     const tempDir = path.join(packagePath, "temp_models")
 
-    // Step 1: Convert materials from PNG to VTF/VMT FIRST (before STUDIOMDL needs them!)
-    console.log(`📦 Step 1: Converting materials to VTF/VMT format...`)
-    const materialsSourceDir = path.join(tempDir, "materials")
-    const materialTargetDir = path.join(
-        packagePath,
-        "resources",
-        "materials",
-        "models",
-        "props_map_editor",
-        "bpee",
-        itemName
-    )
+    // Step 1: Convert materials from PNG to VTF/VMT FIRST (unless using shared materials)
+    let materialTargetDir
     
-    await convertMaterialsToPackage(materialsSourceDir, materialTargetDir, tempDir, itemName)
+    if (options.skipMaterialConversion && options.sharedMaterialsPath) {
+        console.log(`📦 Step 1: Using shared materials from: ${options.sharedMaterialsPath}`)
+        materialTargetDir = options.sharedMaterialsPath
+    } else {
+        console.log(`📦 Step 1: Converting materials to VTF/VMT format...`)
+        const materialsSourceDir = path.join(tempDir, "materials")
+        materialTargetDir = path.join(
+            packagePath,
+            "resources",
+            "materials",
+            "models",
+            "props_map_editor",
+            "bpee",
+            itemName
+        )
+        
+        await convertMaterialsToPackage(materialsSourceDir, materialTargetDir, tempDir, itemName)
+    }
 
     // Step 2: Compile OBJ to MDL using STUDIOMDL (now materials are ready!)
     console.log(`🔨 Step 2: Compiling MDL with STUDIOMDL...`)
+    
+    // Extract the materials folder name from the path
+    // e.g., ".../bpee/old_aperture_walls/" -> "old_aperture_walls"
+    const materialsFolderName = path.basename(materialTargetDir)
+    
+    // Use sharedModelFolder if provided, otherwise use itemName
+    const modelFolderName = options.sharedModelFolder || itemName
+    
     const compiledFiles = await convertObjToMDL(objPath, tempDir, {
         modelName: itemName,
         scale: options.scale || 1.0,
-        packageMaterialsDir: materialTargetDir // Pass the materials location
+        packageMaterialsDir: materialTargetDir, // Pass the materials location
+        materialsFolder: materialsFolderName, // Use shared folder name for $cdmaterials
+        modelFolder: modelFolderName // Use shared folder for all model variants
     })
 
     // Step 3: Copy MDL files to package resources (materials are already there)
     console.log(`📋 Step 3: Copying compiled MDL to package...`)
-    const result = await copyMDLToPackage(compiledFiles, packagePath, itemName, null)
+    const result = await copyMDLToPackage(compiledFiles, packagePath, itemName, null, modelFolderName)
 
     console.log(`✅ MDL conversion and installation complete!`)
     console.log(`  Model path for editoritems: ${result.relativeModelPath}`)
@@ -669,12 +709,128 @@ async function convertAndInstallMDL(objPath, packagePath, itemName, options = {}
     }
 }
 
+// VBSP PARSER FOR MULTI-MODEL GENERATION
+// ===========================================
+
+/**
+ * Parses VBSP blocks to extract a mapping from variable values to instance paths.
+ * @param {Array} blocks - The array of VBSP blocks from meta.json.
+ * @param {string} targetVariable - The variable to search for (e.g., "TIMER DELAY").
+ * @returns {Map<string, string>} A map where keys are variable values (e.g., "3", "4") and values are instance paths.
+ */
+function mapVariableValuesToInstances(blocks, targetVariable) {
+    const valueInstanceMap = new Map()
+
+    console.log(`🔍 Searching for variable "${targetVariable}" in VBSP blocks...`)
+    console.log(`   Total blocks: ${blocks ? blocks.length : 0}`)
+
+    if (!Array.isArray(blocks)) {
+        console.warn('   ❌ Blocks is not an array')
+        return valueInstanceMap
+    }
+
+    // Handle "DEFAULT" specially - it means use the first registered instance
+    if (targetVariable === 'DEFAULT') {
+        console.log('   📌 DEFAULT selected - this is handled separately')
+        return valueInstanceMap // Empty map for DEFAULT
+    }
+
+    // Convert target variable to fixup format (e.g., "TIMER DELAY" -> "$timer_delay")
+    const fixupVariable = `$${targetVariable.replace(/ /g, '_').toLowerCase()}`
+    console.log(`   Converted to fixup format: "${fixupVariable}"`)
+
+    // Helper function to recursively search for changeInstance blocks
+    const findChangeInstancesInBlock = (block, depth = 0) => {
+        const indent = '  '.repeat(depth + 2)
+        console.log(`${indent}Checking block type: ${block.type}`)
+        
+        if (block.type === 'changeInstance' && block.instanceName) {
+            console.log(`${indent}  → Found changeInstance: ${block.instanceName}`)
+            return [{ instanceName: block.instanceName, value: null }]
+        }
+        
+        const results = []
+        
+        // Check children array
+        if (Array.isArray(block.children)) {
+            for (const child of block.children) {
+                results.push(...findChangeInstancesInBlock(child, depth + 1))
+            }
+        }
+        
+        return results
+    }
+
+    // 1. First, try to find a SWITCH block for the target variable
+    console.log('   Looking for switchCase blocks...')
+    const switchBlock = blocks.find(block => 
+        block.type === 'switchCase' && block.variable === fixupVariable
+    )
+
+    if (switchBlock && Array.isArray(switchBlock.cases)) {
+        console.log(`   ✅ Found switchCase block with ${switchBlock.cases.length} cases`)
+        
+        // Extract the value-to-instance mapping from each case
+        for (const caseBlock of switchBlock.cases) {
+            console.log(`     Case value: "${caseBlock.value}"`)
+            // Cases use 'thenBlocks' not 'children'!
+            const blocks = caseBlock.thenBlocks || caseBlock.children || []
+            if (caseBlock.value && Array.isArray(blocks)) {
+                // Find the changeInstance block within the case
+                const changeInstanceBlock = blocks.find(child => child.type === 'changeInstance')
+                if (changeInstanceBlock && changeInstanceBlock.instanceName) {
+                    console.log(`       → Instance: ${changeInstanceBlock.instanceName}`)
+                    valueInstanceMap.set(caseBlock.value, changeInstanceBlock.instanceName)
+                } else {
+                    console.log(`       → No changeInstance found in thenBlocks`)
+                }
+            }
+        }
+    } else {
+        console.log('   ⚠️ No switchCase block found, trying IF blocks...')
+        
+        // 2. If no switch block, look for IF/ELSE blocks that check this variable
+        for (const block of blocks) {
+            if (block.type === 'if' || block.type === 'ifElse') {
+                console.log(`   Found ${block.type} block`)
+                
+                // Check if this IF block uses our target variable
+                if (block.condition && block.condition.includes(fixupVariable)) {
+                    console.log(`     → Uses target variable: ${block.condition}`)
+                    
+                    // Extract the value being checked (e.g., "$timer_delay == 5" -> "5")
+                    const match = block.condition.match(/==\s*["']?(\w+)["']?/)
+                    if (match) {
+                        const value = match[1]
+                        console.log(`     → Checking for value: "${value}"`)
+                        
+                        // Find changeInstance in this block's children
+                        const instances = findChangeInstancesInBlock(block)
+                        if (instances.length > 0) {
+                            console.log(`     → Found ${instances.length} changeInstance(s)`)
+                            valueInstanceMap.set(value, instances[0].instanceName)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    console.log(`   📊 Final mapping: ${valueInstanceMap.size} entries`)
+    for (const [value, instancePath] of valueInstanceMap.entries()) {
+        console.log(`     "${value}" → ${instancePath}`)
+    }
+
+    return valueInstanceMap
+}
+
 module.exports = {
     getStudioMDLPath,
     generateQCFile,
     convertObjToMDL,
     convertMaterialsToPackage,
     copyMDLToPackage,
-    convertAndInstallMDL
+    convertAndInstallMDL,
+    mapVariableValuesToInstances
 }
 

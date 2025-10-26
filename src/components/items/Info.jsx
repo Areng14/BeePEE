@@ -28,8 +28,9 @@ function Info({ item, formData, onUpdate }) {
     const [isPreview, setIsPreview] = useState(false)
     const [selectedInstanceKey, setSelectedInstanceKey] = useState("")
     const [isConverting, setIsConverting] = useState(false)
+    const [conversionProgress, setConversionProgress] = useState("")
     const [textureStyle, setTextureStyle] = useState("cartoon")
-    const [useDevTools, setUseDevTools] = useState(false)
+    const [vbspVariables, setVbspVariables] = useState([])
 
     useEffect(() => {
         // Load the icon when item changes or when staged icon changes
@@ -41,20 +42,65 @@ function Info({ item, formData, onUpdate }) {
         }
     }, [item, formData.stagedIconPath])
 
-    // Keep selected instance in sync when instances list changes
+    // Extract all variables used by the item
     useEffect(() => {
-        const entries = Object.entries(formData?.instances || {}).filter(
-            ([, inst]) => !inst?._toRemove,
-        )
-        if (entries.length === 0) {
+        const variables = ['DEFAULT'] // Always include DEFAULT
+        
+        // Add all item variables
+        if (Array.isArray(formData?.variables)) {
+            // Variables are an array of objects with displayName and fixupName
+            formData.variables.forEach(varObj => {
+                if (varObj && varObj.displayName) {
+                    // Use the displayName directly, convert to uppercase
+                    const displayName = varObj.displayName.toUpperCase()
+                    if (!variables.includes(displayName)) {
+                        variables.push(displayName)
+                    }
+                }
+            })
+        }
+        
+        setVbspVariables(variables)
+    }, [formData?.variables])
+
+    // Keep selected variable in sync when variables change
+    useEffect(() => {
+        if (vbspVariables.length === 0) {
             setSelectedInstanceKey("")
             return
         }
         setSelectedInstanceKey((prev) => {
-            const stillExists = entries.some(([key]) => key === prev)
-            return stillExists ? prev : entries[0][0]
+            // Check if previous selection still exists in variables list
+            const stillExists = vbspVariables.includes(prev)
+            // Default to "DEFAULT" if previous selection doesn't exist
+            return stillExists ? prev : "DEFAULT"
         })
-    }, [formData?.instances])
+    }, [vbspVariables])
+
+    // Listen for conversion progress updates from backend
+    useEffect(() => {
+        const handleProgress = (event, progressData) => {
+            const { stage, message, detail } = progressData
+            
+            // Update progress message based on stage
+            const stageMessages = {
+                merge: "📐 Merging VMFs into grid...",
+                vmf2obj: "🔄 Converting to OBJ...",
+                split: "✂️ Splitting models...",
+                mdl: "🔨 Converting to MDL..."
+            }
+            
+            setConversionProgress(stageMessages[stage] || message || "Converting...")
+        }
+        
+        // Register listener
+        window.api?.on?.('conversion-progress', handleProgress)
+        
+        // Cleanup
+        return () => {
+            window.api?.off?.('conversion-progress', handleProgress)
+        }
+    }, [])
 
     // Get relative path from package root (show staged path if available)
     const getRelativeIconPath = () => {
@@ -117,61 +163,45 @@ function Info({ item, formData, onUpdate }) {
         ),
     }
 
-    const instanceEntries = Object.entries(formData?.instances || {}).filter(
-        ([, inst]) => !inst?._toRemove,
-    )
-
-    // Get the expected OBJ file path for the current instance
+    // Get the expected OBJ file path for the model
+    // After multi-model generation, files are named after instance names (e.g., half_glass_0.obj)
+    // Just return the temp_models directory - backend will find the first OBJ file
     const getObjPath = () => {
-        if (!selectedInstanceKey || !item?.packagePath) return null
-
-        const instanceData = formData.instances?.[selectedInstanceKey]
-        const instanceName = instanceData?.Name
-        if (!instanceName) return null
-
-        // VMF2OBJ outputs to temp_models/ with only the filename base (no subdirs)
+        if (!item?.id || !item?.packagePath) return null
+        
         const tempDir = `${item.packagePath}/temp_models`
-        const fileBase = instanceName
-            .split(/[\\\//]/)
-            .pop()
-            ?.replace(/\.vmf$/i, "")
-        if (!fileBase) return null
-        return `${tempDir}/${fileBase}.obj`
+        
+        // Return directory path - backend will find first OBJ file
+        return tempDir
     }
 
-    // Get the expected MTL file path for the current instance
+    // Get the expected MTL file path for the model
     const getMtlPath = () => {
         const objPath = getObjPath()
         if (!objPath) return null
         return objPath.replace(/\.obj$/i, ".mtl")
     }
 
-    // Get display name for the current instance
+    // Get display name for the current selection
     const getInstanceDisplayName = () => {
         if (!selectedInstanceKey) return null
-
-        const instanceData = formData.instances?.[selectedInstanceKey]
-        const idx = instanceEntries.findIndex(
-            ([key]) => key === selectedInstanceKey,
-        )
-        return instanceData?.displayName || `Instance ${idx + 1}`
+        return selectedInstanceKey // Just return the variable name (e.g., "TIMER DELAY", "DEFAULT")
     }
 
     const handleMakeModel = async () => {
         if (!selectedInstanceKey || isConverting) return
 
         setIsConverting(true)
+        setConversionProgress("🚀 Starting conversion...")
         try {
-            // Compute the on-disk VMF path for the selected instance
-            const instanceData = formData.instances?.[selectedInstanceKey]
-            const instanceName = instanceData?.Name
-            if (!instanceName) return
-
+            // selectedInstanceKey now contains the selected variable name (e.g., "TIMER DELAY", "DEFAULT")
+            // Backend will handle mapping variable to appropriate instance
+            
             // Ask backend to resolve the VMF path and convert
             const result = await window.package.convertInstanceToObj(
                 item.id,
-                selectedInstanceKey,
-                { textureStyle, debug: useDevTools },
+                selectedInstanceKey, // This is now a variable name, not an instance key
+                { textureStyle, isVariable: true },
             )
             if (result?.success) {
                 console.log("VMF2OBJ conversion completed successfully")
@@ -189,13 +219,12 @@ function Info({ item, formData, onUpdate }) {
                 }
             } else {
                 console.error("VMF2OBJ failed:", result?.error)
-                alert(`Model generation failed:\n\n${result?.error || "Unknown error"}`)
             }
         } catch (error) {
             console.error("Failed to make model:", error)
-            alert(`Failed to make model:\n\n${error.message || error}`)
         } finally {
             setIsConverting(false)
+            setConversionProgress("")
         }
     }
 
@@ -426,47 +455,28 @@ function Info({ item, formData, onUpdate }) {
                                 <MenuItem value="raw">Raw</MenuItem>
                             </Select>
                         </FormControl>
-                        <FormControl size="small" sx={{ minWidth: 160 }}>
-                            <InputLabel id="dev-tools-label">Mode</InputLabel>
-                            <Select
-                                labelId="dev-tools-label"
-                                label="Mode"
-                                value={useDevTools ? "dev" : "normal"}
-                                onChange={(e) =>
-                                    setUseDevTools(e.target.value === "dev")
-                                }>
-                                <MenuItem value="normal">Normal</MenuItem>
-                                <MenuItem value="dev">Use Dev Tools</MenuItem>
-                            </Select>
-                        </FormControl>
                         <FormControl size="small" fullWidth>
-                            <InputLabel id="instance-select-label">
-                                Instance
+                            <InputLabel id="variable-select-label">
+                                Variable
                             </InputLabel>
                             <Select
-                                labelId="instance-select-label"
-                                label="Instance"
+                                labelId="variable-select-label"
+                                label="Variable"
                                 value={selectedInstanceKey}
                                 onChange={(e) =>
                                     setSelectedInstanceKey(e.target.value)
                                 }
                                 fullWidth>
-                                {instanceEntries.length === 0 ? (
+                                {vbspVariables.length === 0 ? (
                                     <MenuItem value="" disabled>
-                                        No instances
+                                        No variables
                                     </MenuItem>
                                 ) : (
-                                    instanceEntries.map(([key, inst], idx) => {
-                                        const displayName =
-                                            (inst.displayName ||
-                                                `Instance ${idx}`) +
-                                            (inst.Name ? ` — ${inst.Name}` : "")
-                                        return (
-                                            <MenuItem key={key} value={key}>
-                                                {displayName}
-                                            </MenuItem>
-                                        )
-                                    })
+                                    vbspVariables.map((varName) => (
+                                        <MenuItem key={varName} value={varName}>
+                                            {varName}
+                                        </MenuItem>
+                                    ))
                                 )}
                             </Select>
                         </FormControl>
@@ -493,7 +503,7 @@ function Info({ item, formData, onUpdate }) {
                                     />
                                 ) : null
                             }>
-                            {isConverting ? "Converting..." : "Make Model"}
+                            {isConverting ? (conversionProgress || "Converting...") : "Make Model"}
                         </Button>
                     </Stack>
                 </Box>

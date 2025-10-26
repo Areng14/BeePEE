@@ -52,6 +52,7 @@
         "@react-three/fiber": "^9.3.0",
         "7zip-bin": "^5.2.0",
         "node-7z": "^3.0.0",
+        "p-limit": "^7.2.0",
         "pica": "^8.0.0",
         "react": "^19.1.0",
         "react-dom": "^19.1.0",
@@ -60,6 +61,7 @@
         "sharp": "^0.34.3",
         "three": "^0.179.1",
         "vdf-parser": "^1.2.1",
+        "vmf-transpiler": "^1.0.0",
         "vtf": "github:icewind1991/vtf.js",
         "winreg": "^1.2.5"
     },
