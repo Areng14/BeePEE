@@ -279,6 +279,12 @@ class Item {
                     console.warn(
                         `Could not get VMF stats for VBSP instance ${instancePath}: ${error.message}`,
                     )
+                    const meta = this.getMetadata()
+                    if (!meta.instanceErrors) {
+                        meta.instanceErrors = {}
+                    }
+                    meta.instanceErrors[nextIndex.toString()] = error.message
+                    this.saveMetadata(meta)
                 }
 
                 // Add to editoritems.json
@@ -514,6 +520,12 @@ class Item {
                         `Error getting VMF stats for instance ${index}:`,
                         error.message,
                     )
+                    const meta = this.getMetadata()
+                    if (!meta.instanceErrors) {
+                        meta.instanceErrors = {}
+                    }
+                    meta.instanceErrors[index] = error.message
+                    this.saveMetadata(meta)
                 }
             }
 
@@ -614,6 +626,12 @@ class Item {
                 `Error getting VMF stats for new instance ${instanceName}:`,
                 error.message,
             )
+            const meta = this.getMetadata()
+            if (!meta.instanceErrors) {
+                meta.instanceErrors = {}
+            }
+            meta.instanceErrors[nextIndex.toString()] = error.message
+            this.saveMetadata(meta)
         }
 
         editoritems.Item.Exporting.Instances[nextIndex.toString()] = {
@@ -1408,6 +1426,22 @@ class Item {
             Conditions: {},
         }
 
+        const applyTimerLogic = (variableName, value) => {
+            if (!variableName) return value
+            const cleanVariableName = variableName.replace(/^\\$/, "")
+            if (
+                cleanVariableName === "timer_delay" ||
+                cleanVariableName === "TimerDelay"
+            ) {
+                const numValue = Number(value)
+                if (!isNaN(numValue)) {
+                    if (numValue >= 0 && numValue <= 30) return numValue
+                    return 0 // default to infinite for out-of-range values
+                }
+            }
+            return value
+        }
+
         // Helper function to convert boolean values
         const convertBooleanValue = (value, variableName = "") => {
             // If value is explicitly provided, convert it
@@ -1493,8 +1527,12 @@ class Item {
 
             switch (block.type) {
                 case "if":
-                    const ifValue = convertBooleanValue(
+                    const modifiedIfValue = applyTimerLogic(
+                        block.variable,
                         block.value,
+                    )
+                    const ifValue = convertBooleanValue(
+                        modifiedIfValue,
                         block.variable,
                     )
                     const ifOperator = block.operator || "=="
@@ -1513,8 +1551,12 @@ class Item {
                     return ifResult
 
                 case "ifElse":
-                    const ifElseValue = convertBooleanValue(
+                    const modifiedIfElseValue = applyTimerLogic(
+                        block.variable,
                         block.value,
+                    )
+                    const ifElseValue = convertBooleanValue(
+                        modifiedIfElseValue,
                         block.variable,
                     )
                     const ifElseOperator = block.operator || "=="
@@ -1615,7 +1657,11 @@ class Item {
                             }
                             
                             if (hasValue) {
-                                const arg = `${variableWithDollar} = ${convertBooleanValue(caseBlock.value, variableWithDollar)}`
+                                const modifiedCaseValue = applyTimerLogic(
+                                    block.variable,
+                                    caseBlock.value,
+                                )
+                                const arg = `${variableWithDollar} = ${convertBooleanValue(modifiedCaseValue, variableWithDollar)}`
                                 const caseResults = processChildBlocks(
                                     caseBlock?.thenBlocks || [],
                                     "thenBlocks",
@@ -1670,7 +1716,11 @@ class Item {
                             }
                             
                             if (hasValue) {
-                                const arg = `${caseBlock.value}`
+                                const modifiedCaseValue = applyTimerLogic(
+                                    block.test,
+                                    caseBlock.value,
+                                )
+                                const arg = `${modifiedCaseValue}`
                                 const caseResults = processChildBlocks(
                                     caseBlock?.thenBlocks || [],
                                     "thenBlocks",

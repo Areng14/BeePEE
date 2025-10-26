@@ -2841,6 +2841,7 @@ function reg_events(mainWindow) {
             } catch (error) {
                 const details = [
                     error.message,
+                    error.stack ? `stack:\n${error.stack}` : null,
                     error.cmd ? `cmd: ${error.cmd}` : null,
                     error.cwd ? `cwd: ${error.cwd}` : null,
                 ]
@@ -2883,7 +2884,22 @@ function reg_events(mainWindow) {
                     
                     console.log('Value to instance map:', valueInstanceMap)
                     
-                    if (valueInstanceMap.size === 0) {
+                    // Sort the map: -1 first, then numerically ascending
+                    const sortedEntries = [...valueInstanceMap.entries()].sort(
+                        ([valA], [valB]) => {
+                            const numA = Number(valA)
+                            const numB = Number(valB)
+
+                            if (numA === -1 && numB !== -1) return -1
+                            if (numB === -1 && numA !== -1) return 1
+
+                            return numA - numB
+                        },
+                    )
+                    const sortedValueInstanceMap = new Map(sortedEntries)
+                    console.log("Sorted value to instance map:", sortedValueInstanceMap)
+                    
+                    if (sortedValueInstanceMap.size === 0) {
                         dialog.showMessageBox({
                             type: 'warning',
                             title: 'No Instances Found',
@@ -2893,14 +2909,65 @@ function reg_events(mainWindow) {
                         return { success: false, error: `No instances found for variable "${instanceKey}"` }
                     }
                     
+                    // Determine base instance for filling missing values
+                    let baseInstance = null
+                    if (
+                        sortedValueInstanceMap.has("0") ||
+                        sortedValueInstanceMap.has(0)
+                    ) {
+                        const zeroKey = sortedValueInstanceMap.has("0") ? "0" : 0
+                        baseInstance = sortedValueInstanceMap.get(zeroKey)
+                    } else if (sortedValueInstanceMap.size > 0) {
+                        const minKey = [
+                            ...sortedValueInstanceMap.keys(),
+                        ]
+                            .map((k) => Number(k))
+                            .filter((n) => !isNaN(n))
+                            .sort((a, b) => a - b)[0]
+                        baseInstance = sortedValueInstanceMap.get(String(minKey))
+                        console.log(
+                            `No '0' timer found, using instance from smallest key '${minKey}' as base.`,
+                        )
+                    } else {
+                        dialog.showMessageBox({
+                            type: "error",
+                            title: "Cannot Generate Models",
+                            message: "No timer instances defined.",
+                            detail: "The VBSP configuration must have at least one instance defined for a timer value to generate models.",
+                        })
+                        return {
+                            success: false,
+                            error: "No timer instances found.",
+                        }
+                    }
+
+                    // Create a new, complete map from 0-30
+                    const finalInstanceMap = new Map()
+                    for (let i = 0; i <= 30; i++) {
+                        const keyStr = String(i)
+                        if (sortedValueInstanceMap.has(keyStr)) {
+                            finalInstanceMap.set(
+                                keyStr,
+                                sortedValueInstanceMap.get(keyStr),
+                            )
+                        } else {
+                            finalInstanceMap.set(keyStr, baseInstance)
+                        }
+                    }
+                    console.log(
+                        `Final map has ${finalInstanceMap.size} entries.`,
+                    )
+
                     // Step 2: Use VMF Atlas - merge all VMFs into a grid, convert once, then split
                     console.log(`📐 Using VMF Atlas approach (grid layout)...`)
-                    
-                    const uniqueInstances = [...new Set(valueInstanceMap.values())]
-                    
+
+                    const uniqueInstances = [
+                        ...new Set(finalInstanceMap.values()),
+                    ]
+
                     // Send initial progress
-                    event.sender.send('conversion-progress', {
-                        stage: 'merge',
+                    event.sender.send("conversion-progress", {
+                        stage: "merge",
                         message: `Preparing to merge ${uniqueInstances.length} instances into grid...`,
                     })
                     const tempDir = path.join(item.packagePath, "temp_models")
@@ -3082,8 +3149,13 @@ function reg_events(mainWindow) {
                     // Create new SubTypes for each converted model
                     const newSubTypes = []
                     let isFirstSubType = true
-                    for (const [value, instancePath] of valueInstanceMap.entries()) {
-                        const result = conversionResults.find(r => r.instancePath === instancePath)
+                    for (const [
+                        value,
+                        instancePath,
+                    ] of finalInstanceMap.entries()) {
+                        const result = conversionResults.find(
+                            (r) => r.instancePath === instancePath,
+                        )
                         if (result && result.modelPath) {
                             let newSubType
                             
@@ -3236,6 +3308,7 @@ function reg_events(mainWindow) {
             } catch (error) {
                 const details = [
                     error.message,
+                    error.stack ? `stack:\n${error.stack}` : null,
                     error.cmd ? `cmd: ${error.cmd}` : null,
                     error.cwd ? `cwd: ${error.cwd}` : null,
                 ]
