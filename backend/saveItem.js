@@ -102,6 +102,11 @@ async function saveItem(item) {
         editorItems.Item.Editor.SubType.Name = item.name
     }
 
+    // Update MovementHandle if provided
+    if (item.movementHandle) {
+        editorItems.Item.Editor.MovementHandle = item.movementHandle
+    }
+
     // Update properties
     properties.Properties = {
         ...properties.Properties,

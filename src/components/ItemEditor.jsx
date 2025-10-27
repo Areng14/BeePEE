@@ -135,6 +135,7 @@ function ItemEditor() {
         name: "",
         author: "",
         description: "",
+        movementHandle: "HANDLE_4_DIRECTIONS",
         // Icon staging
         stagedIconPath: null,
         stagedIconName: null,
@@ -209,6 +210,7 @@ function ItemEditor() {
                         name: item.name || "",
                         author: item.details?.Authors || "",
                         description: description,
+                        movementHandle: item.movementHandle || "HANDLE_4_DIRECTIONS",
                         inputs: inputResult.success ? inputResult.inputs : {},
                         outputs: outputResult.success
                             ? outputResult.outputs
@@ -242,6 +244,7 @@ function ItemEditor() {
                         name: item.name || "",
                         author: item.details?.Authors || "",
                         description: description,
+                        movementHandle: item.movementHandle || "HANDLE_4_DIRECTIONS",
                         inputs: {},
                         outputs: {},
                         // Update instances from item data, but preserve local modifications
@@ -453,6 +456,7 @@ function ItemEditor() {
                 const saveData = {
                     id: item.id,
                     name: formData.name,
+                    movementHandle: formData.movementHandle,
                     fullItemPath: item.fullItemPath,
                     details: {
                         ...item.details,

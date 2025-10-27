@@ -65,6 +65,9 @@ class Item {
 
         this.name = subType.Name
 
+        // Get MovementHandle from editor properties
+        this.movementHandle = editor.MovementHandle || "HANDLE_4_DIRECTIONS"
+
         //Get details
         if (!fs.existsSync(this.paths.properties)) {
             throw new Error("Missing properties.json!")
@@ -1997,6 +2000,7 @@ class Item {
         return {
             id: this.id,
             name: this.name,
+            movementHandle: this.movementHandle,
             details: this.details,
             icon: this.icon,
             paths: this.paths,
@@ -2013,6 +2017,7 @@ class Item {
         return {
             id: this.id,
             name: this.name,
+            movementHandle: this.movementHandle,
             details: this.details,
             icon: this.icon,
             paths: this.paths,
