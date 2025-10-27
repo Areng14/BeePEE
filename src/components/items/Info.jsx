@@ -434,6 +434,26 @@ function Info({ item, formData, onUpdate }) {
                 {/* Section divider */}
                 <Divider sx={{ my: 1 }} />
 
+                {/* Movement Handle */}
+                <FormControl fullWidth>
+                    <InputLabel id="movement-handle-label">Rotation Handle</InputLabel>
+                    <Select
+                        labelId="movement-handle-label"
+                        label="Rotation Handle"
+                        value={formData.movementHandle}
+                        onChange={(e) => onUpdate("movementHandle", e.target.value)}
+                        variant="outlined">
+                        <MenuItem value="HANDLE_NONE">No Handle</MenuItem>
+                        <MenuItem value="HANDLE_4_DIRECTIONS">4 Directions</MenuItem>
+                        <MenuItem value="HANDLE_36_DIRECTIONS">36 Directions</MenuItem>
+                        <MenuItem value="HANDLE_6_POSITIONS">6 Positions</MenuItem>
+                        <MenuItem value="HANDLE_8_POSITIONS">8 Positions</MenuItem>
+                    </Select>
+                </FormControl>
+
+                {/* Section divider */}
+                <Divider sx={{ my: 1 }} />
+
                 {/* Instance -> Model section */}
                 <Box>
                     <Typography variant="subtitle1" sx={{ mb: 1 }}>
