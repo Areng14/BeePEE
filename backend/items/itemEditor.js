@@ -40,7 +40,9 @@ function createItemEditor(item, mainWindow) {
     if (isDev) {
         window.loadURL(`http://localhost:5173/editor`)
     } else {
-        window.loadFile(path.join(__dirname, "../dist/index.html"), { query: { route: "editor" } })
+        window.loadFile(path.join(__dirname, "../dist/index.html"), {
+            query: { route: "editor" },
+        })
     }
 
     window.setMenuBarVisibility(false)
@@ -96,8 +98,8 @@ function createItemCreationWindow(mainWindow) {
     if (isDev) {
         createItemWindow.loadURL(`http://localhost:5173/create-item`)
     } else {
-        createItemWindow.loadFile(path.join(__dirname, "../dist/index.html"), { 
-            query: { route: "create-item" } 
+        createItemWindow.loadFile(path.join(__dirname, "../dist/index.html"), {
+            query: { route: "create-item" },
         })
     }
 
@@ -137,9 +139,12 @@ function createPackageCreationWindow(mainWindow) {
     if (isDev) {
         createPackageWindow.loadURL(`http://localhost:5173/create-package`)
     } else {
-        createPackageWindow.loadFile(path.join(__dirname, "../dist/index.html"), { 
-            query: { route: "create-package" } 
-        })
+        createPackageWindow.loadFile(
+            path.join(__dirname, "../dist/index.html"),
+            {
+                query: { route: "create-package" },
+            },
+        )
     }
 
     createPackageWindow.setMenuBarVisibility(false)
@@ -176,11 +181,16 @@ function createPackageInformationWindow(mainWindow) {
     })
 
     if (isDev) {
-        packageInformationWindow.loadURL(`http://localhost:5173/package-information`)
+        packageInformationWindow.loadURL(
+            `http://localhost:5173/package-information`,
+        )
     } else {
-        packageInformationWindow.loadFile(path.join(__dirname, "../dist/index.html"), { 
-            query: { route: "package-information" } 
-        })
+        packageInformationWindow.loadFile(
+            path.join(__dirname, "../dist/index.html"),
+            {
+                query: { route: "package-information" },
+            },
+        )
     }
 
     packageInformationWindow.setMenuBarVisibility(false)
@@ -195,5 +205,5 @@ module.exports = {
     createPackageCreationWindow,
     getCreatePackageWindow: () => createPackageWindow,
     createPackageInformationWindow,
-    getPackageInformationWindow: () => packageInformationWindow
+    getPackageInformationWindow: () => packageInformationWindow,
 }

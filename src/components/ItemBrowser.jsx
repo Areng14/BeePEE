@@ -17,11 +17,16 @@ function ItemBrowser() {
             try {
                 const currentItems = await window.package.getCurrentItems?.()
                 if (currentItems && currentItems.length > 0) {
-                    console.log("ItemBrowser: Fetched current items on mount:", currentItems.length)
+                    console.log(
+                        "ItemBrowser: Fetched current items on mount:",
+                        currentItems.length,
+                    )
                     setItems(currentItems)
                 }
             } catch (error) {
-                console.log("ItemBrowser: No current items available (this is normal for new packages)")
+                console.log(
+                    "ItemBrowser: No current items available (this is normal for new packages)",
+                )
             }
         }
         fetchCurrentItems()
@@ -113,15 +118,18 @@ function ItemBrowser() {
 
     const handleEditItem = (itemId) => {
         console.log("Attempting to open editor for item:", itemId)
-        console.log("Current items in state:", items.map(i => i.id))
-        
+        console.log(
+            "Current items in state:",
+            items.map((i) => i.id),
+        )
+
         // Always use the current state to find the item
-        const currentItem = items.find(i => i.id === itemId)
+        const currentItem = items.find((i) => i.id === itemId)
         if (!currentItem) {
             console.warn("Item no longer exists, skipping editor open:", itemId)
             return
         }
-        
+
         window.package.openItemEditor(currentItem)
     }
 

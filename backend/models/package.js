@@ -32,7 +32,7 @@ class Package {
 
             // Read and parse info.json
             const parsedInfo = JSON.parse(fs.readFileSync(infoPath, "utf-8"))
-            
+
             // Use the actual package name from info.json if available
             if (parsedInfo.Name) {
                 this.name = parsedInfo.Name
@@ -71,7 +71,9 @@ class Package {
                 }
             }
             if (totalImported > 0) {
-                console.log(`✅ Auto-imported VBSP instances for ${totalImported} item(s) in ${this.name}\n`)
+                console.log(
+                    `✅ Auto-imported VBSP instances for ${totalImported} item(s) in ${this.name}\n`,
+                )
             } else {
                 console.log(`⏭️ No VBSP instances to import in ${this.name}\n`)
             }

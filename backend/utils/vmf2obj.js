@@ -114,7 +114,10 @@ async function applyCartoonishToTextures(outputDir, { debug } = {}) {
 
     const exePath = getCartoonExePath()
     if (!fs.existsSync(exePath)) {
-        console.warn("cartoon.exe not found, skipping cartoonish processing:", exePath)
+        console.warn(
+            "cartoon.exe not found, skipping cartoonish processing:",
+            exePath,
+        )
         return { success: false, processed: 0, error: "cartoon.exe missing" }
     }
 
@@ -350,7 +353,7 @@ async function convertVmfToObj(vmfPath, options = {}) {
     const outputBase = path.join(outputDir, baseName)
     const textureStyle = options.textureStyle || "cartoon"
     const debug = !!options.debug
-    
+
     // Prefer invoking the CLI main class directly to avoid GUI launcher
     const rawArgs = [
         "-cp",
@@ -363,13 +366,13 @@ async function convertVmfToObj(vmfPath, options = {}) {
     if (resourceArg) {
         rawArgs.push("-r", resourceArg)
     }
-    
+
     // Only add -t flag if NOT using dev tools (debug mode)
     // -t ignores tool brushes for cleaner models
     if (!debug) {
         rawArgs.push("-t")
     }
-    
+
     // Always be quiet
     rawArgs.push("-q")
 
@@ -450,17 +453,30 @@ async function convertVmfToObj(vmfPath, options = {}) {
                 if (hasMtl) {
                     try {
                         console.log("Converting TGA textures to PNG...")
-                        const conversionResult = await convertTexturesForModel(outputDir, baseName)
+                        const conversionResult = await convertTexturesForModel(
+                            outputDir,
+                            baseName,
+                        )
                         if (conversionResult.success) {
-                            console.log(`TGA conversion successful: ${conversionResult.converted.length} files converted`)
+                            console.log(
+                                `TGA conversion successful: ${conversionResult.converted.length} files converted`,
+                            )
                             if (conversionResult.failed.length > 0) {
-                                console.warn(`Failed to convert ${conversionResult.failed.length} TGA files:`, conversionResult.failed)
+                                console.warn(
+                                    `Failed to convert ${conversionResult.failed.length} TGA files:`,
+                                    conversionResult.failed,
+                                )
                             }
                         } else {
-                            console.warn("TGA to PNG conversion failed, but continuing with original textures")
+                            console.warn(
+                                "TGA to PNG conversion failed, but continuing with original textures",
+                            )
                         }
                     } catch (conversionError) {
-                        console.warn("Error during TGA to PNG conversion:", conversionError)
+                        console.warn(
+                            "Error during TGA to PNG conversion:",
+                            conversionError,
+                        )
                         // Continue anyway - original TGA files will still work with our loaders
                     }
                 }
@@ -469,15 +485,26 @@ async function convertVmfToObj(vmfPath, options = {}) {
                 try {
                     if (textureStyle === "cartoon") {
                         console.log("Applying cartoonish effect to textures...")
-                        const cartoonResult = await applyCartoonishToTextures(outputDir, { debug })
+                        const cartoonResult = await applyCartoonishToTextures(
+                            outputDir,
+                            { debug },
+                        )
                         if (cartoonResult.success) {
-                            console.log(`Cartoonified ${cartoonResult.processed} textures`)
+                            console.log(
+                                `Cartoonified ${cartoonResult.processed} textures`,
+                            )
                         } else {
-                            console.warn("Cartoonify step reported failure:", cartoonResult.error || "unknown")
+                            console.warn(
+                                "Cartoonify step reported failure:",
+                                cartoonResult.error || "unknown",
+                            )
                         }
                     }
                 } catch (cartoonError) {
-                    console.warn("Cartoonify step failed:", cartoonError?.message || cartoonError)
+                    console.warn(
+                        "Cartoonify step failed:",
+                        cartoonError?.message || cartoonError,
+                    )
                 }
 
                 resolve({

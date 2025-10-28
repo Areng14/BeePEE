@@ -258,7 +258,7 @@ async function parseGameInfo(gameinfoPath, baseDir, log = console) {
                     log.log(`  ✅ Found search path: ${searchPath}`)
                 }
             }
-            
+
             log.log(`📊 Total search paths found: ${searchPaths.length}`)
         } else {
             log.log(`⚠️ No SearchPaths section found in gameinfo.txt`)
@@ -297,14 +297,14 @@ async function findPortal2Resources(log = console) {
         if (fs.existsSync(gameinfoPath)) {
             paths.gameinfo = gameinfoPath
             log.log(`📄 Found gameinfo.txt: ${gameinfoPath}`)
-            
+
             const gameInfo = await parseGameInfo(
                 gameinfoPath,
                 path.join(p2dir, "portal2"),
                 log,
             )
             paths.searchPaths = gameInfo.searchPaths
-            
+
             log.log(`📊 Gameinfo parsing complete:`)
             log.log(`  - Search paths: ${gameInfo.searchPaths.length}`)
         } else {
@@ -316,14 +316,14 @@ async function findPortal2Resources(log = console) {
         log.log(`🔍 Auto-scanning for DLC folders...`)
         const portal2Root = p2dir // Portal 2 root directory
         log.log(`  Scanning in: ${portal2Root}`)
-        
+
         const autoDlcFolders = []
         let dlcNumber = 1
         while (true) {
             const dlcFolderName = `portal2_dlc${dlcNumber}` // Correct naming: portal2_dlc1, portal2_dlc2, etc.
             const dlcPath = path.join(portal2Root, dlcFolderName)
             log.log(`  🔍 Checking: ${dlcFolderName} at ${dlcPath}`)
-            
+
             if (fs.existsSync(dlcPath)) {
                 log.log(`    ✅ Found DLC: ${dlcFolderName} at ${dlcPath}`)
                 autoDlcFolders.push({
@@ -333,13 +333,17 @@ async function findPortal2Resources(log = console) {
                 })
                 dlcNumber++ // Check next DLC
             } else {
-                log.log(`    ❌ DLC ${dlcFolderName} not found, stopping at ${dlcNumber - 1}`)
+                log.log(
+                    `    ❌ DLC ${dlcFolderName} not found, stopping at ${dlcNumber - 1}`,
+                )
                 break // Stop when we hit a missing DLC
             }
         }
-        
+
         paths.dlcFolders = autoDlcFolders
-        log.log(`📊 Auto DLC scan complete: ${autoDlcFolders.length} DLCs found`)
+        log.log(
+            `📊 Auto DLC scan complete: ${autoDlcFolders.length} DLCs found`,
+        )
 
         // Check for FGD files and parse them
         const fgdPath = path.join(p2dir, "bin", "portal2.fgd")

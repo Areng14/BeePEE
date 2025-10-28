@@ -3,7 +3,8 @@ const { contextBridge, ipcRenderer } = require("electron")
 // Expose general electron API
 contextBridge.exposeInMainWorld("electron", {
     invoke: (channel, data) => ipcRenderer.invoke(channel, data),
-    showOpenDialog: (options) => ipcRenderer.invoke("show-open-dialog", options),
+    showOpenDialog: (options) =>
+        ipcRenderer.invoke("show-open-dialog", options),
 })
 
 // Expose general event API for progress updates, etc.
@@ -29,7 +30,10 @@ contextBridge.exposeInMainWorld("package", {
         // Note: We DON'T remove all listeners here because multiple components need to listen
         // (App.jsx for navigation, ItemBrowser for loading items)
         ipcRenderer.on("package:loaded", (event, items) => {
-            console.log("preload.js: Received package:loaded event with items:", items?.length)
+            console.log(
+                "preload.js: Received package:loaded event with items:",
+                items?.length,
+            )
             callback(items)
         })
     },

@@ -42,16 +42,17 @@ function getStudioMDLPath() {
  * @returns {Promise<string>} - Path to the generated QC file
  */
 async function generateQCFile(objPath, outputPath, options = {}) {
-    const modelName = options.modelName || path.basename(objPath, path.extname(objPath))
+    const modelName =
+        options.modelName || path.basename(objPath, path.extname(objPath))
     const scale = options.scale || 1.0
     // Materials folder can be different from model name (for shared materials)
     const materialsFolder = options.materialsFolder || modelName
     // Parent folder for models - all variants go in same folder
     const modelFolder = options.modelFolder || modelName
-    
+
     // Get relative path from QC to OBJ (they should be in same directory)
     const objFileName = path.basename(objPath)
-    
+
     // Generate QC content
     // All models for an item go in the same folder: bpee/{itemID}/{variant}.mdl
     // $cdmaterials should point to where VMT files are stored (relative to materials/ folder)
@@ -66,10 +67,10 @@ $sequence idle "${objFileName}" fps 30
 
     console.log(`Generating QC file at: ${outputPath}`)
     console.log(`QC Content:\n${qcContent}`)
-    
+
     fs.writeFileSync(outputPath, qcContent, "utf-8")
     console.log("QC file generated successfully")
-    
+
     return outputPath
 }
 
@@ -81,64 +82,81 @@ $sequence idle "${objFileName}" fps 30
 async function applyCartoonification(inputPath, outputPath) {
     const isDev = !app.isPackaged
     const cartoonExePath = isDev
-        ? path.join(__dirname, '..', 'libs', 'areng_cartoonify', 'cartoon.exe')
-        : path.join(process.resourcesPath, 'extraResources', 'areng_cartoonify', 'cartoon.exe')
-    
+        ? path.join(__dirname, "..", "libs", "areng_cartoonify", "cartoon.exe")
+        : path.join(
+              process.resourcesPath,
+              "extraResources",
+              "areng_cartoonify",
+              "cartoon.exe",
+          )
+
     if (!fs.existsSync(cartoonExePath)) {
         console.error(`❌ CARTOON.EXE NOT FOUND at: ${cartoonExePath}`)
-        console.error(`   Cartoonification will be SKIPPED - using original textures`)
+        console.error(
+            `   Cartoonification will be SKIPPED - using original textures`,
+        )
         // Copy original file as fallback
         fs.copyFileSync(inputPath, outputPath)
         return
     }
-    
+
     console.log(`   🎨 Using cartoon.exe from: ${cartoonExePath}`)
-    
+
     // Copy original file to output path FIRST
     // Cartoon.exe modifies files IN-PLACE!
     fs.copyFileSync(inputPath, outputPath)
-    
+
     return new Promise((resolve, reject) => {
         // Get file size and modified time BEFORE cartoonification for validation
         const statsBefore = fs.statSync(outputPath)
         const sizeBefore = statsBefore.size
         const mtimeBefore = statsBefore.mtime.getTime()
-        
+
         // Run cartoon.exe on the OUTPUT file (not the original)
         const child = spawn(cartoonExePath, [outputPath], {
             cwd: path.dirname(cartoonExePath),
-            stdio: 'pipe',
-            windowsHide: true
+            stdio: "pipe",
+            windowsHide: true,
         })
-        
-        let stdout = ''
-        let stderr = ''
-        
-        child.stdout?.on('data', (data) => {
+
+        let stdout = ""
+        let stderr = ""
+
+        child.stdout?.on("data", (data) => {
             stdout += data.toString()
         })
-        
-        child.stderr?.on('data', (data) => {
+
+        child.stderr?.on("data", (data) => {
             stderr += data.toString()
         })
-        
-        child.on('close', (code) => {
+
+        child.on("close", (code) => {
             if (code === 0) {
                 // Verify the file was actually modified
                 const statsAfter = fs.statSync(outputPath)
                 const sizeAfter = statsAfter.size
                 const mtimeAfter = statsAfter.mtime.getTime()
-                
+
                 // Check if file was actually modified (size or mtime changed)
                 if (sizeAfter !== sizeBefore || mtimeAfter !== mtimeBefore) {
-                    console.log(`    ✅ Cartoonified: ${path.basename(outputPath)} (${sizeBefore}→${sizeAfter} bytes)`)
+                    console.log(
+                        `    ✅ Cartoonified: ${path.basename(outputPath)} (${sizeBefore}→${sizeAfter} bytes)`,
+                    )
                     if (stdout) console.log(`       stdout: ${stdout.trim()}`)
                 } else {
-                    console.error(`    ⚠️  CARTOON WARNING: File not modified despite exit code 0`)
+                    console.error(
+                        `    ⚠️  CARTOON WARNING: File not modified despite exit code 0`,
+                    )
                     console.error(`       File: ${path.basename(outputPath)}`)
-                    console.error(`       stdout: ${stdout.trim() || '(empty)'}`)
-                    console.error(`       stderr: ${stderr.trim() || '(empty)'}`)
-                    console.error(`       Using original texture (no cartoonification applied)`)
+                    console.error(
+                        `       stdout: ${stdout.trim() || "(empty)"}`,
+                    )
+                    console.error(
+                        `       stderr: ${stderr.trim() || "(empty)"}`,
+                    )
+                    console.error(
+                        `       Using original texture (no cartoonification applied)`,
+                    )
                 }
                 resolve()
             } else {
@@ -146,15 +164,19 @@ async function applyCartoonification(inputPath, outputPath) {
                 console.error(`   File: ${path.basename(outputPath)}`)
                 console.error(`   stderr: ${stderr}`)
                 console.error(`   stdout: ${stdout}`)
-                console.error(`   Using original non-cartoonified texture as fallback`)
+                console.error(
+                    `   Using original non-cartoonified texture as fallback`,
+                )
                 // File was already copied, just use the original
                 resolve()
             }
         })
-        
-        child.on('error', (error) => {
+
+        child.on("error", (error) => {
             console.error(`❌ CARTOON.EXE SPAWN ERROR: ${error.message}`)
-            console.error(`   Using original non-cartoonified texture as fallback`)
+            console.error(
+                `   Using original non-cartoonified texture as fallback`,
+            )
             // File was already copied, just use the original
             resolve()
         })
@@ -169,14 +191,14 @@ async function applyCartoonification(inputPath, outputPath) {
  */
 function reverseSourceEngineRotation(objPath, outputPath) {
     console.log(`🔄 Reversing rotation for STUDIOMDL compilation...`)
-    
+
     const objContent = fs.readFileSync(objPath, "utf-8")
     const lines = objContent.split("\n")
     const reversedLines = []
-    
+
     let vertexCount = 0
     let normalCount = 0
-    
+
     for (const line of lines) {
         if (line.startsWith("v ")) {
             // Vertex line: v x y z [w]
@@ -185,17 +207,17 @@ function reverseSourceEngineRotation(objPath, outputPath) {
                 const x = parseFloat(parts[1])
                 const y = parseFloat(parts[2])
                 const z = parseFloat(parts[3])
-                
+
                 // Apply Y -90° rotation first
                 let rotatedX = -z
                 let rotatedY = y
                 let rotatedZ = x
-                
+
                 // Then apply X +90° rotation
                 const originalX = rotatedX
                 const originalY = -rotatedZ
                 const originalZ = rotatedY
-                
+
                 let reversedLine = `v ${originalX} ${originalY} ${originalZ}`
                 if (parts.length > 4) {
                     reversedLine += ` ${parts[4]}`
@@ -212,13 +234,15 @@ function reverseSourceEngineRotation(objPath, outputPath) {
                 const nx = parseFloat(parts[1])
                 const ny = parseFloat(parts[2])
                 const nz = parseFloat(parts[3])
-                
+
                 // Apply Y -90° rotation only (same as vertices)
                 const originalNx = nz
                 const originalNy = ny
                 const originalNz = -nx
-                
-                reversedLines.push(`vn ${originalNx} ${originalNy} ${originalNz}`)
+
+                reversedLines.push(
+                    `vn ${originalNx} ${originalNy} ${originalNz}`,
+                )
                 normalCount++
             } else {
                 reversedLines.push(line)
@@ -227,9 +251,11 @@ function reverseSourceEngineRotation(objPath, outputPath) {
             reversedLines.push(line)
         }
     }
-    
+
     fs.writeFileSync(outputPath, reversedLines.join("\n"), "utf-8")
-    console.log(`✅ Reversed rotation for ${vertexCount} vertices and ${normalCount} normals`)
+    console.log(
+        `✅ Reversed rotation for ${vertexCount} vertices and ${normalCount} normals`,
+    )
     console.log(`💾 Un-rotated OBJ saved to: ${outputPath}`)
 }
 
@@ -256,20 +282,21 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
         fs.mkdirSync(outputDir, { recursive: true })
     }
 
-    const modelName = options.modelName || path.basename(objPath, path.extname(objPath))
-    
+    const modelName =
+        options.modelName || path.basename(objPath, path.extname(objPath))
+
     // Create a copy of the OBJ with REVERSED rotation for STUDIOMDL
     // The original OBJ is rotated for Three.js viewing, but Source Engine needs original coordinates
-    const unrotatedObjPath = objPath.replace('.obj', '_sourcecoords.obj')
+    const unrotatedObjPath = objPath.replace(".obj", "_sourcecoords.obj")
     reverseSourceEngineRotation(objPath, unrotatedObjPath)
-    
+
     // Generate QC file pointing to the UN-ROTATED OBJ (Source Engine coordinates)
     const qcPath = path.join(path.dirname(unrotatedObjPath), `${modelName}.qc`)
-    await generateQCFile(unrotatedObjPath, qcPath, { 
-        modelName, 
+    await generateQCFile(unrotatedObjPath, qcPath, {
+        modelName,
         scale: options.scale,
         materialsFolder: options.materialsFolder, // Allow override for shared materials
-        modelFolder: options.modelFolder // Allow override for model parent folder
+        modelFolder: options.modelFolder, // Allow override for model parent folder
     })
 
     console.log(`Starting STUDIOMDL compilation...`)
@@ -288,18 +315,27 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
     }
 
     if (!gameDir || !fs.existsSync(gameDir)) {
-        throw new Error("Portal 2 game directory not found. STUDIOMDL requires -game parameter.")
+        throw new Error(
+            "Portal 2 game directory not found. STUDIOMDL requires -game parameter.",
+        )
     }
 
     // Copy materials to Portal 2 game directory for STUDIOMDL compilation
     // Materials should ALREADY be converted to VTF/VMT format before calling this function
-    const gameMaterialsDir = path.join(gameDir, "materials", "models", "props_map_editor")
-    console.log(`📁 Copying materials to Portal 2 for STUDIOMDL: ${gameMaterialsDir}`)
-    
+    const gameMaterialsDir = path.join(
+        gameDir,
+        "materials",
+        "models",
+        "props_map_editor",
+    )
+    console.log(
+        `📁 Copying materials to Portal 2 for STUDIOMDL: ${gameMaterialsDir}`,
+    )
+
     if (!fs.existsSync(gameMaterialsDir)) {
         fs.mkdirSync(gameMaterialsDir, { recursive: true })
     }
-    
+
     // Copy materials from package resources to Portal 2 (temporarily for compilation)
     const packageMaterialsDir = options.packageMaterialsDir
     if (packageMaterialsDir && fs.existsSync(packageMaterialsDir)) {
@@ -321,13 +357,15 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
         copyDir(packageMaterialsDir, gameMaterialsDir)
         console.log(`✅ Materials copied to Portal 2 for STUDIOMDL compilation`)
     } else {
-        console.warn(`⚠️ Package materials directory not provided or not found: ${packageMaterialsDir}`)
+        console.warn(
+            `⚠️ Package materials directory not provided or not found: ${packageMaterialsDir}`,
+        )
     }
 
     // Run STUDIOMDL
     // Command: studiomdl.exe -game "path/to/portal2" -nop4 -verbose "path/to/file.qc"
     const cmd = `"${studiomdlPath}" -game "${gameDir}" -nop4 -verbose "${qcPath}"`
-    
+
     console.log(`Executing STUDIOMDL: ${cmd}`)
 
     try {
@@ -343,52 +381,73 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
         // STUDIOMDL outputs to the game directory structure
         // The model will be at: gameDir/models/props_map_editor/bpee/{modelFolder}/{modelName}.mdl
         const modelFolder = options.modelFolder || modelName
-        const compiledBasePath = path.join(gameDir, "models", "props_map_editor", "bpee", modelFolder, modelName)
+        const compiledBasePath = path.join(
+            gameDir,
+            "models",
+            "props_map_editor",
+            "bpee",
+            modelFolder,
+            modelName,
+        )
         const mdlPath = `${compiledBasePath}.mdl`
         const vvdPath = `${compiledBasePath}.vvd`
-        
+
         // STUDIOMDL can create various VTX formats, check which ones exist
         const dx90VtxPath = `${compiledBasePath}.dx90.vtx`
         const dx80VtxPath = `${compiledBasePath}.dx80.vtx`
         const swVtxPath = `${compiledBasePath}.sw.vtx`
-        const legacyVtxPath = `${compiledBasePath}.vtx`  // Sometimes just .vtx
+        const legacyVtxPath = `${compiledBasePath}.vtx` // Sometimes just .vtx
 
         // Check if files were created
         if (!fs.existsSync(mdlPath)) {
-            throw new Error(`MDL file was not created at expected location: ${mdlPath}`)
+            throw new Error(
+                `MDL file was not created at expected location: ${mdlPath}`,
+            )
         }
 
         console.log(`✅ MDL compilation successful!`)
         console.log(`  MDL: ${mdlPath}`)
-        console.log(`  VVD: ${fs.existsSync(vvdPath) ? vvdPath : 'not found'}`)
-        console.log(`  DX90 VTX: ${fs.existsSync(dx90VtxPath) ? dx90VtxPath : 'not found'}`)
-        console.log(`  DX80 VTX: ${fs.existsSync(dx80VtxPath) ? dx80VtxPath : 'not found'}`)
-        console.log(`  SW VTX: ${fs.existsSync(swVtxPath) ? swVtxPath : 'not found'}`)
-        console.log(`  Legacy VTX: ${fs.existsSync(legacyVtxPath) ? legacyVtxPath : 'not found'}`)
+        console.log(`  VVD: ${fs.existsSync(vvdPath) ? vvdPath : "not found"}`)
+        console.log(
+            `  DX90 VTX: ${fs.existsSync(dx90VtxPath) ? dx90VtxPath : "not found"}`,
+        )
+        console.log(
+            `  DX80 VTX: ${fs.existsSync(dx80VtxPath) ? dx80VtxPath : "not found"}`,
+        )
+        console.log(
+            `  SW VTX: ${fs.existsSync(swVtxPath) ? swVtxPath : "not found"}`,
+        )
+        console.log(
+            `  Legacy VTX: ${fs.existsSync(legacyVtxPath) ? legacyVtxPath : "not found"}`,
+        )
 
         // Collect all VTX files that exist
         const result = {
             mdlPath: fs.existsSync(mdlPath) ? mdlPath : null,
             vvdPath: fs.existsSync(vvdPath) ? vvdPath : null,
         }
-        
+
         // Portal 2 expects .dx90.vtx format
         // If STUDIOMDL created just .vtx, we need to also copy it as .dx90.vtx
         if (fs.existsSync(dx90VtxPath)) {
             result.dx90_vtxPath = dx90VtxPath
         } else if (fs.existsSync(legacyVtxPath)) {
             // Legacy .vtx exists, copy it as dx90
-            console.log("⚠️  Found legacy .vtx, will copy as .dx90.vtx for Portal 2 compatibility")
-            result.dx90_vtxPath = legacyVtxPath  // Will be renamed during copy
-            result.vtxPath = legacyVtxPath  // Also keep original
+            console.log(
+                "⚠️  Found legacy .vtx, will copy as .dx90.vtx for Portal 2 compatibility",
+            )
+            result.dx90_vtxPath = legacyVtxPath // Will be renamed during copy
+            result.vtxPath = legacyVtxPath // Also keep original
         }
-        
+
         if (fs.existsSync(dx80VtxPath)) result.dx80_vtxPath = dx80VtxPath
         if (fs.existsSync(swVtxPath)) result.sw_vtxPath = swVtxPath
 
         // DON'T clean up materials - leave them in Portal 2 for testing!
         // BEEMOD will handle installing them properly later
-        console.log(`ℹ️ Materials left in Portal 2 for testing: ${gameMaterialsDir}`)
+        console.log(
+            `ℹ️ Materials left in Portal 2 for testing: ${gameMaterialsDir}`,
+        )
 
         return result
     } catch (error) {
@@ -404,9 +463,16 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
  * @param {string} tempDir - Temporary models directory (for MTL file)
  * @param {string} itemName - Name of the item
  */
-async function convertMaterialsToPackage(materialsSourceDir, materialTargetDir, tempDir, itemName) {
+async function convertMaterialsToPackage(
+    materialsSourceDir,
+    materialTargetDir,
+    tempDir,
+    itemName,
+) {
     if (!materialsSourceDir || !fs.existsSync(materialsSourceDir)) {
-        console.warn(`⚠️ Materials source directory not found: ${materialsSourceDir}`)
+        console.warn(
+            `⚠️ Materials source directory not found: ${materialsSourceDir}`,
+        )
         return
     }
 
@@ -419,15 +485,15 @@ async function convertMaterialsToPackage(materialsSourceDir, materialTargetDir, 
             console.warn(`⚠️ Source materials directory not found: ${src}`)
             return
         }
-        
+
         if (!fs.existsSync(flatDest)) {
             fs.mkdirSync(flatDest, { recursive: true })
         }
-        
+
         const entries = fs.readdirSync(src, { withFileTypes: true })
         for (const entry of entries) {
             const srcPath = path.join(src, entry.name)
-            
+
             if (entry.isDirectory()) {
                 // Recurse into subdirectories but keep output FLAT
                 await convertMaterials(srcPath, flatDest)
@@ -435,22 +501,22 @@ async function convertMaterialsToPackage(materialsSourceDir, materialTargetDir, 
                 // Only process PNG files (TGAs were already converted to PNG by VMF2OBJ)
                 // Textures are ALREADY cartoonified by VMF2OBJ stage, just convert to VTF
                 // Extract just the filename, ignore any directory structure
-                const baseFileName = path.basename(entry.name, '.png')
-                const vtfPath = path.join(flatDest, baseFileName + '.vtf')
-                
+                const baseFileName = path.basename(entry.name, ".png")
+                const vtfPath = path.join(flatDest, baseFileName + ".vtf")
+
                 try {
                     console.log(`  Converting ${entry.name}...`)
                     console.log(`    Source: ${srcPath}`)
                     console.log(`    Target VTF: ${vtfPath}`)
-                    
+
                     // Convert PNG directly to VTF (already cartoonified by VMF2OBJ)
                     // Skip automatic VMT creation - we'll create them ourselves with correct paths
                     await convertImageToVTF(srcPath, vtfPath, {
                         format: "DXT5",
                         generateMipmaps: true,
-                        skipVMT: true
+                        skipVMT: true,
                     })
-                    
+
                     console.log(`    ✅ VTF created`)
                     console.log(`  ✅ Converted: ${entry.name} → VTF`)
                 } catch (error) {
@@ -461,57 +527,68 @@ async function convertMaterialsToPackage(materialsSourceDir, materialTargetDir, 
             }
         }
     }
-    
+
     // Parse MTL file to get material names and their texture paths
     // Try to find the MTL file - it might have a different name than itemName
-    let mtlFilePath = path.join(tempDir, itemName + '_0.mtl')
-    
+    let mtlFilePath = path.join(tempDir, itemName + "_0.mtl")
+
     // If not found, search for any *_0.mtl file in temp directory
     if (!fs.existsSync(mtlFilePath)) {
         const tempFiles = fs.readdirSync(tempDir)
-        const mtlFile = tempFiles.find(f => f.endsWith('_0.mtl'))
+        const mtlFile = tempFiles.find((f) => f.endsWith("_0.mtl"))
         if (mtlFile) {
             mtlFilePath = path.join(tempDir, mtlFile)
             console.log(`⚠️  Expected MTL file not found, using: ${mtlFile}`)
         }
     }
-    
+
     const materialMap = {}
     if (fs.existsSync(mtlFilePath)) {
         console.log(`📖 Parsing MTL file: ${mtlFilePath}`)
-        const mtlContent = fs.readFileSync(mtlFilePath, 'utf-8')
-        const lines = mtlContent.split('\n')
+        const mtlContent = fs.readFileSync(mtlFilePath, "utf-8")
+        const lines = mtlContent.split("\n")
         let currentMaterial = null
-        
+
         for (const line of lines) {
-            if (line.startsWith('newmtl ')) {
+            if (line.startsWith("newmtl ")) {
                 currentMaterial = line.substring(7).trim()
-            } else if (currentMaterial && line.startsWith('map_Kd ')) {
-                const texturePath = line.substring(7).trim().replace('materials/', '')
+            } else if (currentMaterial && line.startsWith("map_Kd ")) {
+                const texturePath = line
+                    .substring(7)
+                    .trim()
+                    .replace("materials/", "")
                 materialMap[currentMaterial] = texturePath
             }
         }
-        console.log(`Found ${Object.keys(materialMap).length} materials in MTL file`)
+        console.log(
+            `Found ${Object.keys(materialMap).length} materials in MTL file`,
+        )
     } else {
         console.warn(`⚠️ MTL file not found: ${mtlFilePath}`)
     }
-    
+
     // Convert all materials from temp_models/materials/ to resources/materials/models/props_map_editor/
     // And create VMT files based on MATERIAL NAMES, not file paths
     try {
         await convertMaterials(materialsSourceDir, materialTargetDir)
-        
+
         // Now create VMT files based on TEXTURE filenames (not material names!)
         // STUDIOMDL references materials by their TEXTURE filename, not the MTL material name
         for (const [materialName, texturePath] of Object.entries(materialMap)) {
             try {
                 // Extract just the texture filename (no path, no extension)
                 // Use split on BOTH / and \ since MTL files use forward slashes
-                const textureFileName = texturePath.split(/[/\\]/).pop().replace(/\.(png|tga)$/i, '')
-                
+                const textureFileName = texturePath
+                    .split(/[/\\]/)
+                    .pop()
+                    .replace(/\.(png|tga)$/i, "")
+
                 // VMT filename MUST match the texture filename (what STUDIOMDL uses)
-                const vmtPath = path.join(materialTargetDir, textureFileName + '.vmt')
-                
+                const vmtPath = path.join(
+                    materialTargetDir,
+                    textureFileName + ".vmt",
+                )
+
                 const vmtContent = `patch
 {
 include "materials/models/props_map_editor/item_lighting_common.vmt"
@@ -523,14 +600,20 @@ $model 1
 }
 }
 `
-                fs.writeFileSync(vmtPath, vmtContent, 'utf-8')
-                console.log(`  ✅ Created VMT: ${textureFileName}.vmt (for material: ${materialName.split(/[/\\]/).pop()})`)
+                fs.writeFileSync(vmtPath, vmtContent, "utf-8")
+                console.log(
+                    `  ✅ Created VMT: ${textureFileName}.vmt (for material: ${materialName.split(/[/\\]/).pop()})`,
+                )
             } catch (error) {
-                console.error(`  ❌ Failed to create VMT for material ${materialName}: ${error.message}`)
+                console.error(
+                    `  ❌ Failed to create VMT for material ${materialName}: ${error.message}`,
+                )
             }
         }
-        
-        console.log(`✅ Materials converted and copied to: ${materialTargetDir}`)
+
+        console.log(
+            `✅ Materials converted and copied to: ${materialTargetDir}`,
+        )
     } catch (error) {
         console.warn(`⚠️  Failed to convert materials: ${error.message}`)
         throw error
@@ -545,7 +628,13 @@ $model 1
  * @param {string} materialsSourceDir - DEPRECATED: Materials should be converted before calling this
  * @returns {Promise<Object>} - Object containing final paths
  */
-async function copyMDLToPackage(compiledFiles, packagePath, itemName, materialsSourceDir = null, sharedFolder = null) {
+async function copyMDLToPackage(
+    compiledFiles,
+    packagePath,
+    itemName,
+    materialsSourceDir = null,
+    sharedFolder = null,
+) {
     // Target directory in package: resources/models/props_map_editor/bpee/{itemID}/
     // Use sharedFolder if provided (for multi-model items), otherwise use itemName
     const folderName = sharedFolder || itemName
@@ -555,7 +644,7 @@ async function copyMDLToPackage(compiledFiles, packagePath, itemName, materialsS
         "models",
         "props_map_editor",
         "bpee",
-        folderName
+        folderName,
     )
 
     // Ensure target directory exists
@@ -563,13 +652,13 @@ async function copyMDLToPackage(compiledFiles, packagePath, itemName, materialsS
         fs.mkdirSync(targetDir, { recursive: true })
         console.log(`Created directory: ${targetDir}`)
     }
-    
+
     // Materials are now converted BEFORE this function is called
     // (Legacy parameter materialsSourceDir is kept for backward compatibility but ignored)
 
     const copiedFiles = {}
     const filesToDelete = []
-    
+
     // Copy each file type (ALL files: .mdl, .vvd, .vtx)
     // KEEP THE ORIGINAL EXTENSIONS! Don't rename!
     for (const [fileType, sourcePath] of Object.entries(compiledFiles)) {
@@ -577,12 +666,12 @@ async function copyMDLToPackage(compiledFiles, packagePath, itemName, materialsS
             // Get the FULL extension (e.g., .dx90.vtx, not just .vtx)
             const fileName = path.basename(sourcePath)
             const targetPath = path.join(targetDir, fileName)
-            
+
             fs.copyFileSync(sourcePath, targetPath)
             console.log(`Copied ${fileType}: ${sourcePath} -> ${targetPath}`)
-            
+
             copiedFiles[fileType] = targetPath
-            
+
             // Only add to delete list once (avoid deleting same file twice if it's used for multiple types)
             if (!filesToDelete.includes(sourcePath)) {
                 filesToDelete.push(sourcePath)
@@ -612,13 +701,19 @@ async function copyMDLToPackage(compiledFiles, packagePath, itemName, materialsS
         try {
             // Try to remove {itemID}/ folder if empty
             const itemIdDir = cleanupDir
-            if (fs.existsSync(itemIdDir) && fs.readdirSync(itemIdDir).length === 0) {
+            if (
+                fs.existsSync(itemIdDir) &&
+                fs.readdirSync(itemIdDir).length === 0
+            ) {
                 fs.rmdirSync(itemIdDir)
                 console.log(`  Removed empty directory: ${itemIdDir}`)
-                
+
                 // Try bpee/ folder
                 const bpeeDir = path.dirname(itemIdDir)
-                if (fs.existsSync(bpeeDir) && fs.readdirSync(bpeeDir).length === 0) {
+                if (
+                    fs.existsSync(bpeeDir) &&
+                    fs.readdirSync(bpeeDir).length === 0
+                ) {
                     fs.rmdirSync(bpeeDir)
                     console.log(`  Removed empty directory: ${bpeeDir}`)
                 }
@@ -631,11 +726,11 @@ async function copyMDLToPackage(compiledFiles, packagePath, itemName, materialsS
     // Return the relative path for editoritems (relative to resources/models/)
     // Use folderName (shared folder) not itemName
     const relativeModelPath = `bpee/${folderName}/${itemName}.mdl`
-    
+
     return {
         copiedFiles,
         relativeModelPath,
-        targetDir
+        targetDir,
     }
 }
 
@@ -647,7 +742,12 @@ async function copyMDLToPackage(compiledFiles, packagePath, itemName, materialsS
  * @param {Object} options - Conversion options
  * @returns {Promise<Object>} - Object with MDL paths and metadata
  */
-async function convertAndInstallMDL(objPath, packagePath, itemName, options = {}) {
+async function convertAndInstallMDL(
+    objPath,
+    packagePath,
+    itemName,
+    options = {},
+) {
     console.log(`🔄 Starting OBJ to MDL conversion...`)
     console.log(`  OBJ: ${objPath}`)
     console.log(`  Package: ${packagePath}`)
@@ -657,9 +757,11 @@ async function convertAndInstallMDL(objPath, packagePath, itemName, options = {}
 
     // Step 1: Convert materials from PNG to VTF/VMT FIRST (unless using shared materials)
     let materialTargetDir
-    
+
     if (options.skipMaterialConversion && options.sharedMaterialsPath) {
-        console.log(`📦 Step 1: Using shared materials from: ${options.sharedMaterialsPath}`)
+        console.log(
+            `📦 Step 1: Using shared materials from: ${options.sharedMaterialsPath}`,
+        )
         materialTargetDir = options.sharedMaterialsPath
     } else {
         console.log(`📦 Step 1: Converting materials to VTF/VMT format...`)
@@ -671,33 +773,44 @@ async function convertAndInstallMDL(objPath, packagePath, itemName, options = {}
             "models",
             "props_map_editor",
             "bpee",
-            itemName
+            itemName,
         )
-        
-        await convertMaterialsToPackage(materialsSourceDir, materialTargetDir, tempDir, itemName)
+
+        await convertMaterialsToPackage(
+            materialsSourceDir,
+            materialTargetDir,
+            tempDir,
+            itemName,
+        )
     }
 
     // Step 2: Compile OBJ to MDL using STUDIOMDL (now materials are ready!)
     console.log(`🔨 Step 2: Compiling MDL with STUDIOMDL...`)
-    
+
     // Extract the materials folder name from the path
     // e.g., ".../bpee/old_aperture_walls/" -> "old_aperture_walls"
     const materialsFolderName = path.basename(materialTargetDir)
-    
+
     // Use sharedModelFolder if provided, otherwise use itemName
     const modelFolderName = options.sharedModelFolder || itemName
-    
+
     const compiledFiles = await convertObjToMDL(objPath, tempDir, {
         modelName: itemName,
         scale: options.scale || 1.0,
         packageMaterialsDir: materialTargetDir, // Pass the materials location
         materialsFolder: materialsFolderName, // Use shared folder name for $cdmaterials
-        modelFolder: modelFolderName // Use shared folder for all model variants
+        modelFolder: modelFolderName, // Use shared folder for all model variants
     })
 
     // Step 3: Copy MDL files to package resources (materials are already there)
     console.log(`📋 Step 3: Copying compiled MDL to package...`)
-    const result = await copyMDLToPackage(compiledFiles, packagePath, itemName, null, modelFolderName)
+    const result = await copyMDLToPackage(
+        compiledFiles,
+        packagePath,
+        itemName,
+        null,
+        modelFolderName,
+    )
 
     console.log(`✅ MDL conversion and installation complete!`)
     console.log(`  Model path for editoritems: ${result.relativeModelPath}`)
@@ -715,17 +828,34 @@ async function convertAndInstallMDL(objPath, packagePath, itemName, options = {}
         const collisionRoll = options.collisionRoll || 90
         const collisionPitch = options.collisionPitch || 0
         const collisionYaw = options.collisionYaw || 0
-        await convertObjTo3DS(objPath, threeDSPath, collisionScale, collisionRoll, collisionPitch, collisionYaw)
+        await convertObjTo3DS(
+            objPath,
+            threeDSPath,
+            collisionScale,
+            collisionRoll,
+            collisionPitch,
+            collisionYaw,
+        )
 
         // Copy 3DS to package resources
         // Use sharedModelFolder if provided (for multi-model items), otherwise use itemName
         const folderName = options.sharedModelFolder || itemName
-        threeDSResult = await copy3DSToPackage(threeDSPath, packagePath, folderName, itemName)
+        threeDSResult = await copy3DSToPackage(
+            threeDSPath,
+            packagePath,
+            folderName,
+            itemName,
+        )
 
         console.log(`✅ 3DS collision model created!`)
-        console.log(`  Path for editoritems: ${threeDSResult.relativeModelPath}`)
+        console.log(
+            `  Path for editoritems: ${threeDSResult.relativeModelPath}`,
+        )
     } catch (threeDSError) {
-        console.error(`⚠️  3DS collision model generation failed:`, threeDSError.message)
+        console.error(
+            `⚠️  3DS collision model generation failed:`,
+            threeDSError.message,
+        )
         console.error(`   MDL model was still created successfully.`)
         // Don't throw - 3DS is optional, MDL is the main output
         threeDSResult = { success: false, error: threeDSError.message }
@@ -735,7 +865,7 @@ async function convertAndInstallMDL(objPath, packagePath, itemName, options = {}
         success: true,
         ...result,
         compiledFiles,
-        threeDSResult
+        threeDSResult,
     }
 }
 
@@ -751,55 +881,62 @@ async function convertAndInstallMDL(objPath, packagePath, itemName, options = {}
 function mapVariableValuesToInstances(blocks, targetVariable) {
     const valueInstanceMap = new Map()
 
-    console.log(`🔍 Searching for variable "${targetVariable}" in VBSP blocks...`)
+    console.log(
+        `🔍 Searching for variable "${targetVariable}" in VBSP blocks...`,
+    )
     console.log(`   Total blocks: ${blocks ? blocks.length : 0}`)
 
     if (!Array.isArray(blocks)) {
-        console.warn('   ❌ Blocks is not an array')
+        console.warn("   ❌ Blocks is not an array")
         return valueInstanceMap
     }
 
     // Handle "DEFAULT" specially - it means use the first registered instance
-    if (targetVariable === 'DEFAULT') {
-        console.log('   📌 DEFAULT selected - this is handled separately')
+    if (targetVariable === "DEFAULT") {
+        console.log("   📌 DEFAULT selected - this is handled separately")
         return valueInstanceMap // Empty map for DEFAULT
     }
 
     // Convert target variable to fixup format (e.g., "TIMER DELAY" -> "$timer_delay")
-    const fixupVariable = `$${targetVariable.replace(/ /g, '_').toLowerCase()}`
+    const fixupVariable = `$${targetVariable.replace(/ /g, "_").toLowerCase()}`
     console.log(`   Converted to fixup format: "${fixupVariable}"`)
 
     // Helper function to recursively search for changeInstance blocks
     const findChangeInstancesInBlock = (block, depth = 0) => {
-        const indent = '  '.repeat(depth + 2)
+        const indent = "  ".repeat(depth + 2)
         console.log(`${indent}Checking block type: ${block.type}`)
-        
-        if (block.type === 'changeInstance' && block.instanceName) {
-            console.log(`${indent}  → Found changeInstance: ${block.instanceName}`)
+
+        if (block.type === "changeInstance" && block.instanceName) {
+            console.log(
+                `${indent}  → Found changeInstance: ${block.instanceName}`,
+            )
             return [{ instanceName: block.instanceName, value: null }]
         }
-        
+
         const results = []
-        
+
         // Check children array
         if (Array.isArray(block.children)) {
             for (const child of block.children) {
                 results.push(...findChangeInstancesInBlock(child, depth + 1))
             }
         }
-        
+
         return results
     }
 
     // 1. First, try to find a SWITCH block for the target variable
-    console.log('   Looking for switchCase blocks...')
-    const switchBlock = blocks.find(block => 
-        block.type === 'switchCase' && block.variable === fixupVariable
+    console.log("   Looking for switchCase blocks...")
+    const switchBlock = blocks.find(
+        (block) =>
+            block.type === "switchCase" && block.variable === fixupVariable,
     )
 
     if (switchBlock && Array.isArray(switchBlock.cases)) {
-        console.log(`   ✅ Found switchCase block with ${switchBlock.cases.length} cases`)
-        
+        console.log(
+            `   ✅ Found switchCase block with ${switchBlock.cases.length} cases`,
+        )
+
         // Extract the value-to-instance mapping from each case
         for (const caseBlock of switchBlock.cases) {
             console.log(`     Case value: "${caseBlock.value}"`)
@@ -807,38 +944,57 @@ function mapVariableValuesToInstances(blocks, targetVariable) {
             const blocks = caseBlock.thenBlocks || caseBlock.children || []
             if (caseBlock.value && Array.isArray(blocks)) {
                 // Find the changeInstance block within the case
-                const changeInstanceBlock = blocks.find(child => child.type === 'changeInstance')
+                const changeInstanceBlock = blocks.find(
+                    (child) => child.type === "changeInstance",
+                )
                 if (changeInstanceBlock && changeInstanceBlock.instanceName) {
-                    console.log(`       → Instance: ${changeInstanceBlock.instanceName}`)
-                    valueInstanceMap.set(caseBlock.value, changeInstanceBlock.instanceName)
+                    console.log(
+                        `       → Instance: ${changeInstanceBlock.instanceName}`,
+                    )
+                    valueInstanceMap.set(
+                        caseBlock.value,
+                        changeInstanceBlock.instanceName,
+                    )
                 } else {
-                    console.log(`       → No changeInstance found in thenBlocks`)
+                    console.log(
+                        `       → No changeInstance found in thenBlocks`,
+                    )
                 }
             }
         }
     } else {
-        console.log('   ⚠️ No switchCase block found, trying IF blocks...')
-        
+        console.log("   ⚠️ No switchCase block found, trying IF blocks...")
+
         // 2. If no switch block, look for IF/ELSE blocks that check this variable
         for (const block of blocks) {
-            if (block.type === 'if' || block.type === 'ifElse') {
+            if (block.type === "if" || block.type === "ifElse") {
                 console.log(`   Found ${block.type} block`)
-                
+
                 // Check if this IF block uses our target variable
-                if (block.condition && block.condition.includes(fixupVariable)) {
-                    console.log(`     → Uses target variable: ${block.condition}`)
-                    
+                if (
+                    block.condition &&
+                    block.condition.includes(fixupVariable)
+                ) {
+                    console.log(
+                        `     → Uses target variable: ${block.condition}`,
+                    )
+
                     // Extract the value being checked (e.g., "$timer_delay == 5" -> "5")
                     const match = block.condition.match(/==\s*["']?(\w+)["']?/)
                     if (match) {
                         const value = match[1]
                         console.log(`     → Checking for value: "${value}"`)
-                        
+
                         // Find changeInstance in this block's children
                         const instances = findChangeInstancesInBlock(block)
                         if (instances.length > 0) {
-                            console.log(`     → Found ${instances.length} changeInstance(s)`)
-                            valueInstanceMap.set(value, instances[0].instanceName)
+                            console.log(
+                                `     → Found ${instances.length} changeInstance(s)`,
+                            )
+                            valueInstanceMap.set(
+                                value,
+                                instances[0].instanceName,
+                            )
                         }
                     }
                 }
@@ -864,14 +1020,27 @@ function mapVariableValuesToInstances(blocks, targetVariable) {
  * @param {number} yaw - Yaw rotation in degrees around Z-axis (default: 0)
  * @returns {Promise<string>} - Path to the created 3DS file
  */
-async function convertObjTo3DS(objPath, outputPath, scale = 0.9, roll = 90, pitch = 0, yaw = 0) {
+async function convertObjTo3DS(
+    objPath,
+    outputPath,
+    scale = 0.9,
+    roll = 90,
+    pitch = 0,
+    yaw = 0,
+) {
     if (!objPath || !fs.existsSync(objPath)) {
         throw new Error(`OBJ file not found: ${objPath}`)
     }
 
     const isDev = !app.isPackaged
     const converterExe = isDev
-        ? path.join(__dirname, "..", "libs", "areng_obj23ds", "convert_obj_to_3ds.exe")
+        ? path.join(
+              __dirname,
+              "..",
+              "libs",
+              "areng_obj23ds",
+              "convert_obj_to_3ds.exe",
+          )
         : path.join(
               process.resourcesPath,
               "extraResources",
@@ -915,7 +1084,9 @@ async function convertObjTo3DS(objPath, outputPath, scale = 0.9, roll = 90, pitc
         }
 
         const fileSize = fs.statSync(outputPath).size
-        console.log(`✅ 3DS conversion successful! File size: ${fileSize} bytes`)
+        console.log(
+            `✅ 3DS conversion successful! File size: ${fileSize} bytes`,
+        )
 
         return outputPath
     } catch (error) {
@@ -932,7 +1103,12 @@ async function convertObjTo3DS(objPath, outputPath, scale = 0.9, roll = 90, pitc
  * @param {string} itemName - Name of the item (for filename)
  * @returns {Promise<Object>} - Object with copied file info and relative path
  */
-async function copy3DSToPackage(threeDSPath, packagePath, folderName, itemName) {
+async function copy3DSToPackage(
+    threeDSPath,
+    packagePath,
+    folderName,
+    itemName,
+) {
     if (!threeDSPath || !fs.existsSync(threeDSPath)) {
         throw new Error(`3DS file not found: ${threeDSPath}`)
     }
@@ -945,7 +1121,7 @@ async function copy3DSToPackage(threeDSPath, packagePath, folderName, itemName) 
         "models",
         "puzzlemaker",
         "selection_bpee",
-        folderName
+        folderName,
     )
 
     // Ensure target directory exists
@@ -984,4 +1160,3 @@ module.exports = {
     convertObjTo3DS,
     copy3DSToPackage,
 }
-

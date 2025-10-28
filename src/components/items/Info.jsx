@@ -44,12 +44,12 @@ function Info({ item, formData, onUpdate }) {
 
     // Extract all variables used by the item
     useEffect(() => {
-        const variables = ['DEFAULT'] // Always include DEFAULT
-        
+        const variables = ["DEFAULT"] // Always include DEFAULT
+
         // Add all item variables
         if (Array.isArray(formData?.variables)) {
             // Variables are an array of objects with displayName and fixupName
-            formData.variables.forEach(varObj => {
+            formData.variables.forEach((varObj) => {
                 if (varObj && varObj.displayName) {
                     // Use the displayName directly, convert to uppercase
                     const displayName = varObj.displayName.toUpperCase()
@@ -59,7 +59,7 @@ function Info({ item, formData, onUpdate }) {
                 }
             })
         }
-        
+
         setVbspVariables(variables)
     }, [formData?.variables])
 
@@ -81,24 +81,26 @@ function Info({ item, formData, onUpdate }) {
     useEffect(() => {
         const handleProgress = (event, progressData) => {
             const { stage, message, detail } = progressData
-            
+
             // Update progress message based on stage
             const stageMessages = {
                 merge: "📐 Merging VMFs into grid...",
                 vmf2obj: "🔄 Converting to OBJ...",
                 split: "✂️ Splitting models...",
-                mdl: "🔨 Converting to MDL..."
+                mdl: "🔨 Converting to MDL...",
             }
-            
-            setConversionProgress(stageMessages[stage] || message || "Converting...")
+
+            setConversionProgress(
+                stageMessages[stage] || message || "Converting...",
+            )
         }
-        
+
         // Register listener
-        window.api?.on?.('conversion-progress', handleProgress)
-        
+        window.api?.on?.("conversion-progress", handleProgress)
+
         // Cleanup
         return () => {
-            window.api?.off?.('conversion-progress', handleProgress)
+            window.api?.off?.("conversion-progress", handleProgress)
         }
     }, [])
 
@@ -168,9 +170,9 @@ function Info({ item, formData, onUpdate }) {
     // Just return the temp_models directory - backend will find the first OBJ file
     const getObjPath = () => {
         if (!item?.id || !item?.packagePath) return null
-        
+
         const tempDir = `${item.packagePath}/temp_models`
-        
+
         // Return directory path - backend will find first OBJ file
         return tempDir
     }
@@ -196,7 +198,7 @@ function Info({ item, formData, onUpdate }) {
         try {
             // selectedInstanceKey now contains the selected variable name (e.g., "TIMER DELAY", "DEFAULT")
             // Backend will handle mapping variable to appropriate instance
-            
+
             // Ask backend to resolve the VMF path and convert
             const result = await window.package.convertInstanceToObj(
                 item.id,
@@ -205,15 +207,24 @@ function Info({ item, formData, onUpdate }) {
             )
             if (result?.success) {
                 console.log("VMF2OBJ conversion completed successfully")
-                
+
                 // Check MDL conversion result
                 if (result.mdlResult?.success) {
                     console.log("✅ MDL conversion successful!")
-                    console.log(`   Model path: ${result.mdlResult.relativeModelPath}`)
-                    alert(`Model generated successfully!\n\nOBJ: ${result.objPath}\nMDL: ${result.mdlResult.relativeModelPath}\n\nThe editoritems.json has been updated with your custom model.`)
+                    console.log(
+                        `   Model path: ${result.mdlResult.relativeModelPath}`,
+                    )
+                    alert(
+                        `Model generated successfully!\n\nOBJ: ${result.objPath}\nMDL: ${result.mdlResult.relativeModelPath}\n\nThe editoritems.json has been updated with your custom model.`,
+                    )
                 } else if (result.mdlResult?.error) {
-                    console.warn("⚠️ OBJ created but MDL conversion failed:", result.mdlResult.error)
-                    alert(`OBJ model created successfully, but MDL conversion failed:\n\n${result.mdlResult.error}\n\nYou can still preview the OBJ model.`)
+                    console.warn(
+                        "⚠️ OBJ created but MDL conversion failed:",
+                        result.mdlResult.error,
+                    )
+                    alert(
+                        `OBJ model created successfully, but MDL conversion failed:\n\n${result.mdlResult.error}\n\nYou can still preview the OBJ model.`,
+                    )
                 } else {
                     console.log("OBJ created (MDL conversion skipped)")
                 }
@@ -436,18 +447,30 @@ function Info({ item, formData, onUpdate }) {
 
                 {/* Movement Handle */}
                 <FormControl fullWidth>
-                    <InputLabel id="movement-handle-label">Rotation Handle</InputLabel>
+                    <InputLabel id="movement-handle-label">
+                        Rotation Handle
+                    </InputLabel>
                     <Select
                         labelId="movement-handle-label"
                         label="Rotation Handle"
                         value={formData.movementHandle}
-                        onChange={(e) => onUpdate("movementHandle", e.target.value)}
+                        onChange={(e) =>
+                            onUpdate("movementHandle", e.target.value)
+                        }
                         variant="outlined">
                         <MenuItem value="HANDLE_NONE">No Handle</MenuItem>
-                        <MenuItem value="HANDLE_4_DIRECTIONS">4 Directions</MenuItem>
-                        <MenuItem value="HANDLE_36_DIRECTIONS">36 Directions</MenuItem>
-                        <MenuItem value="HANDLE_6_POSITIONS">6 Positions</MenuItem>
-                        <MenuItem value="HANDLE_8_POSITIONS">8 Positions</MenuItem>
+                        <MenuItem value="HANDLE_4_DIRECTIONS">
+                            4 Directions
+                        </MenuItem>
+                        <MenuItem value="HANDLE_36_DIRECTIONS">
+                            36 Directions
+                        </MenuItem>
+                        <MenuItem value="HANDLE_6_POSITIONS">
+                            6 Positions
+                        </MenuItem>
+                        <MenuItem value="HANDLE_8_POSITIONS">
+                            8 Positions
+                        </MenuItem>
                     </Select>
                 </FormControl>
 
@@ -523,7 +546,9 @@ function Info({ item, formData, onUpdate }) {
                                     />
                                 ) : null
                             }>
-                            {isConverting ? (conversionProgress || "Converting...") : "Make Model"}
+                            {isConverting
+                                ? conversionProgress || "Converting..."
+                                : "Make Model"}
                         </Button>
                     </Stack>
                 </Box>

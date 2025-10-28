@@ -208,10 +208,10 @@ async function convertImageToVTF(imagePath, outputPath, options = {}) {
 
                     // Create corresponding VMT file (unless skipVMT option is set)
                     if (options.skipVMT !== true) {
-                        const vmtPath = outputPath.replace('.vtf', '.vmt')
+                        const vmtPath = outputPath.replace(".vtf", ".vmt")
                         await createVMTFile(vmtPath, outputPath)
                     }
-                    
+
                     return
                 } else {
                     throw new Error(
@@ -288,11 +288,18 @@ async function createVMTFile(vmtPath, vtfPath) {
     try {
         // Get the texture name relative to the materials directory
         // The $basetexture path is ABSOLUTE from materials/ directory
-        const materialsDir = path.join(process.cwd(), "packages", "PieCreeper's Items", "resources", "materials")
-        const relativePath = path.relative(materialsDir, vtfPath)
-            .replace(/\\/g, '/')
-            .replace('.vtf', '')
-        
+        const materialsDir = path.join(
+            process.cwd(),
+            "packages",
+            "PieCreeper's Items",
+            "resources",
+            "materials",
+        )
+        const relativePath = path
+            .relative(materialsDir, vtfPath)
+            .replace(/\\/g, "/")
+            .replace(".vtf", "")
+
         const vmtContent = `patch
 {
 include "materials/models/props_map_editor/item_lighting_common.vmt"
@@ -304,8 +311,8 @@ $model 1
 }
 }
 `
-        
-        fs.writeFileSync(vmtPath, vmtContent, 'utf-8')
+
+        fs.writeFileSync(vmtPath, vmtContent, "utf-8")
         console.log(`✅ Created VMT file: ${vmtPath}`)
     } catch (error) {
         console.error(`Failed to create VMT file: ${error.message}`)

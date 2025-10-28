@@ -25,13 +25,15 @@ function PackageInformationPage() {
             try {
                 setLoading(true)
                 const result = await window.electron.invoke("get-package-info")
-                
+
                 if (result.success) {
                     setPackageId(result.info.ID || "")
                     setName(result.info.Name || "")
                     setDescription(result.info.Desc || "")
                 } else {
-                    setError(result.error || "Failed to load package information")
+                    setError(
+                        result.error || "Failed to load package information",
+                    )
                 }
             } catch (err) {
                 console.error("Error loading package info:", err)
@@ -58,7 +60,7 @@ function PackageInformationPage() {
             if (result.success) {
                 setSuccess(true)
                 console.log("Package information updated successfully")
-                
+
                 // Close window after a short delay
                 setTimeout(() => {
                     window.close()
@@ -178,10 +180,7 @@ function PackageInformationPage() {
                     borderColor: "divider",
                     bgcolor: "background.paper",
                 }}>
-                <Stack
-                    direction="row"
-                    spacing={1}
-                    justifyContent="flex-end">
+                <Stack direction="row" spacing={1} justifyContent="flex-end">
                     <Button
                         variant="outlined"
                         onClick={handleCancel}
@@ -206,4 +205,3 @@ function PackageInformationPage() {
 }
 
 export default PackageInformationPage
-

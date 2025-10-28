@@ -190,7 +190,7 @@ function convertJsonToVdf(jsonData, indent = 0, parentKey = null) {
         )
 
         // Check if all values are simple (non-object) types
-        const allSimpleValues = sortedKeys.every(key => {
+        const allSimpleValues = sortedKeys.every((key) => {
             const value = jsonData[key]
             return typeof value !== "object" || value === null
         })
@@ -228,12 +228,16 @@ function convertJsonToVdf(jsonData, indent = 0, parentKey = null) {
                 // Check if the value is an array-like object
                 if (isArrayLikeObject(value)) {
                     // Check if all values are simple types
-                    const allSimple = Object.values(value).every(v => typeof v !== "object" || v === null)
-                    
+                    const allSimple = Object.values(value).every(
+                        (v) => typeof v !== "object" || v === null,
+                    )
+
                     if (allSimple) {
                         // For simple values, write as a block with key-value pairs inside
                         vdfString += `${indentStr}"${vdfKey}"\n${indentStr}{\n`
-                        const sortedKeys = Object.keys(value).sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+                        const sortedKeys = Object.keys(value).sort(
+                            (a, b) => parseInt(a, 10) - parseInt(b, 10),
+                        )
                         for (const k of sortedKeys) {
                             // Handle desc_ prefix - convert to empty string
                             const innerKey = k.startsWith("desc_") ? "" : k
@@ -243,19 +247,31 @@ function convertJsonToVdf(jsonData, indent = 0, parentKey = null) {
                     } else if (vdfKey === "Instances") {
                         // Special handling for Instances: write as numbered sub-blocks
                         vdfString += `${indentStr}"${vdfKey}"\n${indentStr}{\n`
-                        const sortedKeys = Object.keys(value).sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+                        const sortedKeys = Object.keys(value).sort(
+                            (a, b) => parseInt(a, 10) - parseInt(b, 10),
+                        )
                         for (const k of sortedKeys) {
                             vdfString += `${"\t".repeat(indent + 1)}"${k}"\n${"\t".repeat(indent + 1)}{\n`
-                            vdfString += convertJsonToVdf(value[k], indent + 2, null)
+                            vdfString += convertJsonToVdf(
+                                value[k],
+                                indent + 2,
+                                null,
+                            )
                             vdfString += `${"\t".repeat(indent + 1)}}\n`
                         }
                         vdfString += `${indentStr}}\n`
                     } else if (vdfKey === "SubType") {
                         // Special handling for SubType array: write as repeated "SubType" keys
-                        const sortedKeys = Object.keys(value).sort((a, b) => parseInt(a, 10) - parseInt(b, 10))
+                        const sortedKeys = Object.keys(value).sort(
+                            (a, b) => parseInt(a, 10) - parseInt(b, 10),
+                        )
                         for (const k of sortedKeys) {
                             vdfString += `${indentStr}"${vdfKey}"\n${indentStr}{\n`
-                            vdfString += convertJsonToVdf(value[k], indent + 1, null)
+                            vdfString += convertJsonToVdf(
+                                value[k],
+                                indent + 1,
+                                null,
+                            )
                             vdfString += `${indentStr}}\n`
                         }
                     } else {
@@ -612,7 +628,7 @@ const unloadPackage = async (packageName, remove = false) => {
 const extractPackage = async (pathToPackage, packageDir) => {
     console.log("Extracting package from:", pathToPackage)
     console.log("Extracting to:", packageDir)
-    
+
     const stream = extractFull(pathToPackage, packageDir, {
         $bin: path7za,
         recursive: true,
@@ -649,28 +665,33 @@ const importPackage = async (pathToPackage) => {
         let tempPkg = null
         try {
             console.log("Importing package from:", pathToPackage)
-            
+
             // Validate that the file exists and is an archive
             if (!fs.existsSync(pathToPackage)) {
                 throw new Error(`Package file not found: ${pathToPackage}`)
             }
-            
+
             const ext = path.extname(pathToPackage).toLowerCase()
-            if (ext !== '.bee_pack' && ext !== '.zip') {
-                throw new Error(`Invalid package format. Expected .bee_pack or .zip, got: ${ext}`)
+            if (ext !== ".bee_pack" && ext !== ".zip") {
+                throw new Error(
+                    `Invalid package format. Expected .bee_pack or .zip, got: ${ext}`,
+                )
             }
-            
+
             sendProgressUpdate(0, "Starting package import...")
 
             tempPkg = new Package(pathToPackage)
             console.log("Package name:", tempPkg.name)
             console.log("Package will be extracted to:", tempPkg.packageDir)
-            
+
             sendProgressUpdate(10, "Preparing package directory...")
 
             // Extract package - wipe existing directory first
             if (fs.existsSync(tempPkg.packageDir)) {
-                console.log("Removing existing package directory:", tempPkg.packageDir)
+                console.log(
+                    "Removing existing package directory:",
+                    tempPkg.packageDir,
+                )
                 fs.rmSync(tempPkg.packageDir, { recursive: true, force: true })
                 console.log(
                     "Wiped existing package directory before import extraction",
@@ -743,31 +764,34 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
 
             // Determine if we're loading from an already-extracted package (info.json) or an archive
             const isInfoJson = path.basename(pathToPackage) === "info.json"
-            
+
             let pkg
             let packageDir
 
             if (isInfoJson) {
                 // Loading from already-extracted package directory
-                console.log("Loading from already-extracted package:", pathToPackage)
+                console.log(
+                    "Loading from already-extracted package:",
+                    pathToPackage,
+                )
                 packageDir = path.dirname(pathToPackage)
-                
+
                 // Create a temporary Package instance just to get the packageDir path structure
                 // We'll use the actual directory path instead
                 pkg = new Package(pathToPackage)
                 pkg.packageDir = packageDir // Override with the actual directory
-                
+
                 if (!skipProgressReset) {
                     sendProgressUpdate(50, "Loading extracted package...")
                 }
             } else {
                 // Loading from archive - need to extract
                 console.log("Loading from archive:", pathToPackage)
-                
+
                 // Create package instance
                 pkg = new Package(pathToPackage)
                 packageDir = pkg.packageDir
-                
+
                 if (!skipProgressReset) {
                     sendProgressUpdate(10, "Preparing package directory...")
                 }
@@ -809,7 +833,7 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
             // Now load the package
             await pkg.load()
             packages.push(pkg)
-            
+
             // Set the current package directory
             currentPackageDir = pkg.packageDir
 
@@ -849,12 +873,15 @@ const reg_loadPackagePopup = () => {
         if (result.canceled) return null
 
         const pkg = await loadPackage(result.filePaths[0])
-        
+
         // Send package loaded event to main window
         if (mainWindow) {
-            mainWindow.webContents.send("package:loaded", pkg.items.map(item => item.toJSONWithExistence()))
+            mainWindow.webContents.send(
+                "package:loaded",
+                pkg.items.map((item) => item.toJSONWithExistence()),
+            )
         }
-        
+
         return pkg.items // return the package's items
     })
 }
@@ -874,38 +901,40 @@ function savePackageAsBpee(packageDir, outputBpeePath) {
         if (!fs.existsSync(outDir)) {
             fs.mkdirSync(outDir, { recursive: true })
         }
-        
+
         // Delete existing file if it exists
         if (fs.existsSync(outputBpeePath)) {
             fs.unlinkSync(outputBpeePath)
         }
-        
+
         // Use 7z command directly to create ZIP format
         // Command: 7za a -tzip output.bpee packageDir\*
         const args = [
-            'a',           // add to archive
-            '-tzip',       // use ZIP format
-            '-r',          // recursive
+            "a", // add to archive
+            "-tzip", // use ZIP format
+            "-r", // recursive
             outputBpeePath,
-            path.join(packageDir, '*')
+            path.join(packageDir, "*"),
         ]
-        
+
         const process = spawn(path7za, args)
-        
-        let errorOutput = ''
-        process.stderr.on('data', (data) => {
+
+        let errorOutput = ""
+        process.stderr.on("data", (data) => {
             errorOutput += data.toString()
         })
-        
-        process.on('close', (code) => {
+
+        process.on("close", (code) => {
             if (code === 0) {
                 resolve()
             } else {
-                reject(new Error(`7zip failed with code ${code}: ${errorOutput}`))
+                reject(
+                    new Error(`7zip failed with code ${code}: ${errorOutput}`),
+                )
             }
         })
-        
-        process.on('error', (error) => {
+
+        process.on("error", (error) => {
             reject(error)
         })
     })
@@ -943,8 +972,10 @@ async function exportPackageAsBeePack(packageDir, outputBeePackPath) {
 
                 for (const entry of entries) {
                     // Skip temp_models directory - it's only used for local model generation
-                    if (entry.name === 'temp_models') {
-                        console.log("Skipping temp_models directory during export")
+                    if (entry.name === "temp_models") {
+                        console.log(
+                            "Skipping temp_models directory during export",
+                        )
                         continue
                     }
 
@@ -979,34 +1010,38 @@ async function exportPackageAsBeePack(packageDir, outputBeePackPath) {
             if (fs.existsSync(outputBeePackPath)) {
                 fs.unlinkSync(outputBeePackPath)
             }
-            
+
             await new Promise((resolve, reject) => {
                 // Use 7z command directly to create ZIP format
                 // Command: 7za a -tzip output.bee_pack tempDir\*
                 const args = [
-                    'a',           // add to archive
-                    '-tzip',       // use ZIP format
-                    '-r',          // recursive
+                    "a", // add to archive
+                    "-tzip", // use ZIP format
+                    "-r", // recursive
                     outputBeePackPath,
-                    path.join(tempExportDir, '*')
+                    path.join(tempExportDir, "*"),
                 ]
-                
+
                 const process = spawn(path7za, args)
-                
-                let errorOutput = ''
-                process.stderr.on('data', (data) => {
+
+                let errorOutput = ""
+                process.stderr.on("data", (data) => {
                     errorOutput += data.toString()
                 })
-                
-                process.on('close', (code) => {
+
+                process.on("close", (code) => {
                     if (code === 0) {
                         resolve()
                     } else {
-                        reject(new Error(`7zip failed with code ${code}: ${errorOutput}`))
+                        reject(
+                            new Error(
+                                `7zip failed with code ${code}: ${errorOutput}`,
+                            ),
+                        )
                     }
                 })
-                
-                process.on('error', (error) => {
+
+                process.on("error", (error) => {
                     reject(error)
                 })
             })
