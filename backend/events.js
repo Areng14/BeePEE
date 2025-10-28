@@ -3359,15 +3359,52 @@ function reg_events(mainWindow) {
                     )
 
                     if (sortedValueInstanceMap.size === 0) {
-                        dialog.showMessageBox({
-                            type: "warning",
-                            title: "No Instances Found",
-                            message: `No instances found for variable "${instanceKey}".`,
-                            detail: "Make sure the VBSP blocks are configured correctly.",
-                        })
-                        return {
-                            success: false,
-                            error: `No instances found for variable "${instanceKey}"`,
+                        // For cubeType variables, fall back to using the first instance
+                        if (String(instanceKey).toLowerCase().includes("cubetype")) {
+                            console.log(
+                                `No instances found for cubeType variable "${instanceKey}", falling back to first instance`,
+                            )
+                            const instanceKeys = Object.keys(item.instances).sort(
+                                (a, b) => parseInt(a, 10) - parseInt(b, 10),
+                            )
+                            const firstKey = instanceKeys[0]
+                            const firstInstance = firstKey
+                                ? item.instances[firstKey]
+                                : null
+                            
+                            if (!firstInstance?.Name) {
+                                dialog.showMessageBox({
+                                    type: "error",
+                                    title: "No Instances Available",
+                                    message: `No instances available for fallback.`,
+                                    detail: "Make sure the item has at least one instance registered.",
+                                })
+                                return {
+                                    success: false,
+                                    error: `No instances available for fallback`,
+                                }
+                            }
+
+                            // Create a map with all cubeType values (0-4) pointing to the first instance
+                            const cubeTypeMap = new Map()
+                            for (let i = 0; i <= 4; i++) {
+                                cubeTypeMap.set(String(i), firstInstance.Name)
+                            }
+                            sortedValueInstanceMap = cubeTypeMap
+                            console.log(
+                                `Created fallback cubeType map with ${cubeTypeMap.size} entries, all pointing to first instance: ${firstInstance.Name}`,
+                            )
+                        } else {
+                            dialog.showMessageBox({
+                                type: "warning",
+                                title: "No Instances Found",
+                                message: `No instances found for variable "${instanceKey}".`,
+                                detail: "Make sure the VBSP blocks are configured correctly.",
+                            })
+                            return {
+                                success: false,
+                                error: `No instances found for variable "${instanceKey}"`,
+                            }
                         }
                     }
 

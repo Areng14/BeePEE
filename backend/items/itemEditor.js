@@ -75,8 +75,8 @@ function createItemCreationWindow(mainWindow) {
     const isDev = !require("electron").app.isPackaged
 
     createItemWindow = new BrowserWindow({
-        width: 600,
-        height: 900,
+        width: 500,
+        height: 500,
         title: "BeePEE - Create New Item",
         webPreferences: {
             nodeIntegration: false,
