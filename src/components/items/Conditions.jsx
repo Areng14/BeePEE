@@ -674,7 +674,11 @@ const validateChangeInstanceBlock = (block, formData = {}) => {
 const validateRandomSelectionBlock = (block, formData = {}) => {
     const errors = []
 
-    if (!block.options || !Array.isArray(block.options) || block.options.length === 0) {
+    if (
+        !block.options ||
+        !Array.isArray(block.options) ||
+        block.options.length === 0
+    ) {
         errors.push({
             type: "error",
             message: "Random Selection block must have at least one option",
@@ -683,7 +687,8 @@ const validateRandomSelectionBlock = (block, formData = {}) => {
     } else if (block.options.length < 2) {
         errors.push({
             type: "warning",
-            message: "Random Selection should have at least 2 options to be useful",
+            message:
+                "Random Selection should have at least 2 options to be useful",
             field: "options",
         })
     }
@@ -693,7 +698,8 @@ const validateRandomSelectionBlock = (block, formData = {}) => {
         block.options.forEach((option, index) => {
             if (typeof option === "string" && option.trim() !== "") {
                 const instanceExists = Object.values(formData.instances).some(
-                    (instance) => !instance._toRemove && instance.Name === option
+                    (instance) =>
+                        !instance._toRemove && instance.Name === option,
                 )
                 if (!instanceExists) {
                     errors.push({
@@ -1370,7 +1376,8 @@ function IfBlock({ block, onUpdateProperty, availableVariables, formData }) {
                                                         "$timer_delay" &&
                                                     value !== ""
                                                 ) {
-                                                    const numValue = Number(value)
+                                                    const numValue =
+                                                        Number(value)
                                                     if (
                                                         !isNaN(numValue) &&
                                                         numValue < 3 &&
@@ -2144,20 +2151,26 @@ function SortableBlock({
             case "randomSelection":
                 return (
                     <Box>
-                        <Typography variant="body2" sx={{ mb: 1, color: "#888" }}>
+                        <Typography
+                            variant="body2"
+                            sx={{ mb: 1, color: "#888" }}>
                             Randomly selects one of the following:
                         </Typography>
                         <List dense sx={{ pl: 2 }}>
-                            {block.options && block.options.map((option, index) => (
-                                <ListItem key={index} sx={{ py: 0.5 }}>
-                                    <ListItemText
-                                        primary={`${index + 1}. ${option}`}
-                                        primaryTypographyProps={{
-                                            sx: { fontSize: "0.85rem", fontFamily: "monospace" }
-                                        }}
-                                    />
-                                </ListItem>
-                            ))}
+                            {block.options &&
+                                block.options.map((option, index) => (
+                                    <ListItem key={index} sx={{ py: 0.5 }}>
+                                        <ListItemText
+                                            primary={`${index + 1}. ${option}`}
+                                            primaryTypographyProps={{
+                                                sx: {
+                                                    fontSize: "0.85rem",
+                                                    fontFamily: "monospace",
+                                                },
+                                            }}
+                                        />
+                                    </ListItem>
+                                ))}
                         </List>
                     </Box>
                 )
@@ -3662,7 +3675,11 @@ function Conditions({
                 case "case":
                     return {
                         Case: {
-                            Value: block.value !== undefined && block.value !== null ? block.value : "",
+                            Value:
+                                block.value !== undefined &&
+                                block.value !== null
+                                    ? block.value
+                                    : "",
                             Result: processChildBlocks(
                                 block.thenBlocks,
                                 "thenBlocks",
@@ -3885,7 +3902,8 @@ function Conditions({
                 Object.keys(formData.conditions).length > 0
             ),
             conditionsKeys: Object.keys(formData.conditions || {}),
-            vbspConditionsImported: formData.conditions?._vbsp_conditions_imported,
+            vbspConditionsImported:
+                formData.conditions?._vbsp_conditions_imported,
         })
 
         // Initialize blocks from formData if available
@@ -3897,8 +3915,9 @@ function Conditions({
             Object.keys(formData.conditions).length > 0
         ) {
             // Check for _vbsp_conditions_imported flag to prevent re-importing on every load
-            const vbspAlreadyImported = formData.conditions._vbsp_conditions_imported === true
-            
+            const vbspAlreadyImported =
+                formData.conditions._vbsp_conditions_imported === true
+
             if (vbspAlreadyImported) {
                 console.log(
                     "VBSP conditions already imported previously - skipping conversion to prevent unsaved changes",
@@ -3907,12 +3926,12 @@ function Conditions({
                 // If we reach here, it means blocks were imported but not saved to meta.json properly
                 return
             }
-            
+
             console.log(
                 "Converting VBSP conditions to blocks (first time):",
                 formData.conditions,
             )
-            
+
             const result = convertVbspToBlocks(formData.conditions)
             if (result.success) {
                 console.log(
@@ -4514,12 +4533,17 @@ function Conditions({
                             // Each item in the random array might have a ChangeInstance
                             if (typeof item === "string") {
                                 return item
-                            } else if (typeof item === "object" && item.Changeinstance) {
-                                return item.Changeinstance || item.changeInstance
+                            } else if (
+                                typeof item === "object" &&
+                                item.Changeinstance
+                            ) {
+                                return (
+                                    item.Changeinstance || item.changeInstance
+                                )
                             }
                             return `Option ${index + 1}`
                         }),
-                        thenBlocks: [] // For nested actions if any
+                        thenBlocks: [], // For nested actions if any
                     }
                     blocks.push(randomBlock)
                 }

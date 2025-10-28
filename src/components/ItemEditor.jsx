@@ -203,14 +203,17 @@ function ItemEditor() {
                     const conditionsData = conditionsResult.success
                         ? conditionsResult.conditions
                         : {}
-                    const hasBlocks = conditionsData.blocks && Array.isArray(conditionsData.blocks)
-                    
+                    const hasBlocks =
+                        conditionsData.blocks &&
+                        Array.isArray(conditionsData.blocks)
+
                     setFormData((prev) => ({
                         ...prev,
                         name: item.name || "",
                         author: item.details?.Authors || "",
                         description: description,
-                        movementHandle: item.movementHandle || "HANDLE_4_DIRECTIONS",
+                        movementHandle:
+                            item.movementHandle || "HANDLE_4_DIRECTIONS",
                         inputs: inputResult.success ? inputResult.inputs : {},
                         outputs: outputResult.success
                             ? outputResult.outputs
@@ -244,7 +247,8 @@ function ItemEditor() {
                         name: item.name || "",
                         author: item.details?.Authors || "",
                         description: description,
-                        movementHandle: item.movementHandle || "HANDLE_4_DIRECTIONS",
+                        movementHandle:
+                            item.movementHandle || "HANDLE_4_DIRECTIONS",
                         inputs: {},
                         outputs: {},
                         // Update instances from item data, but preserve local modifications
@@ -406,20 +410,24 @@ function ItemEditor() {
                 conditions: false, // Don't mark as modified - we'll save immediately
             },
         }))
-        
+
         // Auto-save the converted blocks immediately to meta.json
         // This prevents "unsaved changes" from appearing on first open
         if (item?.id && blocks) {
             console.log("Auto-saving converted VBSP blocks to meta.json...")
-            window.package.saveConditions(item.id, { blocks })
+            window.package
+                .saveConditions(item.id, { blocks })
                 .then(() => {
                     console.log("✅ Auto-saved converted VBSP blocks")
                 })
                 .catch((error) => {
-                    console.error("Failed to auto-save converted blocks:", error)
+                    console.error(
+                        "Failed to auto-save converted blocks:",
+                        error,
+                    )
                 })
         }
-        
+
         // Don't set unsaved changes or add to undo stack since this is automatic
     }
 
@@ -765,7 +773,9 @@ function ItemEditor() {
     const handleDeleteItem = async () => {
         setIsDeleting(true)
         try {
-            const result = await window.electron.invoke("delete-item", { itemId: item.id })
+            const result = await window.electron.invoke("delete-item", {
+                itemId: item.id,
+            })
             if (result.success) {
                 // Close the editor window after successful deletion
                 window.close()
@@ -1155,11 +1165,12 @@ function ItemEditor() {
                 </DialogTitle>
                 <DialogContent>
                     <DialogContentText id="delete-dialog-description">
-                        This will permanently delete the item and all its associated files.
-                        This action cannot be undone.
+                        This will permanently delete the item and all its
+                        associated files. This action cannot be undone.
                     </DialogContentText>
                     <Alert severity="warning" sx={{ mt: 2 }}>
-                        <strong>Warning:</strong> All data for this item will be lost, including:
+                        <strong>Warning:</strong> All data for this item will be
+                        lost, including:
                         <ul style={{ marginTop: 8, marginBottom: 0 }}>
                             <li>Item configuration</li>
                             <li>All instances</li>
@@ -1169,7 +1180,9 @@ function ItemEditor() {
                     </Alert>
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setDeleteDialogOpen(false)} disabled={isDeleting}>
+                    <Button
+                        onClick={() => setDeleteDialogOpen(false)}
+                        disabled={isDeleting}>
                         Cancel
                     </Button>
                     <Button
@@ -1177,7 +1190,13 @@ function ItemEditor() {
                         color="error"
                         variant="contained"
                         disabled={isDeleting}
-                        startIcon={isDeleting ? <CircularProgress size={20} color="inherit" /> : <Delete />}>
+                        startIcon={
+                            isDeleting ? (
+                                <CircularProgress size={20} color="inherit" />
+                            ) : (
+                                <Delete />
+                            )
+                        }>
                         {isDeleting ? "Deleting..." : "Delete Permanently"}
                     </Button>
                 </DialogActions>

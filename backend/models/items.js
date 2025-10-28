@@ -172,11 +172,15 @@ class Item {
             this.extractChangeInstances(vbspData, changeInstances)
 
             if (changeInstances.length === 0) {
-                console.log(`⏭️ No changeinstance blocks found in VBSP config for ${this.name}`)
+                console.log(
+                    `⏭️ No changeinstance blocks found in VBSP config for ${this.name}`,
+                )
                 return false
             }
 
-            console.log(`🔄 Auto-importing ${changeInstances.length} VBSP instances for ${this.name}...`)
+            console.log(
+                `🔄 Auto-importing ${changeInstances.length} VBSP instances for ${this.name}...`,
+            )
 
             // Start index after the last editor instance
             let nextIndex = Object.keys(this.instances).length
@@ -205,8 +209,10 @@ class Item {
             // Frontend will check this flag and skip auto-conversion
             meta._vbsp_imported = true
             this.saveMetadata(meta)
-            
-            console.log(`✅ Auto-imported and saved ${changeInstances.length} VBSP instances for ${this.name}`)
+
+            console.log(
+                `✅ Auto-imported and saved ${changeInstances.length} VBSP instances for ${this.name}`,
+            )
             return true
         } catch (error) {
             console.error(
@@ -387,6 +393,77 @@ class Item {
                     error.message,
                 )
             }
+        }
+    }
+
+    /**
+     * Reload all item data from files (name, author, details, etc.)
+     * This should be called after saving to ensure the in-memory data matches the saved files
+     */
+    reloadItemData() {
+        try {
+            // Re-read editoritems file
+            const parsedEditoritems = JSON.parse(
+                fs.readFileSync(this.paths.editorItems, "utf-8"),
+            )
+
+            // Update name from editoritems
+            const editor = parsedEditoritems.Item.Editor
+            const subType = Array.isArray(editor.SubType)
+                ? editor.SubType[0]
+                : editor.SubType
+
+            if (subType?.Name) {
+                this.name = subType.Name
+            }
+
+            // Update MovementHandle
+            this.movementHandle = editor.MovementHandle || "HANDLE_4_DIRECTIONS"
+
+            // Re-read properties file
+            if (fs.existsSync(this.paths.properties)) {
+                const parsedProperties = JSON.parse(
+                    fs.readFileSync(this.paths.properties, "utf-8"),
+                )
+                this.details = parsedProperties["Properties"]
+
+                // Update icon path
+                const iconPath = parsedProperties.Properties?.Icon?.["0"]
+                this.icon = iconPath
+                    ? path.join(
+                          this.packagePath,
+                          "resources/BEE2/items",
+                          iconPath,
+                      )
+                    : null
+
+                if (!this.icon) {
+                    // Icon isn't defined in properties, get it from editoritems
+                    const rawIconPath = subType.Palette?.Image
+                    if (rawIconPath) {
+                        // Remove "palette/" prefix and build full path
+                        const cleanIconPath = rawIconPath
+                            .split("/")
+                            .slice(1)
+                            .join("/")
+                        this.icon = path.join(
+                            this.packagePath,
+                            "resources/BEE2/items",
+                            cleanIconPath,
+                        )
+                    }
+                }
+            }
+
+            // Also reload instances
+            this.reloadInstances()
+
+            console.log(`Reloaded item data: ${this.name} (id: ${this.id})`)
+        } catch (error) {
+            console.error(
+                `Failed to reload item data for ${this.id}:`,
+                error.message,
+            )
         }
     }
 
@@ -997,7 +1074,9 @@ class Item {
             }
 
             // Check if ButtonType variable is being added
-            const hasButtonType = variables.some(v => v.presetKey === "ButtonType")
+            const hasButtonType = variables.some(
+                (v) => v.presetKey === "ButtonType",
+            )
             const hadButtonType = "ButtonType" in editorItems.Item.Properties
 
             // Clear existing VBSP variables
@@ -1022,44 +1101,65 @@ class Item {
 
             // Handle ButtonType SubType generation
             const currentSubType = editorItems.Item.Editor.SubType
-            
+
             if (hasButtonType) {
                 // ButtonType exists - ensure we have 3 SubTypes
                 // Always rebuild Editor to ensure correct key order
                 const otherEditorProps = {}
-                for (const [key, value] of Object.entries(editorItems.Item.Editor)) {
-                    if (key !== 'SubType' && key !== 'SubTypeProperty') {
+                for (const [key, value] of Object.entries(
+                    editorItems.Item.Editor,
+                )) {
+                    if (key !== "SubType" && key !== "SubTypeProperty") {
                         otherEditorProps[key] = value
                     }
                 }
-                
-                const subTypeArray = Array.isArray(currentSubType) 
-                    ? (currentSubType.length === 3 ? currentSubType : [currentSubType[0] || {}, currentSubType[0] || {}, currentSubType[0] || {}])
-                    : [{...currentSubType}, {...currentSubType}, {...currentSubType}]
-                
+
+                const subTypeArray = Array.isArray(currentSubType)
+                    ? currentSubType.length === 3
+                        ? currentSubType
+                        : [
+                              currentSubType[0] || {},
+                              currentSubType[0] || {},
+                              currentSubType[0] || {},
+                          ]
+                    : [
+                          { ...currentSubType },
+                          { ...currentSubType },
+                          { ...currentSubType },
+                      ]
+
                 // Rebuild with correct order: SubTypeProperty first, then SubType, then others
                 editorItems.Item.Editor = {
                     SubTypeProperty: "ButtonType",
                     SubType: subTypeArray,
-                    ...otherEditorProps
+                    ...otherEditorProps,
                 }
-                console.log("ButtonType exists: Ensured 3 SubTypes with SubTypeProperty first")
+                console.log(
+                    "ButtonType exists: Ensured 3 SubTypes with SubTypeProperty first",
+                )
             } else {
                 // No ButtonType - ensure we have single SubType
-                if (Array.isArray(currentSubType) && currentSubType.length > 0) {
+                if (
+                    Array.isArray(currentSubType) &&
+                    currentSubType.length > 0
+                ) {
                     // Rebuild Editor object without SubTypeProperty
                     const otherEditorProps = {}
-                    for (const [key, value] of Object.entries(editorItems.Item.Editor)) {
-                        if (key !== 'SubType' && key !== 'SubTypeProperty') {
+                    for (const [key, value] of Object.entries(
+                        editorItems.Item.Editor,
+                    )) {
+                        if (key !== "SubType" && key !== "SubTypeProperty") {
                             otherEditorProps[key] = value
                         }
                     }
-                    
+
                     editorItems.Item.Editor = {
                         SubType: currentSubType[0],
-                        ...otherEditorProps
+                        ...otherEditorProps,
                     }
-                    console.log("ButtonType removed: Reverted to single SubType")
+                    console.log(
+                        "ButtonType removed: Reverted to single SubType",
+                    )
                 }
             }
 
@@ -1087,7 +1187,9 @@ class Item {
             // Get all instances
             const instances = editorItems.Item.Exporting.Instances
             if (!instances || Object.keys(instances).length === 0) {
-                console.log("No instances found, skipping ButtonType condition generation")
+                console.log(
+                    "No instances found, skipping ButtonType condition generation",
+                )
                 return
             }
 
@@ -1099,11 +1201,13 @@ class Item {
                     id: `case_${instanceIndex}`,
                     type: "case",
                     value: instanceIndex.toString(),
-                    thenBlocks: [{
-                        id: `changeInstance_${instanceIndex}`,
-                        type: "changeInstance",
-                        instanceIndex: instanceIndex
-                    }]
+                    thenBlocks: [
+                        {
+                            id: `changeInstance_${instanceIndex}`,
+                            type: "changeInstance",
+                            instanceIndex: instanceIndex,
+                        },
+                    ],
                 })
             }
 
@@ -1113,7 +1217,7 @@ class Item {
                 type: "switchCase",
                 variable: "button_type",
                 method: "first",
-                cases: cases
+                cases: cases,
             }
 
             // Load existing blocks
@@ -1128,33 +1232,52 @@ class Item {
             }
 
             // Check if a button_type switch already exists
-            const hasButtonTypeSwitch = existingBlocks.some(block => 
-                (block.type === "switchCase" || block.type === "switchGlobal") && 
-                block.variable === "button_type"
+            const hasButtonTypeSwitch = existingBlocks.some(
+                (block) =>
+                    (block.type === "switchCase" ||
+                        block.type === "switchGlobal") &&
+                    block.variable === "button_type",
             )
 
             if (!hasButtonTypeSwitch) {
                 // Add the new switch block
                 existingBlocks.push(switchBlock)
-                
+
                 // Save the blocks to meta.json
                 const metaData = fs.existsSync(this.paths.meta)
                     ? JSON.parse(fs.readFileSync(this.paths.meta, "utf-8"))
                     : {}
-                
+
                 metaData.vbsp_blocks = existingBlocks
-                fs.writeFileSync(this.paths.meta, JSON.stringify(metaData, null, 4), "utf-8")
+                fs.writeFileSync(
+                    this.paths.meta,
+                    JSON.stringify(metaData, null, 4),
+                    "utf-8",
+                )
 
                 // Convert and save to vbsp_config.json
                 const vbspData = this.convertBlocksToVbsp(existingBlocks)
-                fs.writeFileSync(this.paths.vbsp_config, JSON.stringify(vbspData, null, 4), "utf-8")
+                fs.writeFileSync(
+                    this.paths.vbsp_config,
+                    JSON.stringify(vbspData, null, 4),
+                    "utf-8",
+                )
 
-                console.log("Auto-generated ButtonType VBSP conditions with", cases.length, "cases")
+                console.log(
+                    "Auto-generated ButtonType VBSP conditions with",
+                    cases.length,
+                    "cases",
+                )
             } else {
-                console.log("ButtonType switch already exists, skipping auto-generation")
+                console.log(
+                    "ButtonType switch already exists, skipping auto-generation",
+                )
             }
         } catch (error) {
-            console.error("Failed to auto-generate ButtonType conditions:", error)
+            console.error(
+                "Failed to auto-generate ButtonType conditions:",
+                error,
+            )
         }
     }
 
@@ -1271,11 +1394,16 @@ class Item {
         const normalizeBlock = (block) => {
             // Ensure case blocks always have a value property
             // Use "0" as default since empty strings are now skipped during VBSP conversion
-            if (block.type === "case" && (block.value === undefined || block.value === "")) {
-                console.log(`⚠️  Normalizing case block ${block.id}: setting missing/empty value to "0" (you should change this to the correct value)`)
+            if (
+                block.type === "case" &&
+                (block.value === undefined || block.value === "")
+            ) {
+                console.log(
+                    `⚠️  Normalizing case block ${block.id}: setting missing/empty value to "0" (you should change this to the correct value)`,
+                )
                 block.value = "0"
             }
-            
+
             // Recursively normalize child blocks
             if (block.thenBlocks && Array.isArray(block.thenBlocks)) {
                 block.thenBlocks = block.thenBlocks.map(normalizeBlock)
@@ -1286,10 +1414,10 @@ class Item {
             if (block.cases && Array.isArray(block.cases)) {
                 block.cases = block.cases.map(normalizeBlock)
             }
-            
+
             return block
         }
-        
+
         return blocks.map(normalizeBlock)
     }
 
@@ -1302,10 +1430,17 @@ class Item {
                     const metaData = JSON.parse(
                         fs.readFileSync(this.paths.meta, "utf-8"),
                     )
-                    if (metaData.vbsp_blocks && Array.isArray(metaData.vbsp_blocks)) {
-                        console.log(`Loading blocks from meta.json for ${this.name}`)
+                    if (
+                        metaData.vbsp_blocks &&
+                        Array.isArray(metaData.vbsp_blocks)
+                    ) {
+                        console.log(
+                            `Loading blocks from meta.json for ${this.name}`,
+                        )
                         // Normalize blocks to ensure all case blocks have a value property
-                        const normalizedBlocks = this.normalizeBlocks(metaData.vbsp_blocks)
+                        const normalizedBlocks = this.normalizeBlocks(
+                            metaData.vbsp_blocks,
+                        )
                         return { blocks: normalizedBlocks }
                     }
                 } catch (metaError) {
@@ -1315,7 +1450,7 @@ class Item {
                     )
                 }
             }
-            
+
             // Fallback to VBSP format if no blocks in meta.json
             // This will be auto-converted by the frontend and saved back with blocks
             if (
@@ -1328,7 +1463,7 @@ class Item {
                 const vbspData = JSON.parse(
                     fs.readFileSync(this.paths.vbsp_config, "utf-8"),
                 )
-                
+
                 // Check if conditions have already been imported (flag is set in meta.json)
                 let vbspImported = false
                 if (fs.existsSync(this.paths.meta)) {
@@ -1336,16 +1471,19 @@ class Item {
                         const metaData = JSON.parse(
                             fs.readFileSync(this.paths.meta, "utf-8"),
                         )
-                        vbspImported = metaData._vbsp_conditions_imported === true
+                        vbspImported =
+                            metaData._vbsp_conditions_imported === true
                     } catch (error) {
-                        console.warn(`Failed to check _vbsp_conditions_imported flag: ${error.message}`)
+                        console.warn(
+                            `Failed to check _vbsp_conditions_imported flag: ${error.message}`,
+                        )
                     }
                 }
-                
+
                 // Return VBSP data with flag - frontend will convert and save it back with blocks (only if not already imported)
                 return { ...vbspData, _vbsp_conditions_imported: vbspImported }
             }
-            
+
             console.log(`No conditions found for ${this.name}`)
             return {}
         } catch (error) {
@@ -1378,23 +1516,31 @@ class Item {
                         fs.unlinkSync(this.paths.vbsp_config)
                     }
                     if (fs.existsSync(this.paths.meta)) {
-                        const metaData = JSON.parse(fs.readFileSync(this.paths.meta, "utf-8"))
+                        const metaData = JSON.parse(
+                            fs.readFileSync(this.paths.meta, "utf-8"),
+                        )
                         delete metaData.vbsp_blocks
                         delete metaData._vbsp_conditions_imported
-                        fs.writeFileSync(this.paths.meta, JSON.stringify(metaData, null, 4), "utf-8")
+                        fs.writeFileSync(
+                            this.paths.meta,
+                            JSON.stringify(metaData, null, 4),
+                            "utf-8",
+                        )
                     }
                     return true
                 }
                 // Normalize blocks before converting/saving
                 const normalizedBlocks = this.normalizeBlocks(conditions.blocks)
-                
+
                 // Convert blocks to VBSP format
                 vbspData = this.convertBlocksToVbsp(normalizedBlocks)
-                
+
                 // Save the JSON block representation to meta.json
                 let metaData = {}
                 if (fs.existsSync(this.paths.meta)) {
-                    metaData = JSON.parse(fs.readFileSync(this.paths.meta, "utf-8"))
+                    metaData = JSON.parse(
+                        fs.readFileSync(this.paths.meta, "utf-8"),
+                    )
                 }
                 metaData.vbsp_blocks = normalizedBlocks
                 // Mark as imported so frontend won't auto-convert again
@@ -1642,23 +1788,35 @@ class Item {
                         // Process all cases that have actual values (including 0 and false, but NOT empty string)
                         for (const caseBlock of block.cases) {
                             // Check if value exists - explicitly handle 0 and false as valid, but reject empty strings
-                            const valueStr = String(caseBlock?.value || "").trim()
-                            const hasValue = caseBlock &&
+                            const valueStr = String(
+                                caseBlock?.value || "",
+                            ).trim()
+                            const hasValue =
+                                caseBlock &&
                                 caseBlock.value !== undefined &&
                                 caseBlock.value !== null &&
                                 valueStr !== ""
-                            
+
                             // Debug logging for case processing
                             if (!hasValue) {
-                                console.log(`⚠️  Skipping case with invalid/empty value:`, {
-                                    caseBlock: { id: caseBlock?.id, type: caseBlock?.type },
-                                    value: caseBlock?.value,
-                                    valueStr,
-                                    hasValue,
-                                    reason: valueStr === "" ? "empty string" : "undefined/null"
-                                })
+                                console.log(
+                                    `⚠️  Skipping case with invalid/empty value:`,
+                                    {
+                                        caseBlock: {
+                                            id: caseBlock?.id,
+                                            type: caseBlock?.type,
+                                        },
+                                        value: caseBlock?.value,
+                                        valueStr,
+                                        hasValue,
+                                        reason:
+                                            valueStr === ""
+                                                ? "empty string"
+                                                : "undefined/null",
+                                    },
+                                )
                             }
-                            
+
                             if (hasValue) {
                                 const modifiedCaseValue = applyTimerLogic(
                                     block.variable,
@@ -1669,15 +1827,17 @@ class Item {
                                     caseBlock?.thenBlocks || [],
                                     "thenBlocks",
                                 )
-                                
+
                                 // Debug logging for case results
                                 console.log(`✓ Adding case "${arg}":`, {
                                     value: caseBlock.value,
-                                    thenBlocks: caseBlock?.thenBlocks?.length || 0,
+                                    thenBlocks:
+                                        caseBlock?.thenBlocks?.length || 0,
                                     resultKeys: Object.keys(caseResults),
-                                    isEmpty: Object.keys(caseResults).length === 0
+                                    isEmpty:
+                                        Object.keys(caseResults).length === 0,
                                 })
-                                
+
                                 // Always add the case, even if result is empty
                                 // This makes the VBSP more explicit about all possible cases
                                 switchObj.Switch[arg] = caseResults
@@ -1701,23 +1861,35 @@ class Item {
                         // Process all cases that have actual values (including 0 and false, but NOT empty string)
                         for (const caseBlock of block.cases) {
                             // Check if value exists - explicitly handle 0 and false as valid, but reject empty strings
-                            const valueStr = String(caseBlock?.value || "").trim()
-                            const hasValue = caseBlock &&
+                            const valueStr = String(
+                                caseBlock?.value || "",
+                            ).trim()
+                            const hasValue =
+                                caseBlock &&
                                 caseBlock.value !== undefined &&
                                 caseBlock.value !== null &&
                                 valueStr !== ""
-                            
+
                             // Debug logging for case processing
                             if (!hasValue) {
-                                console.log(`⚠️  Skipping global case with invalid/empty value:`, {
-                                    caseBlock: { id: caseBlock?.id, type: caseBlock?.type },
-                                    value: caseBlock?.value,
-                                    valueStr,
-                                    hasValue,
-                                    reason: valueStr === "" ? "empty string" : "undefined/null"
-                                })
+                                console.log(
+                                    `⚠️  Skipping global case with invalid/empty value:`,
+                                    {
+                                        caseBlock: {
+                                            id: caseBlock?.id,
+                                            type: caseBlock?.type,
+                                        },
+                                        value: caseBlock?.value,
+                                        valueStr,
+                                        hasValue,
+                                        reason:
+                                            valueStr === ""
+                                                ? "empty string"
+                                                : "undefined/null",
+                                    },
+                                )
                             }
-                            
+
                             if (hasValue) {
                                 const modifiedCaseValue = applyTimerLogic(
                                     block.test,
@@ -1728,15 +1900,17 @@ class Item {
                                     caseBlock?.thenBlocks || [],
                                     "thenBlocks",
                                 )
-                                
+
                                 // Debug logging for case results
                                 console.log(`✓ Adding global case "${arg}":`, {
                                     value: caseBlock.value,
-                                    thenBlocks: caseBlock?.thenBlocks?.length || 0,
+                                    thenBlocks:
+                                        caseBlock?.thenBlocks?.length || 0,
                                     resultKeys: Object.keys(caseResults),
-                                    isEmpty: Object.keys(caseResults).length === 0
+                                    isEmpty:
+                                        Object.keys(caseResults).length === 0,
                                 })
-                                
+
                                 // Always add the case, even if result is empty
                                 // This makes the VBSP more explicit about all possible cases
                                 switchObj.Switch[arg] = caseResults

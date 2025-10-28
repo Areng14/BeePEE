@@ -13,11 +13,11 @@ import "./global.css"
 function App() {
     // Check if this window should show the editor or create page (for production builds)
     const urlParams = new URLSearchParams(window.location.search)
-    const routeParam = urlParams.get('route')
-    const showEditor = routeParam === 'editor'
-    const showCreateItem = routeParam === 'create-item'
-    const showCreatePackage = routeParam === 'create-package'
-    const showPackageInformation = routeParam === 'package-information'
+    const routeParam = urlParams.get("route")
+    const showEditor = routeParam === "editor"
+    const showCreateItem = routeParam === "create-item"
+    const showCreatePackage = routeParam === "create-package"
+    const showPackageInformation = routeParam === "package-information"
     const [packageLoaded, setPackageLoaded] = useState(false)
     const [loadingState, setLoadingState] = useState({
         open: false,
@@ -108,26 +108,37 @@ function App() {
                 <>
                     <BrowserRouter>
                         <Routes>
-                            <Route 
-                                path="/" 
+                            <Route
+                                path="/"
                                 element={
-                                    packageLoaded ? (
-                                        (() => {
-                                            console.log("Rendering ItemBrowser (packageLoaded=true)")
-                                            return <ItemBrowser />
-                                        })()
-                                    ) : (
-                                        (() => {
-                                            console.log("Rendering WelcomePage (packageLoaded=false)")
-                                            return <WelcomePage />
-                                        })()
-                                    )
-                                } 
+                                    packageLoaded
+                                        ? (() => {
+                                              console.log(
+                                                  "Rendering ItemBrowser (packageLoaded=true)",
+                                              )
+                                              return <ItemBrowser />
+                                          })()
+                                        : (() => {
+                                              console.log(
+                                                  "Rendering WelcomePage (packageLoaded=false)",
+                                              )
+                                              return <WelcomePage />
+                                          })()
+                                }
                             />
                             <Route path="/editor" element={<ItemEditor />} />
-                            <Route path="/create-item" element={<CreateItemPage />} />
-                            <Route path="/create-package" element={<CreatePackagePage />} />
-                            <Route path="/package-information" element={<PackageInformationPage />} />
+                            <Route
+                                path="/create-item"
+                                element={<CreateItemPage />}
+                            />
+                            <Route
+                                path="/create-package"
+                                element={<CreatePackagePage />}
+                            />
+                            <Route
+                                path="/package-information"
+                                element={<PackageInformationPage />}
+                            />
                         </Routes>
                     </BrowserRouter>
                     <LoadingPopup

@@ -1,12 +1,5 @@
 import { useState } from "react"
-import {
-    Box,
-    Typography,
-    TextField,
-    Button,
-    Stack,
-    Alert,
-} from "@mui/material"
+import { Box, Typography, TextField, Button, Stack, Alert } from "@mui/material"
 import { CheckCircle, Close } from "@mui/icons-material"
 
 function CreatePackagePage() {
@@ -131,10 +124,7 @@ function CreatePackagePage() {
                     borderColor: "divider",
                     bgcolor: "background.paper",
                 }}>
-                <Stack
-                    direction="row"
-                    spacing={1}
-                    justifyContent="flex-end">
+                <Stack direction="row" spacing={1} justifyContent="flex-end">
                     <Button
                         variant="outlined"
                         onClick={handleCancel}
@@ -159,5 +149,3 @@ function CreatePackagePage() {
 }
 
 export default CreatePackagePage
-
-
