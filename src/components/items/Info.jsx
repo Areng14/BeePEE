@@ -22,9 +22,11 @@ import {
 } from "@mui/icons-material"
 import ReactMarkdown from "react-markdown"
 import { useState, useEffect } from "react"
+import missingIcon from "../../assets/missing.png"
 
 function Info({ item, formData, onUpdate }) {
     const [iconSrc, setIconSrc] = useState(null)
+    const [iconError, setIconError] = useState(false)
     const [isPreview, setIsPreview] = useState(false)
     const [selectedInstanceKey, setSelectedInstanceKey] = useState("")
     const [isConverting, setIsConverting] = useState(false)
@@ -36,11 +38,22 @@ function Info({ item, formData, onUpdate }) {
         // Load the icon when item changes or when staged icon changes
         const iconToLoad = formData.stagedIconPath || item?.icon
         if (iconToLoad) {
-            window.package.loadFile(iconToLoad).then(setIconSrc)
+            window.package.loadFile(iconToLoad)
+                .then(setIconSrc)
+                .catch((error) => {
+                    console.warn(`Failed to load icon for item ${item?.name}:`, error)
+                    setIconError(true)
+                    setIconSrc(null)
+                })
         } else {
             setIconSrc(null)
+            setIconError(false)
         }
     }, [item, formData.stagedIconPath])
+
+    const handleIconError = () => {
+        setIconError(true)
+    }
 
     // Extract all variables used by the item
     useEffect(() => {

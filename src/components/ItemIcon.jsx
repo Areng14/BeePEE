@@ -1,17 +1,30 @@
 import { Button, Box } from "@mui/material"
 import { Edit } from "@mui/icons-material"
 import { useState, useEffect } from "react"
+import missingIcon from "../assets/missing.png"
 
 function ItemIcon({ item, onEdit }) {
     const [imageSrc, setImageSrc] = useState(null)
+    const [imageError, setImageError] = useState(false)
 
     useEffect(() => {
         if (item.icon) {
-            window.package.loadFile(item.icon).then(setImageSrc)
+            window.package.loadFile(item.icon)
+                .then(setImageSrc)
+                .catch((error) => {
+                    console.warn(`Failed to load icon for item ${item.name}:`, error)
+                    setImageError(true)
+                    setImageSrc(null)
+                })
         } else {
             setImageSrc(null)
+            setImageError(false)
         }
     }, [item.icon])
+
+    const handleImageError = () => {
+        setImageError(true)
+    }
 
     return (
         <Button
@@ -44,8 +57,9 @@ function ItemIcon({ item, onEdit }) {
                 },
             }}>
             <img
-                src={imageSrc || "placeholder.png"}
+                src={imageSrc || missingIcon}
                 alt={item.name}
+                onError={handleImageError}
                 style={{
                     width: "100%",
                     height: "100%",

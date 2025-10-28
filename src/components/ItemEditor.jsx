@@ -899,7 +899,8 @@ function ItemEditor() {
                             }
                         />
                     </Tooltip>
-                    <Tooltip
+                    {/* Other is unused for now, since 1.0 doesnt have plans for this YET. */}
+                    {/* <Tooltip
                         title="Other - Additional item settings"
                         placement="right">
                         <Tab
@@ -912,7 +913,7 @@ function ItemEditor() {
                                 </Badge>
                             }
                         />
-                    </Tooltip>
+                    </Tooltip> */} 
                     <Tooltip
                         title="Metadata - Item metadata and tags"
                         placement="right">

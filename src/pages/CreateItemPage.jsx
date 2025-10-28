@@ -6,8 +6,8 @@ import {
     Button,
     Alert,
     Stack,
-    Paper,
 } from "@mui/material"
+import { CheckCircle, Close } from "@mui/icons-material"
 
 function CreateItemPage() {
     const [itemId, setItemId] = useState("")
@@ -49,6 +49,10 @@ function CreateItemPage() {
         }
     }
 
+    const handleCancel = () => {
+        window.close()
+    }
+
     return (
         <Box
             sx={{
@@ -58,7 +62,7 @@ function CreateItemPage() {
                 overflow: "hidden",
                 bgcolor: "background.default",
             }}>
-            {/* Header Bar */}
+            {/* Header */}
             <Box
                 sx={{
                     display: "flex",
@@ -75,69 +79,62 @@ function CreateItemPage() {
                 </Typography>
             </Box>
 
-            {/* Main Content */}
+            {/* Content */}
+            <Box sx={{ flex: 1, overflow: "auto", p: 3 }}>
+                <Stack spacing={3}>
+                    {error && (
+                        <Alert severity="error" onClose={() => setError("")}>
+                            {error}
+                        </Alert>
+                    )}
+
+                    <TextField
+                        label="Item ID"
+                        value={itemId}
+                        onChange={(e) => setItemId(e.target.value)}
+                        placeholder="my_custom_item"
+                        fullWidth
+                        required
+                        autoFocus
+                        disabled={loading}
+                        helperText="Enter a unique identifier for your item (letters, numbers, and underscores only)"
+                    />
+
+                    <Alert severity="info">
+                        The item will be created with default settings. You can
+                        configure all other properties in the editor after
+                        creation.
+                    </Alert>
+                </Stack>
+            </Box>
+
+            {/* Footer */}
             <Box
                 sx={{
-                    flex: 1,
-                    overflow: "auto",
-                    p: 3,
+                    p: 2,
+                    borderTop: 1,
+                    borderColor: "divider",
+                    bgcolor: "background.paper",
                 }}>
-                {error && (
-                    <Alert
-                        severity="error"
-                        onClose={() => setError("")}
-                        sx={{ mb: 3 }}>
-                        {error}
-                    </Alert>
-                )}
-
-                <Box
-                    sx={{
-                        maxWidth: 500,
-                        mx: "auto",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: 3,
-                    }}>
-                    <Paper sx={{ p: 3 }}>
-                        <Typography variant="h6" sx={{ mb: 2 }}>
-                            Item Information
-                        </Typography>
-                        <Stack spacing={2.5}>
-                            <TextField
-                                label="Item ID *"
-                                value={itemId}
-                                onChange={(e) => setItemId(e.target.value)}
-                                fullWidth
-                                autoFocus
-                                helperText="Enter a unique identifier for your item (letters, numbers, and underscores only)"
-                                placeholder="e.g., my_custom_item"
-                                variant="outlined"
-                            />
-
-                            <Alert severity="info">
-                                The item will be created with default settings.
-                                You can configure all other properties in the
-                                editor after creation.
-                            </Alert>
-                        </Stack>
-                    </Paper>
-
-                    <Box
-                        sx={{
-                            display: "flex",
-                            justifyContent: "center",
-                            gap: 2,
-                        }}>
-                        <Button
-                            onClick={handleCreate}
-                            variant="contained"
-                            size="large"
-                            disabled={loading || !itemId.trim()}>
-                            {loading ? "Creating..." : "Create Item"}
-                        </Button>
-                    </Box>
-                </Box>
+                <Stack direction="row" spacing={1} justifyContent="flex-end">
+                    <Button
+                        variant="outlined"
+                        onClick={handleCancel}
+                        disabled={loading}
+                        startIcon={<Close />}
+                        sx={{ minWidth: 120 }}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={handleCreate}
+                        disabled={loading || !itemId.trim()}
+                        startIcon={<CheckCircle />}
+                        sx={{ minWidth: 120 }}>
+                        {loading ? "Creating..." : "Create"}
+                    </Button>
+                </Stack>
             </Box>
         </Box>
     )

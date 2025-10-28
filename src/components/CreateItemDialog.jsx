@@ -99,15 +99,16 @@ function CreateItemDialog({ open, onClose, onItemCreated }) {
                     </Alert>
                 </Box>
             </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose} disabled={loading}>
-                    Cancel
-                </Button>
+            <DialogActions sx={{ flexDirection: "column", gap: 1, p: 2 }}>
                 <Button
                     onClick={handleCreate}
                     variant="contained"
+                    fullWidth
                     disabled={loading || !itemId.trim()}>
                     {loading ? "Creating..." : "Create Item"}
+                </Button>
+                <Button onClick={onClose} disabled={loading} fullWidth>
+                    Cancel
                 </Button>
             </DialogActions>
         </Dialog>
