@@ -70,3 +70,15 @@ You will use blocks to configure the configuration.
 
 ## Exporting
 When you are done editing, go to file then export package to export it as a .bee_pack. 
+
+
+# Acknowledgements
+
+## MareTF
+For enabling VTF conversion (MIT License - Copyright (c) 2025 Laura Lewis)
+
+## VMF2OBJ
+For enabling VMF to OBJ conversion (MIT License - Copyright (c) 2020 Dylancyclone)
+
+## STUDIOMDL (Source SDK)
+For enabling OBJ to MDL model compilation (Valve Corporation)
