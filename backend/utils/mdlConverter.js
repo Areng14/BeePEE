@@ -873,17 +873,137 @@ async function convertAndInstallMDL(
 // ===========================================
 
 /**
+ * Converts VBSP format conditions to blocks format for processing
+ * @param {Object} vbspConditions - VBSP format conditions
+ * @returns {Array} Array of blocks
+ */
+function convertVbspToBlocks(vbspConditions) {
+    const blocks = []
+    
+    if (!vbspConditions || !vbspConditions.Conditions) {
+        return blocks
+    }
+    
+    // Handle different VBSP structure patterns
+    let conditions = []
+    
+    if (vbspConditions.Conditions.Condition) {
+        // Single condition
+        conditions = Array.isArray(vbspConditions.Conditions.Condition) 
+            ? vbspConditions.Conditions.Condition 
+            : [vbspConditions.Conditions.Condition]
+    } else {
+        // Multiple conditions or different structure
+        const allKeys = Object.keys(vbspConditions.Conditions)
+        const conditionKeys = allKeys.filter(key => 
+            key.startsWith("Switch_") || 
+            key.startsWith("MapInstVar_") ||
+            key === "Switch" ||
+            key === "MapInstVar"
+        )
+        
+        if (conditionKeys.length > 0) {
+            conditions = conditionKeys.map(key => vbspConditions.Conditions[key])
+        } else {
+            conditions = [vbspConditions.Conditions]
+        }
+    }
+    
+    // Convert each condition to block format
+    conditions.forEach((condition, index) => {
+        if (condition.Switch) {
+            // Switch case condition
+            const switchBlock = {
+                id: `switch_${index}`,
+                type: "switchCase",
+                variable: condition.Switch.Variable || condition.Switch,
+                method: "first",
+                cases: []
+            }
+            
+            // Add cases
+            if (condition.Switch.Case) {
+                const cases = Array.isArray(condition.Switch.Case) 
+                    ? condition.Switch.Case 
+                    : [condition.Switch.Case]
+                
+                cases.forEach((caseItem, caseIndex) => {
+                    const caseBlock = {
+                        id: `case_${index}_${caseIndex}`,
+                        type: "case",
+                        value: caseItem.Value || caseItem.value || caseIndex.toString(),
+                        thenBlocks: []
+                    }
+                    
+                    // Add changeInstance if present
+                    if (caseItem.Result && caseItem.Result.Instance) {
+                        caseBlock.thenBlocks.push({
+                            id: `changeInstance_${index}_${caseIndex}`,
+                            type: "changeInstance",
+                            instanceName: caseItem.Result.Instance
+                        })
+                    }
+                    
+                    switchBlock.cases.push(caseBlock)
+                })
+            }
+            
+            blocks.push(switchBlock)
+        } else if (condition.MapInstVar) {
+            // IF condition
+            const ifBlock = {
+                id: `if_${index}`,
+                type: "if",
+                condition: condition.MapInstVar.Variable || condition.MapInstVar,
+                thenBlocks: []
+            }
+            
+            // Add changeInstance if present
+            if (condition.MapInstVar.Result && condition.MapInstVar.Result.Instance) {
+                ifBlock.thenBlocks.push({
+                    id: `changeInstance_${index}`,
+                    type: "changeInstance",
+                    instanceName: condition.MapInstVar.Result.Instance
+                })
+            }
+            
+            blocks.push(ifBlock)
+        }
+    })
+    
+    return blocks
+}
+
+/**
  * Parses VBSP blocks to extract a mapping from variable values to instance paths.
- * @param {Array} blocks - The array of VBSP blocks from meta.json.
+ * @param {Array|Object} blocksOrVbsp - Either blocks array or VBSP conditions object.
  * @param {string} targetVariable - The variable to search for (e.g., "TIMER DELAY").
+ * @param {Object} item - The item object to access registered instances.
  * @returns {Map<string, string>} A map where keys are variable values (e.g., "3", "4") and values are instance paths.
  */
-function mapVariableValuesToInstances(blocks, targetVariable) {
+function mapVariableValuesToInstances(blocksOrVbsp, targetVariable, item = null) {
     const valueInstanceMap = new Map()
 
     console.log(
         `🔍 Searching for variable "${targetVariable}" in VBSP blocks...`,
     )
+
+    let blocks = blocksOrVbsp
+    
+    // Handle VBSP format conditions
+    if (!Array.isArray(blocksOrVbsp) && blocksOrVbsp && typeof blocksOrVbsp === 'object') {
+        // Check if it's already in blocks format (has a blocks property)
+        if (blocksOrVbsp.blocks && Array.isArray(blocksOrVbsp.blocks)) {
+            console.log("   Using existing blocks format...")
+            blocks = blocksOrVbsp.blocks
+            console.log(`   Found ${blocks.length} blocks`)
+        } else {
+            console.log("   Converting VBSP format to blocks...")
+            blocks = convertVbspToBlocks(blocksOrVbsp)
+            console.log(`   Converted to ${blocks.length} blocks`)
+        }
+    }
+
     console.log(`   Total blocks: ${blocks ? blocks.length : 0}`)
 
     if (!Array.isArray(blocks)) {
@@ -901,6 +1021,18 @@ function mapVariableValuesToInstances(blocks, targetVariable) {
     const fixupVariable = `$${targetVariable.replace(/ /g, "_").toLowerCase()}`
     console.log(`   Converted to fixup format: "${fixupVariable}"`)
 
+    // Helper function to get the first registered instance
+    const getFirstRegisteredInstance = () => {
+        if (!item || !item.instances) {
+            return null
+        }
+        const instanceKeys = Object.keys(item.instances).sort(
+            (a, b) => parseInt(a, 10) - parseInt(b, 10),
+        )
+        const firstKey = instanceKeys[0]
+        return firstKey ? item.instances[firstKey]?.Name : null
+    }
+
     // Helper function to recursively search for changeInstance blocks
     const findChangeInstancesInBlock = (block, depth = 0) => {
         const indent = "  ".repeat(depth + 2)
@@ -915,9 +1047,23 @@ function mapVariableValuesToInstances(blocks, targetVariable) {
 
         const results = []
 
-        // Check children array
+        // Check children array (for nested blocks)
         if (Array.isArray(block.children)) {
             for (const child of block.children) {
+                results.push(...findChangeInstancesInBlock(child, depth + 1))
+            }
+        }
+        
+        // Check thenBlocks array (for IF blocks)
+        if (Array.isArray(block.thenBlocks)) {
+            for (const child of block.thenBlocks) {
+                results.push(...findChangeInstancesInBlock(child, depth + 1))
+            }
+        }
+        
+        // Check elseBlocks array (for IF-ELSE blocks)
+        if (Array.isArray(block.elseBlocks)) {
+            for (const child of block.elseBlocks) {
                 results.push(...findChangeInstancesInBlock(child, depth + 1))
             }
         }
@@ -971,20 +1117,31 @@ function mapVariableValuesToInstances(blocks, targetVariable) {
                 console.log(`   Found ${block.type} block`)
 
                 // Check if this IF block uses our target variable
+                // Handle both 'condition' and 'variable' properties
+                const condition = block.condition || block.variable
                 if (
-                    block.condition &&
-                    block.condition.includes(fixupVariable)
+                    condition &&
+                    condition.includes(fixupVariable)
                 ) {
                     console.log(
-                        `     → Uses target variable: ${block.condition}`,
+                        `     → Uses target variable: ${condition}`,
                     )
 
-                    // Extract the value being checked (e.g., "$timer_delay == 5" -> "5")
-                    const match = block.condition.match(/==\s*["']?(\w+)["']?/)
-                    if (match) {
-                        const value = match[1]
+                    // Extract the value being checked
+                    let value = null
+                    
+                    // Check for comparison pattern (e.g., "$timer_delay == 5")
+                    const comparisonMatch = condition.match(/==\s*["']?(\w+)["']?/)
+                    if (comparisonMatch) {
+                        value = comparisonMatch[1]
                         console.log(`     → Checking for value: "${value}"`)
+                    } else if (condition === fixupVariable || condition === `"${fixupVariable}"`) {
+                        // Handle boolean conditions (e.g., "$start_enabled" or "\"$start_enabled\"")
+                        value = "true"
+                        console.log(`     → Boolean condition detected, treating as "true"`)
+                    }
 
+                    if (value) {
                         // Find changeInstance in this block's children
                         const instances = findChangeInstancesInBlock(block)
                         if (instances.length > 0) {
@@ -995,6 +1152,20 @@ function mapVariableValuesToInstances(blocks, targetVariable) {
                                 value,
                                 instances[0].instanceName,
                             )
+                        }
+                        
+                        // For IF statements without ELSE, also add a default case
+                        // This handles the case where the IF condition is true, but we also want
+                        // to handle the case where it's false (default behavior)
+                        if (block.type === "if" && !block.elseBlocks) {
+                            console.log(`     → IF without ELSE detected, adding default case`)
+                            // Add a default case for when the condition is false
+                            // We'll use the first registered instance as the default
+                            const firstInstance = getFirstRegisteredInstance()
+                            if (firstInstance) {
+                                valueInstanceMap.set("false", firstInstance)
+                                console.log(`     → Added default case: "false" → ${firstInstance}`)
+                            }
                         }
                     }
                 }

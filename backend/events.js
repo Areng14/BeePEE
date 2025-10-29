@@ -3219,8 +3219,9 @@ function reg_events(mainWindow) {
                     )
 
                     const valueInstanceMap = mapVariableValuesToInstances(
-                        conditions.blocks,
+                        conditions,
                         instanceKey,
+                        item,
                     )
 
                     console.log("Value to instance map:", valueInstanceMap)

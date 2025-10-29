@@ -1989,7 +1989,7 @@ class Item {
             // Attach instance filter to ensure condition targets this item's instances only
             const withInstanceGuard = {
                 ...topLevelInstanceTest,
-                Result: vbspBlock,
+                ...vbspBlock,
             }
             conditions.push(withInstanceGuard)
         })
