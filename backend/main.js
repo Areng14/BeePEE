@@ -6,6 +6,7 @@ const { reg_events } = require("./events.js")
 const { WindowTitleManager } = require("./windowTitleManager.js")
 const { setMainWindow, clearPackagesDirectory } = require("./packageManager.js")
 const { logger, initializeLogger } = require("./utils/logger.js")
+const isDev = require("./utils/isDev.js")
 
 // Register custom schemes as privileged BEFORE app is ready
 // This ensures that the 'beep' scheme can be used with fetch API and other web features.
@@ -24,8 +25,6 @@ protocol.registerSchemesAsPrivileged([
 ])
 
 const createWindow = () => {
-    const isDev = !app.isPackaged
-
     const win = new BrowserWindow({
         title: "BeePEE",
         width: 1024,

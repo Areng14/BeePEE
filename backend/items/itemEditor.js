@@ -4,14 +4,13 @@ let createPackageWindow = null // Track the create package window
 let packageInformationWindow = null // Track the package information window
 const { BrowserWindow } = require("electron")
 const path = require("path")
+const isDev = require("../utils/isDev.js")
 
 function createItemEditor(item, mainWindow) {
     if (openEditors.has(item.id)) {
         openEditors.get(item.id).focus()
         return
     }
-
-    const isDev = !require("electron").app.isPackaged
 
     const window = new BrowserWindow({
         width: 960,
@@ -72,8 +71,6 @@ function createItemCreationWindow(mainWindow) {
         return
     }
 
-    const isDev = !require("electron").app.isPackaged
-
     createItemWindow = new BrowserWindow({
         width: 500,
         height: 500,
@@ -112,8 +109,6 @@ function createPackageCreationWindow(mainWindow) {
         createPackageWindow.focus()
         return
     }
-
-    const isDev = !require("electron").app.isPackaged
 
     createPackageWindow = new BrowserWindow({
         width: 500,
@@ -156,8 +151,6 @@ function createPackageInformationWindow(mainWindow) {
         packageInformationWindow.focus()
         return
     }
-
-    const isDev = !require("electron").app.isPackaged
 
     packageInformationWindow = new BrowserWindow({
         width: 500,
