@@ -3,6 +3,8 @@
     "main": "backend/main.js",
     "private": true,
     "version": "0.0.0",
+    "description": "Beemod Package Editor",
+    "author": "Areng",
     "scripts": {
         "dev": "concurrently -k \"vite\" \"electron .\"",
         "build": "vite build && electron-builder",

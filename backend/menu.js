@@ -15,6 +15,7 @@ const {
     createPackageCreationWindow,
     createPackageInformationWindow,
 } = require("./items/itemEditor")
+const isDev = require("./utils/isDev.js")
 
 // Track last saved .bpee path in memory
 let lastSavedBpeePath = null
@@ -29,8 +30,6 @@ function getCurrentPackageName() {
 }
 
 function createMainMenu(mainWindow) {
-    const isDev = !require("electron").app.isPackaged
-
     const template = [
         {
             label: "File",

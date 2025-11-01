@@ -4,13 +4,12 @@ const path = require("path")
 const { exec } = require("child_process")
 const { promisify } = require("util")
 const { app } = require("electron")
+const isDev = require("./isDev.js")
 
 const execAsync = promisify(exec)
 
 // Helper to get MareTF path for Electron
 function getMareTFPath() {
-    const isDev = !app.isPackaged
-
     console.log("isDev:", isDev)
     console.log("__dirname:", __dirname)
 

@@ -7,6 +7,7 @@ const { app } = require("electron")
 const sharp = require("sharp")
 const { findPortal2Resources } = require("../data")
 const { convertImageToVTF } = require("./vtfConverter")
+const isDev = require("./isDev.js")
 
 const execAsync = promisify(exec)
 
@@ -14,8 +15,6 @@ const execAsync = promisify(exec)
  * Helper to get STUDIOMDL path
  */
 function getStudioMDLPath() {
-    const isDev = !app.isPackaged
-
     console.log("isDev:", isDev)
     console.log("__dirname:", __dirname)
 
@@ -80,7 +79,6 @@ $sequence idle "${objFileName}" fps 30
  * @param {string} outputPath - Path for the cartoonified output
  */
 async function applyCartoonification(inputPath, outputPath) {
-    const isDev = !app.isPackaged
     const cartoonExePath = isDev
         ? path.join(__dirname, "..", "libs", "areng_cartoonify", "cartoon.exe")
         : path.join(
@@ -1203,7 +1201,6 @@ async function convertObjTo3DS(
         throw new Error(`OBJ file not found: ${objPath}`)
     }
 
-    const isDev = !app.isPackaged
     const converterExe = isDev
         ? path.join(
               __dirname,
