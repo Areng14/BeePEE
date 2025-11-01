@@ -1,4 +1,4 @@
-const { Menu } = require("electron")
+const { Menu, shell } = require("electron")
 const {
     loadPackage,
     importPackage,
@@ -365,6 +365,33 @@ function createMainMenu(mainWindow) {
                             return
                         }
                         createPackageInformationWindow(mainWindow)
+                    },
+                },
+            ],
+        },
+        {
+            label: "Help",
+            submenu: [
+                {
+                    label: "GitHub Repository",
+                    click: () => {
+                        shell.openExternal(
+                            "https://github.com/Areng14/BeePEE",
+                        )
+                    },
+                },
+                {
+                    label: "Tutorial",
+                    click: () => {
+                        shell.openExternal(
+                            "https://github.com/Areng14/BeePEE/wiki",
+                        )
+                    },
+                },
+                {
+                    label: "Discord Server",
+                    click: () => {
+                        shell.openExternal("https://discord.gg/WPzDn4sZY3")
                     },
                 },
             ],

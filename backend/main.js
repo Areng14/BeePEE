@@ -5,6 +5,7 @@ const fs = require("fs")
 const { reg_events } = require("./events.js")
 const { WindowTitleManager } = require("./windowTitleManager.js")
 const { setMainWindow, clearPackagesDirectory } = require("./packageManager.js")
+const { logger, initializeLogger } = require("./utils/logger.js")
 
 // Register custom schemes as privileged BEFORE app is ready
 // This ensures that the 'beep' scheme can be used with fetch API and other web features.
@@ -68,12 +69,15 @@ ipcMain.handle("api:loadImage", async (event, filePath) => {
 
         return `data:${mimeType};base64,${base64}`
     } catch (error) {
-        console.error("Error loading image:", error)
+        logger.error("Error loading image:", error)
         return null
     }
 })
 
 app.whenReady().then(async () => {
+    // Initialize logger
+    initializeLogger()
+
     // Register custom file protocol for secure local file access
     protocol.handle("beep", async (request) => {
         try {
@@ -83,7 +87,7 @@ app.whenReady().then(async () => {
             try {
                 url = decodeURIComponent(url)
             } catch (decodeError) {
-                console.error("Failed to decode URL:", url, decodeError)
+                logger.error("Failed to decode URL:", url, decodeError)
                 return new Response("Bad Request: Invalid URL encoding", {
                     status: 400,
                 })
@@ -110,7 +114,7 @@ app.whenReady().then(async () => {
             try {
                 filePath = path.resolve(url)
             } catch (pathError) {
-                console.error("Failed to resolve path:", url, pathError)
+                logger.error("Failed to resolve path:", url, pathError)
                 return new Response("Bad Request: Invalid file path", {
                     status: 400,
                 })
@@ -122,7 +126,7 @@ app.whenReady().then(async () => {
             const normalizedProjectRoot = path.normalize(projectRoot)
 
             if (!normalizedFilePath.startsWith(normalizedProjectRoot)) {
-                console.log(
+                logger.warn(
                     `Security check failed: ${normalizedFilePath} is not within ${normalizedProjectRoot}`,
                 )
                 return new Response("Forbidden: Access denied", { status: 403 })
@@ -132,13 +136,13 @@ app.whenReady().then(async () => {
             let stats
             try {
                 if (!fs.existsSync(filePath)) {
-                    console.log(`File not found: ${filePath}`)
+                    logger.warn(`File not found: ${filePath}`)
                     return new Response("Not Found", { status: 404 })
                 }
 
                 stats = fs.statSync(filePath)
             } catch (fsError) {
-                console.error(
+                logger.error(
                     `File system error accessing ${filePath}:`,
                     fsError,
                 )
@@ -150,7 +154,7 @@ app.whenReady().then(async () => {
 
             // Check if it's actually a file (not a directory)
             if (!stats.isFile()) {
-                console.log(`Not a file: ${filePath}`)
+                logger.warn(`Not a file: ${filePath}`)
                 return new Response("Bad Request: Path is not a file", {
                     status: 400,
                 })
@@ -160,7 +164,7 @@ app.whenReady().then(async () => {
             try {
                 fs.accessSync(filePath, fs.constants.R_OK)
             } catch (accessError) {
-                console.error(`File not readable: ${filePath}`, accessError)
+                logger.error(`File not readable: ${filePath}`, accessError)
                 return new Response("Forbidden: File not readable", {
                     status: 403,
                 })
@@ -176,14 +180,14 @@ app.whenReady().then(async () => {
                 fileUrl = `file://${filePath}`
             }
 
-            console.log(`Serving file: ${filePath} via ${fileUrl}`)
+            logger.debug(`Serving file: ${filePath} via ${fileUrl}`)
 
             // Fetch the file
             const response = await net.fetch(fileUrl)
 
             // Check if the fetch was successful
             if (!response.ok) {
-                console.error(
+                logger.error(
                     `Failed to fetch file: ${fileUrl}, status: ${response.status}`,
                 )
                 return new Response(
@@ -227,28 +231,28 @@ app.whenReady().then(async () => {
 
             return response
         } catch (error) {
-            console.error("Beep protocol handler error:", error)
+            logger.error("Beep protocol handler error:", error)
             return new Response("Internal Server Error", { status: 500 })
         }
     })
 
-    console.log("🔧 Registered beep:// protocol for secure file access")
+    logger.info("🔧 Registered beep:// protocol for secure file access")
 
     createWindow()
 
     // Configure VMF2OBJ resource paths on startup
     try {
         const { findPortal2Resources } = require("./data")
-        const p2Resources = await findPortal2Resources(console)
+        const p2Resources = await findPortal2Resources(logger)
 
         if (p2Resources?.root) {
             const { setExtraResourcePaths } = require("./utils/vmf2obj")
             const resourcePaths = []
 
-            console.log("🔍 Portal 2 resources found:")
-            console.log("  Root:", p2Resources.root)
-            console.log("  Search paths:", p2Resources.searchPaths || [])
-            console.log("  DLC folders:", p2Resources.dlcFolders || [])
+            logger.info("🔍 Portal 2 resources found:")
+            logger.debug("  Root:", p2Resources.root)
+            logger.debug("  Search paths:", p2Resources.searchPaths || [])
+            logger.debug("  DLC folders:", p2Resources.dlcFolders || [])
 
             // Add main Portal 2 files
             resourcePaths.push(`${p2Resources.root}\\portal2\\pak01_dir.vpk`)
@@ -257,11 +261,11 @@ app.whenReady().then(async () => {
 
             // Add search paths from gameinfo.txt
             if (p2Resources.searchPaths) {
-                console.log(
+                logger.debug(
                     `🔍 Processing ${p2Resources.searchPaths.length} search paths...`,
                 )
                 for (const searchPath of p2Resources.searchPaths) {
-                    console.log(`  📁 Processing search path: "${searchPath}"`)
+                    logger.debug(`  📁 Processing search path: "${searchPath}"`)
 
                     // Handle |gameinfo_path| placeholder
                     let processedPath = searchPath
@@ -270,7 +274,7 @@ app.whenReady().then(async () => {
                             "|gameinfo_path|",
                             "",
                         )
-                        console.log(
+                        logger.debug(
                             `    🔄 Replaced |gameinfo_path| with: "${processedPath}"`,
                         )
                     }
@@ -284,7 +288,7 @@ app.whenReady().then(async () => {
                         // Handle absolute paths like "Hammer" - they're relative to Portal 2 root
                         fullPath = path.join(p2Resources.root, processedPath)
                     }
-                    console.log(`    🎯 Full path: ${fullPath}`)
+                    logger.debug(`    🎯 Full path: ${fullPath}`)
 
                     if (fs.existsSync(fullPath)) {
                         // Check if this path actually contains useful resources for VMF2OBJ
@@ -298,13 +302,13 @@ app.whenReady().then(async () => {
                             // Add the parent folder if it's a VPK
                             if (isVpk) {
                                 resourcePaths.push(fullPath)
-                                console.log(`    ✅ Added VPK: ${fullPath}`)
+                                logger.debug(`    ✅ Added VPK: ${fullPath}`)
                             }
 
                             // Add materials subfolder if it exists
                             if (hasMaterials) {
                                 resourcePaths.push(materialsPath)
-                                console.log(
+                                logger.debug(
                                     `    ✅ Added materials: ${materialsPath}`,
                                 )
                             }
@@ -312,28 +316,28 @@ app.whenReady().then(async () => {
                             // Add models subfolder if it exists
                             if (hasModels) {
                                 resourcePaths.push(modelsPath)
-                                console.log(
+                                logger.debug(
                                     `    ✅ Added models: ${modelsPath}`,
                                 )
                             }
                         } else {
-                            console.log(
+                            logger.debug(
                                 `    ⚠️ Path exists but no materials/models: ${fullPath}`,
                             )
                         }
                     } else {
-                        console.log(`    ❌ Path does not exist: ${fullPath}`)
+                        logger.debug(`    ❌ Path does not exist: ${fullPath}`)
                     }
                 }
             }
 
             // Add DLC folders
             if (p2Resources.dlcFolders) {
-                console.log(
+                logger.debug(
                     `🔍 Processing ${p2Resources.dlcFolders.length} DLC folders...`,
                 )
                 for (const dlc of p2Resources.dlcFolders) {
-                    console.log(
+                    logger.debug(
                         `  📁 Processing DLC: ${dlc.name} at ${dlc.path}`,
                     )
 
@@ -341,9 +345,9 @@ app.whenReady().then(async () => {
                     const dlcVpkPath = path.join(dlc.path, "pak01_dir.vpk")
                     if (fs.existsSync(dlcVpkPath)) {
                         resourcePaths.push(dlcVpkPath)
-                        console.log(`    ✅ Added DLC VPK: ${dlcVpkPath}`)
+                        logger.debug(`    ✅ Added DLC VPK: ${dlcVpkPath}`)
                     } else {
-                        console.log(`    ❌ DLC VPK not found: ${dlcVpkPath}`)
+                        logger.debug(`    ❌ DLC VPK not found: ${dlcVpkPath}`)
                     }
 
                     // Add DLC materials and models folders for custom content
@@ -352,43 +356,46 @@ app.whenReady().then(async () => {
 
                     if (fs.existsSync(dlcMaterialsPath)) {
                         resourcePaths.push(dlcMaterialsPath)
-                        console.log(
+                        logger.debug(
                             `    ✅ Added DLC materials: ${dlcMaterialsPath}`,
                         )
                     } else {
-                        console.log(
+                        logger.debug(
                             `    ❌ DLC materials not found: ${dlcMaterialsPath}`,
                         )
                     }
 
                     if (fs.existsSync(dlcModelsPath)) {
                         resourcePaths.push(dlcModelsPath)
-                        console.log(`    ✅ Added DLC models: ${dlcModelsPath}`)
+                        logger.debug(`    ✅ Added DLC models: ${dlcModelsPath}`)
                     } else {
-                        console.log(
+                        logger.debug(
                             `    ❌ DLC models not found: ${dlcModelsPath}`,
                         )
                     }
                 }
             } else {
-                console.log(`⚠️ No DLC folders found`)
+                logger.debug(`⚠️ No DLC folders found`)
             }
 
             setExtraResourcePaths(resourcePaths)
-            console.log("VMF2OBJ resource paths configured:", resourcePaths)
+            logger.info("VMF2OBJ resource paths configured:", resourcePaths)
         }
     } catch (error) {
-        console.warn("Could not setup Portal 2 resource paths:", error)
+        logger.warn("Could not setup Portal 2 resource paths:", error)
     }
 })
 
 // Clean up packages directory when app exits
 app.on("before-quit", async () => {
     try {
-        console.log("Cleaning up packages directory...")
+        logger.info("Cleaning up packages directory...")
         await clearPackagesDirectory()
-        console.log("Packages directory cleaned up successfully")
+        logger.info("Packages directory cleaned up successfully")
     } catch (error) {
-        console.error("Failed to clean up packages directory:", error.message)
+        logger.error("Failed to clean up packages directory:", error.message)
+    } finally {
+        // Close logger stream
+        logger.close()
     }
 })
