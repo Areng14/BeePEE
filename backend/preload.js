@@ -216,4 +216,15 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.on("package-loading-progress", (event, data) =>
             callback(data),
         ),
+
+    // ========================================
+    // AUTO-UPDATER FUNCTIONS
+    // ========================================
+    checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
+    downloadUpdate: () => ipcRenderer.invoke("download-update"),
+    quitAndInstall: () => ipcRenderer.invoke("quit-and-install"),
+    onUpdateStatus: (callback) => {
+        ipcRenderer.removeAllListeners("update-status")
+        ipcRenderer.on("update-status", (event, data) => callback(data))
+    },
 })

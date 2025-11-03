@@ -2,9 +2,13 @@
     "name": "beepee",
     "main": "backend/main.js",
     "private": true,
-    "version": "0.0.0",
+    "version": "1.0.0-BETA",
     "description": "BEEmod Package Editor",
     "author": "Areng",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/Areng14/BeePEE.git"
+    },
     "scripts": {
         "dev": "concurrently -k \"vite\" \"electron .\"",
         "build": "vite build && electron-builder",
@@ -17,6 +21,14 @@
         "appId": "com.beepee.app",
         "productName": "BeePEE",
         "icon": "public/icon.png",
+        "publish": [
+            {
+                "provider": "github",
+                "owner": "Areng14",
+                "repo": "BeePEE",
+                "releaseType": "prerelease"
+            }
+        ],
         "files": [
             "dist/**/*",
             "backend/**/*",
@@ -28,7 +40,15 @@
             "output": "release"
         },
         "win": {
-            "target": "nsis",
+            "target": [
+                {
+                    "target": "nsis",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "publisherName": "Areng",
             "icon": "public/icon.ico",
             "fileAssociations": [
                 {
@@ -47,8 +67,22 @@
                 }
             ]
         },
+        "nsis": {
+            "oneClick": false,
+            "allowToChangeInstallationDirectory": true,
+            "perMachine": false,
+            "deleteAppDataOnUninstall": false
+        },
         "linux": {
-            "target": "AppImage",
+            "target": [
+                {
+                    "target": "AppImage",
+                    "arch": [
+                        "x64"
+                    ]
+                }
+            ],
+            "category": "Development",
             "icon": "public/icon.png",
             "fileAssociations": [
                 {
@@ -69,7 +103,9 @@
             {
                 "from": "node_modules/7zip-bin",
                 "to": "extraResources/7zip-bin",
-                "filter": ["**/*"]
+                "filter": [
+                    "**/*"
+                ]
             },
             {
                 "from": "backend/libs/studiomdl",
@@ -82,7 +118,9 @@
             {
                 "from": "backend/libs/VMF2OBJ",
                 "to": "extraResources/VMF2OBJ",
-                "filter": ["**/*"]
+                "filter": [
+                    "**/*"
+                ]
             },
             {
                 "from": "backend/libs/areng_cartoonify",
@@ -95,7 +133,9 @@
             {
                 "from": "backend/libs/areng_vmfMerge",
                 "to": "extraResources/areng_vmfMerge",
-                "filter": ["**/*"]
+                "filter": [
+                    "**/*"
+                ]
             }
         ]
     },
@@ -119,6 +159,7 @@
         "@react-three/drei": "^10.6.1",
         "@react-three/fiber": "^9.3.0",
         "7zip-bin": "^5.2.0",
+        "electron-updater": "^6.6.2",
         "node-7z": "^3.0.0",
         "p-limit": "^7.2.0",
         "pica": "^8.0.0",
