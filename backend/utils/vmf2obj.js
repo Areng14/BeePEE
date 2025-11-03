@@ -3,7 +3,6 @@ const path = require("path")
 const { app } = require("electron")
 const { findPortal2Resources } = require("../data")
 const { convertTexturesForModel } = require("./tgaConverter")
-const isDev = require("./isDev.js")
 
 // Extra resource search paths configurable at runtime (folders or VPKs)
 let extraResourcePaths = []
@@ -30,6 +29,7 @@ function uniquePaths(paths) {
 }
 
 function getJavaPath() {
+    const isDev = !app.isPackaged
     const bundledJava = isDev
         ? path.join(
               __dirname,
@@ -56,6 +56,7 @@ function getJavaPath() {
 }
 
 function getJarPath() {
+    const isDev = !app.isPackaged
     const jarPath = isDev
         ? path.join(__dirname, "..", "libs", "VMF2OBJ", "VMF2OBJ.jar")
         : path.join(
@@ -69,6 +70,7 @@ function getJarPath() {
 }
 
 function getCartoonExePath() {
+    const isDev = !app.isPackaged
     const exePath = isDev
         ? path.join(__dirname, "..", "libs", "areng_cartoonify", "cartoon.exe")
         : path.join(
@@ -344,6 +346,8 @@ async function convertVmfToObj(vmfPath, options = {}) {
         console.log(`🔍 VMF2OBJ resource paths:`, resourcePaths)
     }
 
+    // Join paths with semicolon - no need to quote individual paths
+    // when using spawn() as it handles arguments properly
     const resourceArg =
         resourcePaths.length > 0 ? resourcePaths.join(";") : null
 

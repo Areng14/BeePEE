@@ -1,6 +1,35 @@
 // VMF Atlas - Merge multiple VMF instances into a single grid layout
 const fs = require("fs")
 const path = require("path")
+const isDev = require("./isDev.js")
+
+/**
+ * Get the path to the VMF merge executable
+ * @returns {string} Path to merge.exe
+ */
+function getMergeExePath() {
+    const bundledExe = isDev
+        ? path.join(__dirname, "..", "libs", "areng_vmfMerge", "merge.exe")
+        : path.join(
+              process.resourcesPath,
+              "extraResources",
+              "areng_vmfMerge",
+              "merge.exe",
+          )
+
+    console.log("🔍 Checking for bundled merge.exe at:", bundledExe)
+    console.log("   Exists?", fs.existsSync(bundledExe))
+
+    if (fs.existsSync(bundledExe)) {
+        console.log("✅ Using bundled merge.exe:", bundledExe)
+        return bundledExe
+    }
+
+    // Fallback error - we need the exe
+    throw new Error(
+        `VMF merge executable not found at: ${bundledExe}. Please ensure it is properly packaged.`,
+    )
+}
 
 /**
  * Calculate grid dimensions for N items (tries to make it roughly square)
@@ -173,13 +202,9 @@ async function mergeVMFsIntoGrid(vmfFiles, outputPath, options = {}) {
         throw new Error("No valid VMF files could be found")
     }
 
-    // Use Python merge script with srctools for proper texture locking
+    // Use bundled merge executable with srctools for proper texture locking
     const { spawn } = require("child_process")
-    const pythonScript = path.join(__dirname, "../libs/areng_vmfMerge/merge.py")
-
-    if (!fs.existsSync(pythonScript)) {
-        throw new Error(`Python merge script not found: ${pythonScript}`)
-    }
+    const mergeExePath = getMergeExePath()
 
     // Create JSON config for merge script
     const configPath = outputPath.replace(".vmf", "_merge_config.json")
@@ -190,49 +215,46 @@ async function mergeVMFsIntoGrid(vmfFiles, outputPath, options = {}) {
     }
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2))
 
-    console.log(`  🐍 Running Python merge script with texture locking...`)
+    console.log(`  ⚙️  Running bundled merge executable with texture locking...`)
 
-    // Run Python merge script
+    // Run merge executable
     return new Promise((resolve, reject) => {
-        const pythonProcess = spawn(
-            "python",
-            [pythonScript, "--json", configPath],
-            {
-                cwd: path.dirname(pythonScript),
-            },
-        )
+        const mergeProcess = spawn(mergeExePath, ["--json", configPath], {
+            cwd: path.dirname(mergeExePath),
+            windowsHide: true,
+        })
 
         let stdout = ""
         let stderr = ""
 
-        pythonProcess.stdout.on("data", (data) => {
+        mergeProcess.stdout.on("data", (data) => {
             const output = data.toString()
             stdout += output
-            // Forward Python output to console
+            // Forward merge output to console
             output.split("\n").forEach((line) => {
                 if (line.trim()) console.log(`    ${line}`)
             })
         })
 
-        pythonProcess.stderr.on("data", (data) => {
+        mergeProcess.stderr.on("data", (data) => {
             stderr += data.toString()
         })
 
-        pythonProcess.on("close", (code) => {
+        mergeProcess.on("close", (code) => {
             // Clean up config file
             try {
                 if (fs.existsSync(configPath)) fs.unlinkSync(configPath)
             } catch (e) {}
 
             if (code !== 0) {
-                console.error(`  ❌ Python merge failed with code ${code}`)
+                console.error(`  ❌ VMF merge failed with code ${code}`)
                 if (stderr) console.error(stderr)
                 return reject(
                     new Error(`VMF merge failed: ${stderr || "Unknown error"}`),
                 )
             }
 
-            // Parse result from Python output (last line should be JSON)
+            // Parse result from merge output (last line should be JSON)
             const lines = stdout.trim().split("\n")
             const lastLine = lines[lines.length - 1]
 
@@ -299,12 +321,12 @@ async function mergeVMFsIntoGrid(vmfFiles, outputPath, options = {}) {
             }
         })
 
-        pythonProcess.on("error", (error) => {
-            console.error(`  ❌ Failed to spawn Python process:`, error.message)
+        mergeProcess.on("error", (error) => {
+            console.error(`  ❌ Failed to spawn merge process:`, error.message)
             try {
                 if (fs.existsSync(configPath)) fs.unlinkSync(configPath)
             } catch (e) {}
-            reject(new Error(`Failed to run Python merge: ${error.message}`))
+            reject(new Error(`Failed to run VMF merge: ${error.message}`))
         })
     })
 }

@@ -814,11 +814,6 @@ async function handleItemSave(item, event, mainWindow) {
 }
 
 function reg_events(mainWindow) {
-    // Initialize Portal 2 resources at startup
-    findPortal2Resources().catch((error) => {
-        console.error("Failed to find Portal 2 resources:", error)
-    })
-
     // Register package loading
     reg_loadPackagePopup()
 
