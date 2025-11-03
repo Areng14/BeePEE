@@ -12,6 +12,7 @@
     "scripts": {
         "dev": "concurrently -k \"vite\" \"electron .\"",
         "build": "vite build && electron-builder",
+        "publish": "vite build && electron-builder --publish always",
         "start": "electron .",
         "format": "prettier --write .",
         "lint": "eslint . --fix",
@@ -48,7 +49,6 @@
                     ]
                 }
             ],
-            "publisherName": "Areng",
             "icon": "public/icon.ico",
             "fileAssociations": [
                 {
@@ -71,7 +71,9 @@
             "oneClick": false,
             "allowToChangeInstallationDirectory": true,
             "perMachine": false,
-            "deleteAppDataOnUninstall": false
+            "deleteAppDataOnUninstall": false,
+            "installerSidebar": "public/sidebar.bmp",
+            "uninstallerSidebar": "public/sidebar.bmp"
         },
         "linux": {
             "target": [

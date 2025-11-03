@@ -481,6 +481,9 @@ function Info({ item, formData, onUpdate }) {
                         <MenuItem value="HANDLE_6_POSITIONS">
                             6 Positions
                         </MenuItem>
+                        <MenuItem value="HANDLE_5_POSITIONS">
+                            5 Positions
+                        </MenuItem>
                         <MenuItem value="HANDLE_8_POSITIONS">
                             8 Positions
                         </MenuItem>

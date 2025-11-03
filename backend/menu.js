@@ -16,6 +16,7 @@ const {
     createPackageInformationWindow,
 } = require("./items/itemEditor")
 const isDev = require("./utils/isDev.js")
+const { ensurePackagesDir } = require("./utils/packagesDir")
 
 // Track last saved .bpee path in memory
 let lastSavedBpeePath = null
@@ -133,14 +134,7 @@ function createMainMenu(mainWindow) {
                         if (result.canceled) return null
                         try {
                             // Ensure packages directory exists
-                            const packagesDir = path.join(
-                                __dirname,
-                                "..",
-                                "packages",
-                            )
-                            if (!fs.existsSync(packagesDir)) {
-                                fs.mkdirSync(packagesDir, { recursive: true })
-                            }
+                            ensurePackagesDir()
 
                             const pkg = await loadPackage(result.filePaths[0])
                             // currentPackageDir is now managed in packageManager.js
