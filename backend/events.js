@@ -4432,6 +4432,39 @@ function reg_events(mainWindow) {
             return { success: false, error: error.message }
         }
     })
+
+    // ============================================
+    // AUTO-UPDATER IPC HANDLERS
+    // ============================================
+
+    // Check for updates manually (triggered by user)
+    ipcMain.handle("check-for-updates", async () => {
+        const { AutoUpdater } = require("./autoUpdater")
+        // Get updater instance from main.js global
+        if (global.updaterInstance) {
+            await global.updaterInstance.checkForUpdates(false)
+            return { success: true }
+        }
+        return { success: false, error: "Updater not initialized" }
+    })
+
+    // Download update
+    ipcMain.handle("download-update", async () => {
+        if (global.updaterInstance) {
+            global.updaterInstance.downloadUpdate()
+            return { success: true }
+        }
+        return { success: false, error: "Updater not initialized" }
+    })
+
+    // Install update and restart
+    ipcMain.handle("quit-and-install", async () => {
+        if (global.updaterInstance) {
+            global.updaterInstance.quitAndInstall()
+            return { success: true }
+        }
+        return { success: false, error: "Updater not initialized" }
+    })
 }
 
 module.exports = { reg_events }

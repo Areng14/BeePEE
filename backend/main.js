@@ -8,10 +8,12 @@ const { setMainWindow, clearPackagesDirectory } = require("./packageManager.js")
 const { logger, initializeLogger } = require("./utils/logger.js")
 const { ensurePackagesDir, getPackagesDir } = require("./utils/packagesDir.js")
 const isDev = require("./utils/isDev.js")
+const { AutoUpdater } = require("./autoUpdater.js")
 
 // Store reference to main window for file association handling
 let mainWindow = null
 let isLoadingFileOnStartup = false // Flag to prevent window from showing during file load
+let updaterInstance = null // Auto-updater instance
 
 // Register custom schemes as privileged BEFORE app is ready
 // This ensures that the 'beep' scheme can be used with fetch API and other web features.
@@ -73,6 +75,16 @@ const createWindow = () => {
 
     // Store reference to main window for file association handling
     mainWindow = win
+
+    // Initialize auto-updater
+    updaterInstance = new AutoUpdater(win)
+    global.updaterInstance = updaterInstance // Expose to IPC handlers
+
+    // Check for updates on startup
+    updaterInstance.checkOnStartup()
+
+    // Start periodic update checks
+    updaterInstance.startPeriodicChecks()
 
     return win
 }
@@ -411,6 +423,11 @@ app.on("before-quit", async () => {
     } catch (error) {
         logger.error("Failed to clean up packages directory:", error.message)
     } finally {
+        // Stop periodic update checks
+        if (updaterInstance) {
+            updaterInstance.stopPeriodicChecks()
+        }
+
         // Close logger stream
         logger.close()
     }

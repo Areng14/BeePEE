@@ -5,7 +5,8 @@
       "Bash(python:*)",
       "Bash(npm run build:*)",
       "Bash(nul)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": []

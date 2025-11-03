@@ -7,6 +7,7 @@ import CreatePackagePage from "./pages/CreatePackagePage"
 import PackageInformationPage from "./pages/PackageInformationPage"
 import WelcomePage from "./pages/WelcomePage"
 import LoadingPopup from "./components/LoadingPopup"
+import UpdateNotification from "./components/UpdateNotification"
 import { ItemProvider } from "./contexts/ItemContext"
 import "./global.css"
 
@@ -145,6 +146,7 @@ function App() {
                             }))
                         }
                     />
+                    <UpdateNotification />
                 </>
             )}
         </ItemProvider>
