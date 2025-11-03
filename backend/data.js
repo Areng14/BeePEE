@@ -28,7 +28,7 @@ async function findPortal2Dir(log = console) {
         return null
     }
     // 2. Find all Steam libraries
-    const steamLibs = [steamPath.toLowerCase()]
+    const steamLibs = [steamPath]
     try {
         const libVdfPath = path.join(
             steamPath,
@@ -46,7 +46,9 @@ async function findPortal2Dir(log = console) {
                         lib &&
                         fs.existsSync(path.join(lib, "steamapps", "common"))
                     ) {
-                        steamLibs.push(lib.replace(/\\/g, "/").toLowerCase())
+                        // Normalize the path but preserve case and use proper separators
+                        const normalizedLib = path.resolve(lib)
+                        steamLibs.push(normalizedLib)
                     }
                 }
             }
@@ -54,14 +56,22 @@ async function findPortal2Dir(log = console) {
     } catch (e) {
         log.error("Error parsing libraryfolders.vdf:", e)
     }
-    // Remove duplicates
-    const uniqueLibs = Array.from(new Set(steamLibs))
+    // Remove duplicates (case-insensitive comparison on Windows)
+    const uniqueLibs = []
+    const seenLibs = new Set()
+    for (const lib of steamLibs) {
+        const normalized = lib.toLowerCase()
+        if (!seenLibs.has(normalized)) {
+            seenLibs.add(normalized)
+            uniqueLibs.push(lib) // Keep original case
+        }
+    }
 
     // 3. Find Portal 2 directory
     for (const lib of uniqueLibs) {
         const p2dir = path.join(lib, "steamapps", "common", "Portal 2")
         if (fs.existsSync(p2dir)) {
-            return p2dir
+            return path.resolve(p2dir) // Return normalized path
         }
     }
 

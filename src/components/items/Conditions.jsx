@@ -1833,19 +1833,6 @@ function OffsetInstanceBlock({ block, onUpdateProperty }) {
     )
 }
 
-function TestBlock() {
-    return (
-        <Box sx={{ p: 2 }}>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Test Block (Empty for now)
-            </Typography>
-            <Alert severity="info">
-                This is a test block. You can configure it later.
-            </Alert>
-        </Box>
-    )
-}
-
 function DebugBlock({ block, onUpdateProperty, availableVariables }) {
     const [message, setMessage] = useState(block.message || "")
 
@@ -2016,8 +2003,6 @@ function SortableBlock({
                 return <AddCircleOutline fontSize="small" />
             case "addGlobalEnt":
                 return <Add fontSize="small" />
-            case "test":
-                return <Functions fontSize="small" />
             case "ifElse":
                 return <AccountTree fontSize="small" />
             case "offsetInstance":
@@ -2050,15 +2035,9 @@ function SortableBlock({
             debug: "#9C27B0", // Purple - Debug action
         }
 
-        // Test blocks use yellow
-        const testColors = {
-            test: "#FFC107", // Amber - Test blocks
-        }
-
         return (
             logicColors[blockType] ||
             actionColors[blockType] ||
-            testColors[blockType] ||
             "#555"
         )
     }
@@ -2202,9 +2181,6 @@ function SortableBlock({
                         onUpdateProperty={handleUpdateProperty}
                     />
                 )
-
-            case "test":
-                return <TestBlock />
 
             case "debug":
                 return (
@@ -3411,13 +3387,6 @@ const BLOCK_DEFINITIONS = {
         category: "Actions",
         canContainChildren: false,
     },
-    test: {
-        displayName: "Test Block",
-        description:
-            "Empty placeholder block for testing and development purposes",
-        category: "Test",
-        canContainChildren: false,
-    },
     mapInstVar: {
         displayName: "Map Instance Variable",
         description:
@@ -4211,7 +4180,7 @@ function Conditions({
         return ids
     }
 
-    const categories = ["Logic", "Actions", "Test"]
+    const categories = ["Logic", "Actions"]
 
     const getCategoryIcon = (category) => {
         switch (category) {
@@ -4219,8 +4188,6 @@ function Conditions({
                 return <AccountTree />
             case "Actions":
                 return <PlayArrow />
-            case "Test":
-                return <Functions />
             default:
                 return <Info />
         }
