@@ -2,7 +2,7 @@ const openEditors = new Map()
 let createItemWindow = null // Track the create item window
 let createPackageWindow = null // Track the create package window
 let packageInformationWindow = null // Track the package information window
-const { BrowserWindow } = require("electron")
+const { BrowserWindow, app } = require("electron")
 const path = require("path")
 const isDev = require("../utils/isDev.js")
 
@@ -39,7 +39,9 @@ function createItemEditor(item, mainWindow) {
     if (isDev) {
         window.loadURL(`http://localhost:5173/editor`)
     } else {
-        window.loadFile(path.join(__dirname, "../dist/index.html"), {
+        // Use app.getAppPath() for reliable path resolution in packaged app
+        const appPath = app.getAppPath()
+        window.loadFile(path.join(appPath, "dist", "index.html"), {
             query: { route: "editor" },
         })
     }
@@ -95,7 +97,9 @@ function createItemCreationWindow(mainWindow) {
     if (isDev) {
         createItemWindow.loadURL(`http://localhost:5173/create-item`)
     } else {
-        createItemWindow.loadFile(path.join(__dirname, "../dist/index.html"), {
+        // Use app.getAppPath() for reliable path resolution in packaged app
+        const appPath = app.getAppPath()
+        createItemWindow.loadFile(path.join(appPath, "dist", "index.html"), {
             query: { route: "create-item" },
         })
     }
@@ -134,8 +138,10 @@ function createPackageCreationWindow(mainWindow) {
     if (isDev) {
         createPackageWindow.loadURL(`http://localhost:5173/create-package`)
     } else {
+        // Use app.getAppPath() for reliable path resolution in packaged app
+        const appPath = app.getAppPath()
         createPackageWindow.loadFile(
-            path.join(__dirname, "../dist/index.html"),
+            path.join(appPath, "dist", "index.html"),
             {
                 query: { route: "create-package" },
             },
@@ -178,8 +184,10 @@ function createPackageInformationWindow(mainWindow) {
             `http://localhost:5173/package-information`,
         )
     } else {
+        // Use app.getAppPath() for reliable path resolution in packaged app
+        const appPath = app.getAppPath()
         packageInformationWindow.loadFile(
-            path.join(__dirname, "../dist/index.html"),
+            path.join(appPath, "dist", "index.html"),
             {
                 query: { route: "package-information" },
             },

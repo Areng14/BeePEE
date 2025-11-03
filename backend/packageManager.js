@@ -1,14 +1,66 @@
-const { dialog, ipcMain } = require("electron")
+const { dialog, ipcMain, app } = require("electron")
 const { Package } = require("./models/package")
 const fs = require("fs")
 const path = require("path")
 const vdf = require("vdf-parser")
-const path7za = require("7zip-bin").path7za
+let path7za = require("7zip-bin").path7za
 const { extractFull } = require("node-7z")
 const { add } = require("node-7z")
 const { spawn } = require("child_process")
 const { timeOperation } = require("./utils/timing")
 const { vmfStatsCache } = require("./utils/vmfParser")
+const { getPackagesDir, ensurePackagesDir } = require("./utils/packagesDir")
+
+// Fix 7zip-bin path for packaged app
+// When app is packaged, use extraResources directory
+if (app.isPackaged) {
+    const resourcesPath = process.resourcesPath
+    const platform = process.platform
+    const arch = process.arch
+
+    // Map Node.js platform names to 7zip-bin directory names
+    let platformDir = platform
+    if (platform === "win32") {
+        platformDir = "win"
+    } else if (platform === "darwin") {
+        platformDir = "mac"
+    } else if (platform === "linux") {
+        platformDir = "linux"
+    }
+
+    // Determine the correct 7za executable path based on platform
+    let execName = "7za"
+    if (platform === "win32") {
+        execName = "7za.exe"
+    }
+
+    // Build the path: resources/extraResources/7zip-bin/{platformDir}/{arch}/{execName}
+    const extraResourcesPath = path.join(
+        resourcesPath,
+        "extraResources",
+        "7zip-bin",
+        platformDir,
+        arch,
+        execName
+    )
+
+    console.log("Looking for 7zip at:", extraResourcesPath)
+    if (fs.existsSync(extraResourcesPath)) {
+        path7za = extraResourcesPath
+        console.log("Using packaged 7zip-bin path:", path7za)
+    } else {
+        console.error("7zip-bin not found in extraResources:", extraResourcesPath)
+        console.error("Available files in extraResources:")
+        try {
+            const extraResourcesRoot = path.join(resourcesPath, "extraResources")
+            if (fs.existsSync(extraResourcesRoot)) {
+                console.error(fs.readdirSync(extraResourcesRoot))
+            }
+        } catch (e) {
+            console.error("Could not list extraResources:", e.message)
+        }
+    }
+}
 
 // Global reference to main window for progress updates
 let mainWindow = null
@@ -691,16 +743,25 @@ const importPackage = async (pathToPackage) => {
 
             sendProgressUpdate(10, "Preparing package directory...")
 
+            // Packages directory should already be initialized at app startup
+            ensurePackagesDir()
+
             // Extract package - wipe existing directory first
             if (fs.existsSync(tempPkg.packageDir)) {
-                console.log(
-                    "Removing existing package directory:",
-                    tempPkg.packageDir,
-                )
-                fs.rmSync(tempPkg.packageDir, { recursive: true, force: true })
-                console.log(
-                    "Wiped existing package directory before import extraction",
-                )
+                const stat = fs.statSync(tempPkg.packageDir)
+                if (stat.isDirectory()) {
+                    console.log(
+                        "Removing existing package directory:",
+                        tempPkg.packageDir,
+                    )
+                    fs.rmSync(tempPkg.packageDir, { recursive: true, force: true })
+                    console.log(
+                        "Wiped existing package directory before import extraction",
+                    )
+                } else {
+                    // If it's a file, remove it
+                    fs.unlinkSync(tempPkg.packageDir)
+                }
             }
             fs.mkdirSync(tempPkg.packageDir, { recursive: true })
 
@@ -1085,12 +1146,18 @@ async function exportPackageAsBeePack(packageDir, outputBeePackPath) {
  * @returns {Promise<void>} Resolves when done, rejects on error.
  */
 async function clearPackagesDirectory() {
-    const packagesDir = path.resolve(__dirname, "../packages")
+    const packagesDir = getPackagesDir()
     if (fs.existsSync(packagesDir)) {
         const entries = fs.readdirSync(packagesDir)
         for (const entry of entries) {
             const entryPath = path.join(packagesDir, entry)
-            fs.rmSync(entryPath, { recursive: true, force: true })
+            // Check if it's a directory before trying to remove it
+            const stat = fs.statSync(entryPath)
+            if (stat.isDirectory()) {
+                fs.rmSync(entryPath, { recursive: true, force: true })
+            } else {
+                fs.unlinkSync(entryPath)
+            }
         }
     }
 }

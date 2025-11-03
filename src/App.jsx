@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { HashRouter, Routes, Route } from "react-router-dom"
 import { useState, useEffect } from "react"
 import ItemBrowser from "./components/ItemBrowser"
 import ItemEditor from "./components/ItemEditor"
@@ -27,6 +27,12 @@ function App() {
     })
 
     useEffect(() => {
+        // window.package should be available immediately after preload script loads
+        if (!window.package) {
+            console.error("window.package is not available - preload script may have failed")
+            return
+        }
+
         // Listen for package loading progress updates
         const handleProgress = (data) => {
             setLoadingState({
@@ -36,7 +42,6 @@ function App() {
                 error: data.error || null,
             })
 
-            // Auto-hide when complete (unless there's an error)
             if (data.progress >= 100 && !data.error) {
                 setLoadingState((prev) => ({ ...prev, open: false }))
             }
@@ -44,34 +49,20 @@ function App() {
 
         // Listen for package loaded event
         const handlePackageLoaded = (items) => {
-            console.log("Package loaded in App.jsx, items:", items?.length)
-            console.log("Setting packageLoaded to true")
             setPackageLoaded(true)
         }
 
         // Listen for package closed event
         const handlePackageClosed = () => {
-            console.log("Package closed in App.jsx")
-            console.log("Setting packageLoaded to false")
             setPackageLoaded(false)
-            console.log("packageLoaded is now:", false)
         }
 
-        if (window.package?.onPackageLoadingProgress) {
-            window.package.onPackageLoadingProgress(handleProgress)
-        }
+        // Register event listeners
+        window.package.onPackageLoadingProgress(handleProgress)
+        window.package.onPackageLoaded(handlePackageLoaded)
+        window.package.onPackageClosed(handlePackageClosed)
 
-        if (window.package?.onPackageLoaded) {
-            window.package.onPackageLoaded(handlePackageLoaded)
-        }
-
-        if (window.package?.onPackageClosed) {
-            window.package.onPackageClosed(handlePackageClosed)
-        }
-
-        return () => {
-            // Cleanup if needed
-        }
+        // Cleanup is handled by preload script's event listener management
     }, [])
 
     return (
@@ -106,7 +97,7 @@ function App() {
             ) : (
                 // Use normal routing for main window and development
                 <>
-                    <BrowserRouter>
+                    <HashRouter>
                         <Routes>
                             <Route
                                 path="/"
@@ -140,7 +131,7 @@ function App() {
                                 element={<PackageInformationPage />}
                             />
                         </Routes>
-                    </BrowserRouter>
+                    </HashRouter>
                     <LoadingPopup
                         open={loadingState.open}
                         progress={loadingState.progress}

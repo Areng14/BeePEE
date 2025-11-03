@@ -27,6 +27,10 @@ function WelcomePage() {
 
     const handleOpenPackage = async () => {
         try {
+            if (!window.package?.loadPackage) {
+                console.error("window.package.loadPackage is not available")
+                return
+            }
             await window.package.loadPackage()
         } catch (error) {
             console.error("Failed to open package:", error)
