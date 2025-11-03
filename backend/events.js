@@ -28,6 +28,7 @@ const {
 const { spawn } = require("child_process")
 const { Instance } = require("./items/Instance")
 const { getCleanInstancePath } = require("./utils/instancePaths")
+const { getPackagesDir } = require("./utils/packagesDir")
 const { vmfStatsCache } = require("./utils/vmfParser")
 const {
     convertVmfToObj,
@@ -1581,19 +1582,23 @@ function reg_events(mainWindow) {
             }
             const packageId = `${cleanName}_${generateShortUuid()}`
 
-            // Create packages folder if it doesn't exist
-            const packagesDir = path.join(__dirname, "..", "packages")
-            if (!fs.existsSync(packagesDir)) {
-                fs.mkdirSync(packagesDir, { recursive: true })
-            }
+            // Packages directory should already be initialized at app startup
+            const packagesDir = getPackagesDir()
 
             // Create package directory
             const packageDir = path.join(packagesDir, packageId)
+            
             if (fs.existsSync(packageDir)) {
-                throw new Error(
-                    `Package directory already exists: ${packageId}`,
-                )
+                const stat = fs.statSync(packageDir)
+                if (stat.isDirectory()) {
+                    throw new Error(
+                        `Package directory already exists: ${packageId}`,
+                    )
+                }
+                // If it's a file instead of directory, remove it
+                fs.unlinkSync(packageDir)
             }
+
             fs.mkdirSync(packageDir, { recursive: true })
 
             // Create items folder
@@ -1745,14 +1750,40 @@ function reg_events(mainWindow) {
             // After extraction, determine the package directory
             // importPackage extracts to packages/<packagename>/ where <packagename> comes from the info.json INSIDE the archive
             // We need to find that directory
-            const packagesDir = path.join(__dirname, "..", "packages")
+            const packagesDir = getPackagesDir()
+
+            // Validate packages directory
+            if (!fs.existsSync(packagesDir)) {
+                throw new Error(`Packages directory does not exist: ${packagesDir}`)
+            }
+            
+            const stat = fs.statSync(packagesDir)
+            if (!stat.isDirectory()) {
+                throw new Error(
+                    `Packages path exists but is not a directory: ${packagesDir}`,
+                )
+            }
 
             // Find the most recently modified directory in packages/ (should be the one we just extracted)
             const packageDirs = fs
                 .readdirSync(packagesDir)
                 .map((name) => path.join(packagesDir, name))
-                .filter((filepath) => fs.statSync(filepath).isDirectory())
-                .sort((a, b) => fs.statSync(b).mtime - fs.statSync(a).mtime)
+                .filter((filepath) => {
+                    try {
+                        return fs.statSync(filepath).isDirectory()
+                    } catch (error) {
+                        console.error(`Error checking path: ${filepath}`, error)
+                        return false
+                    }
+                })
+                .sort((a, b) => {
+                    try {
+                        return fs.statSync(b).mtime - fs.statSync(a).mtime
+                    } catch (error) {
+                        console.error(`Error sorting directories:`, error)
+                        return 0
+                    }
+                })
 
             if (packageDirs.length === 0) {
                 throw new Error("No package directory found after extraction")

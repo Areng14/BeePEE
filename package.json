@@ -29,17 +29,66 @@
         },
         "win": {
             "target": "nsis",
-            "icon": "public/icon.ico"
+            "icon": "public/icon.ico",
+            "fileAssociations": [
+                {
+                    "ext": "bpee",
+                    "name": "BeePEE Package",
+                    "description": "BeePEE Package File",
+                    "icon": "public/icon.ico",
+                    "role": "Editor"
+                },
+                {
+                    "ext": "bee_pack",
+                    "name": "BEEmod Package",
+                    "description": "BEEmod Package File",
+                    "icon": "public/icon.ico",
+                    "role": "Editor"
+                }
+            ]
         },
         "mac": {
             "target": "dmg",
-            "icon": "public/icon.icns"
+            "icon": "public/icon.icns",
+            "fileAssociations": [
+                {
+                    "ext": "bpee",
+                    "name": "BeePEE Package",
+                    "description": "BeePEE Package File",
+                    "role": "Editor"
+                },
+                {
+                    "ext": "bee_pack",
+                    "name": "BEEmod Package",
+                    "description": "BEEmod Package File",
+                    "role": "Editor"
+                }
+            ]
         },
         "linux": {
             "target": "AppImage",
-            "icon": "public/icon.png"
+            "icon": "public/icon.png",
+            "fileAssociations": [
+                {
+                    "ext": "bpee",
+                    "name": "BeePEE Package",
+                    "description": "BeePEE Package File",
+                    "mimeType": "application/x-beepee-package"
+                },
+                {
+                    "ext": "bee_pack",
+                    "name": "BEEmod Package",
+                    "description": "BEEmod Package File",
+                    "mimeType": "application/x-beemod-package"
+                }
+            ]
         },
         "extraResources": [
+            {
+                "from": "node_modules/7zip-bin",
+                "to": "extraResources/7zip-bin",
+                "filter": ["**/*"]
+            },
             {
                 "from": "backend/libs/studiomdl",
                 "to": "extraResources/studiomdl"

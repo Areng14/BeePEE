@@ -395,6 +395,21 @@ function createMainMenu(mainWindow) {
                 },
             ],
         },
+        {
+            label: "View",
+            submenu: [
+                {
+                    label: "Toggle Developer Tools",
+                    accelerator: "F12",
+                    click: () => {
+                        const focusedWindow = BrowserWindow.getFocusedWindow()
+                        if (focusedWindow) {
+                            focusedWindow.webContents.toggleDevTools()
+                        }
+                    },
+                },
+            ],
+        },
     ]
 
     if (isDev) {

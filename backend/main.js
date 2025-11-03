@@ -6,7 +6,12 @@ const { reg_events } = require("./events.js")
 const { WindowTitleManager } = require("./windowTitleManager.js")
 const { setMainWindow, clearPackagesDirectory } = require("./packageManager.js")
 const { logger, initializeLogger } = require("./utils/logger.js")
+const { ensurePackagesDir } = require("./utils/packagesDir.js")
 const isDev = require("./utils/isDev.js")
+
+// Store reference to main window for file association handling
+let mainWindow = null
+let isLoadingFileOnStartup = false // Flag to prevent window from showing during file load
 
 // Register custom schemes as privileged BEFORE app is ready
 // This ensures that the 'beep' scheme can be used with fetch API and other web features.
@@ -31,8 +36,10 @@ const createWindow = () => {
         height: 512,
         webPreferences: {
             preload: path.join(__dirname, "preload.js"),
+            contextIsolation: true,
+            nodeIntegration: false,
         },
-        devTools: isDev,
+        show: false, // Don't show until ready
     })
 
     // Initialize window title manager
@@ -44,14 +51,30 @@ const createWindow = () => {
 
     createMainMenu(win)
 
+    // Show window when ready (unless loading a file on startup)
+    win.once("ready-to-show", () => {
+        if (!isLoadingFileOnStartup) {
+            win.show()
+            logger.info("Window shown (no file loading on startup)")
+        } else {
+            logger.info("Window ready but hidden (loading file on startup)")
+        }
+    })
+
+    // Load content
     if (isDev) {
         win.loadURL("http://localhost:5173")
     } else {
-        win.loadFile(path.join(__dirname, "../dist/index.html"))
+        win.loadFile(path.join(app.getAppPath(), "dist", "index.html"))
     }
 
-    //register stuff
+    // Register IPC handlers after window is created
     reg_events(win)
+
+    // Store reference to main window for file association handling
+    mainWindow = win
+
+    return win
 }
 
 ipcMain.handle("api:loadImage", async (event, filePath) => {
@@ -76,6 +99,15 @@ ipcMain.handle("api:loadImage", async (event, filePath) => {
 app.whenReady().then(async () => {
     // Initialize logger
     initializeLogger()
+    
+    // Ensure packages directory exists at startup
+    try {
+        ensurePackagesDir()
+        logger.info("Packages directory initialized")
+    } catch (error) {
+        logger.error("Failed to initialize packages directory:", error)
+        // Continue anyway - error will be caught when trying to create packages
+    }
 
     // Register custom file protocol for secure local file access
     protocol.handle("beep", async (request) => {
@@ -398,3 +430,156 @@ app.on("before-quit", async () => {
         logger.close()
     }
 })
+
+// ============================================
+// FILE ASSOCIATION HANDLING
+// ============================================
+
+// Check if a file was passed on startup (before app is ready)
+if (process.platform === "win32" || process.platform === "linux") {
+    const args = process.argv.slice(1) // Skip electron executable
+    const startupFilePath = args.find(arg =>
+        arg.endsWith(".bpee") || arg.endsWith(".bee_pack")
+    )
+    if (startupFilePath && !startupFilePath.startsWith("--")) {
+        logger.info(`File detected on startup (before app ready): ${startupFilePath}`)
+        isLoadingFileOnStartup = true
+    }
+}
+
+// Helper function to handle opening a file
+async function handleFileOpen(filePath, isStartup = false) {
+    if (!filePath || !fs.existsSync(filePath)) {
+        logger.warn(`File does not exist: ${filePath}`)
+        return
+    }
+
+    const ext = path.extname(filePath).toLowerCase()
+    logger.info(`Opening file: ${filePath} (${ext}) [startup: ${isStartup}]`)
+
+    // Wait for app to be ready
+    await app.whenReady()
+
+    // Get or create main window
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        logger.info("Main window not available, waiting for it to be created...")
+        // Window will be created by app.whenReady, wait a bit
+        await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+
+    if (!mainWindow || mainWindow.isDestroyed()) {
+        logger.error("Main window still not available")
+        return
+    }
+
+    try {
+        if (ext === ".bpee") {
+            // Load .bpee package
+            logger.info("Loading .bpee package...")
+            const { loadPackage } = require("./packageManager")
+            const pkg = await loadPackage(filePath)
+            mainWindow.webContents.send("package:loaded", pkg.items)
+            logger.info("Package loaded successfully")
+        } else if (ext === ".bee_pack") {
+            // Import .bee_pack package
+            logger.info("Importing .bee_pack package...")
+            const { importPackage, loadPackage } = require("./packageManager")
+            await importPackage(filePath)
+
+            // Continue progress from import (70%) to load (80%)
+            mainWindow.webContents.send("package-loading-progress", {
+                progress: 80,
+                message: "Loading imported package...",
+            })
+
+            const pkg = await loadPackage(filePath, true)
+
+            // Send final completion message
+            mainWindow.webContents.send("package-loading-progress", {
+                progress: 100,
+                message: "Package imported and loaded successfully!",
+            })
+
+            mainWindow.webContents.send("package:loaded", pkg.items)
+            logger.info("Package imported and loaded successfully")
+        } else {
+            logger.warn(`Unsupported file type: ${ext}`)
+        }
+
+        // Show window after loading completes (if it was hidden during startup)
+        if (isStartup && isLoadingFileOnStartup) {
+            logger.info("Showing window after file load completed")
+            mainWindow.show()
+            isLoadingFileOnStartup = false // Reset flag
+        }
+    } catch (error) {
+        logger.error(`Failed to open file ${filePath}:`, error)
+        const { dialog } = require("electron")
+        dialog.showErrorBox(
+            "Open Failed",
+            `Failed to open ${path.basename(filePath)}: ${error.message}`
+        )
+
+        // Show window even on error (if it was hidden during startup)
+        if (isStartup && isLoadingFileOnStartup) {
+            logger.info("Showing window after file load error")
+            mainWindow.show()
+            isLoadingFileOnStartup = false // Reset flag
+        }
+    }
+}
+
+// Single instance lock - prevent multiple instances
+const gotTheLock = app.requestSingleInstanceLock()
+
+if (!gotTheLock) {
+    // Another instance is already running, quit this one
+    logger.info("Another instance is already running, quitting...")
+    app.quit()
+} else {
+    // Handle second-instance event (when user tries to open another file while app is running)
+    app.on("second-instance", (event, commandLine, workingDirectory) => {
+        logger.info("Second instance detected, processing command line:", commandLine)
+
+        // Focus the existing window
+        if (mainWindow) {
+            if (mainWindow.isMinimized()) mainWindow.restore()
+            mainWindow.focus()
+        }
+
+        // Find the file path in command line arguments
+        // On Windows, the file path is typically the last argument
+        const filePath = commandLine.find(arg =>
+            arg.endsWith(".bpee") || arg.endsWith(".bee_pack")
+        )
+
+        if (filePath) {
+            logger.info(`Opening file from second instance: ${filePath}`)
+            handleFileOpen(filePath)
+        }
+    })
+
+    // Handle macOS open-file event
+    app.on("open-file", (event, filePath) => {
+        event.preventDefault()
+        logger.info(`macOS open-file event: ${filePath}`)
+        handleFileOpen(filePath)
+    })
+
+    // Handle Windows/Linux command line arguments
+    // Check if a file was passed as argument on startup
+    if (process.platform === "win32" || process.platform === "linux") {
+        const args = process.argv.slice(1) // Skip electron executable
+        const filePath = args.find(arg =>
+            arg.endsWith(".bpee") || arg.endsWith(".bee_pack")
+        )
+
+        if (filePath && !filePath.startsWith("--")) {
+            logger.info(`Starting file load: ${filePath}`)
+            // Delay the file open until the window is created
+            app.whenReady().then(() => {
+                setTimeout(() => handleFileOpen(filePath, true), 1500)
+            })
+        }
+    }
+}

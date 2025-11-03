@@ -1,19 +1,14 @@
 const fs = require("fs")
 const path = require("path")
 const { Item } = require("./items")
+const { getPackagesDir } = require("../utils/packagesDir")
 
 class Package {
     constructor(packagePath) {
         this.path = packagePath
         this.name = path.parse(this.path).name
         const packageName = path.parse(this.path).name
-        this.packageDir = path.join(
-            __dirname,
-            "..",
-            "..",
-            "packages",
-            packageName,
-        )
+        this.packageDir = path.join(getPackagesDir(), packageName)
         this.items = []
     }
 
