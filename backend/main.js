@@ -6,7 +6,7 @@ const { reg_events } = require("./events.js")
 const { WindowTitleManager } = require("./windowTitleManager.js")
 const { setMainWindow, clearPackagesDirectory } = require("./packageManager.js")
 const { logger, initializeLogger } = require("./utils/logger.js")
-const { ensurePackagesDir } = require("./utils/packagesDir.js")
+const { ensurePackagesDir, getPackagesDir } = require("./utils/packagesDir.js")
 const isDev = require("./utils/isDev.js")
 
 // Store reference to main window for file association handling
@@ -151,14 +151,19 @@ app.whenReady().then(async () => {
                 })
             }
 
-            // Security: Only allow access to files within the project directory
+            // Security: Only allow access to files within the project directory OR packages directory
             const projectRoot = path.resolve(__dirname, "..")
+            const packagesRoot = path.resolve(getPackagesDir())
             const normalizedFilePath = path.normalize(filePath)
             const normalizedProjectRoot = path.normalize(projectRoot)
+            const normalizedPackagesRoot = path.normalize(packagesRoot)
 
-            if (!normalizedFilePath.startsWith(normalizedProjectRoot)) {
+            const isInProject = normalizedFilePath.startsWith(normalizedProjectRoot)
+            const isInPackages = normalizedFilePath.startsWith(normalizedPackagesRoot)
+
+            if (!isInProject && !isInPackages) {
                 logger.warn(
-                    `Security check failed: ${normalizedFilePath} is not within ${normalizedProjectRoot}`,
+                    `Security check failed: ${normalizedFilePath} is not within ${normalizedProjectRoot} or ${normalizedPackagesRoot}`,
                 )
                 return new Response("Forbidden: Access denied", { status: 403 })
             }
@@ -274,7 +279,16 @@ app.whenReady().then(async () => {
     // Configure VMF2OBJ resource paths on startup
     try {
         const { findPortal2Resources } = require("./data")
-        const p2Resources = await findPortal2Resources(logger)
+
+        // Create a console-compatible wrapper for logger
+        const logWrapper = {
+            log: (...args) => logger.info(...args),
+            error: (...args) => logger.error(...args),
+            warn: (...args) => logger.warn(...args),
+            debug: (...args) => logger.debug(...args),
+        }
+
+        const p2Resources = await findPortal2Resources(logWrapper)
 
         if (p2Resources?.root) {
             const { setExtraResourcePaths } = require("./utils/vmf2obj")
@@ -285,10 +299,10 @@ app.whenReady().then(async () => {
             logger.debug("  Search paths:", p2Resources.searchPaths || [])
             logger.debug("  DLC folders:", p2Resources.dlcFolders || [])
 
-            // Add main Portal 2 files
+            // Add main Portal 2 VPK file (contains all materials and models)
             resourcePaths.push(`${p2Resources.root}\\portal2\\pak01_dir.vpk`)
-            resourcePaths.push(`${p2Resources.root}\\portal2\\materials`)
-            resourcePaths.push(`${p2Resources.root}\\portal2\\models`)
+            // Note: We don't add the portal2 folder directly to avoid VMF2OBJ scanning
+            // thousands of unrelated files that can cause StringIndexOutOfBoundsException
 
             // Add search paths from gameinfo.txt
             if (p2Resources.searchPaths) {
@@ -323,38 +337,30 @@ app.whenReady().then(async () => {
 
                     if (fs.existsSync(fullPath)) {
                         // Check if this path actually contains useful resources for VMF2OBJ
-                        const materialsPath = path.join(fullPath, "materials")
-                        const modelsPath = path.join(fullPath, "models")
-                        const hasMaterials = fs.existsSync(materialsPath)
-                        const hasModels = fs.existsSync(modelsPath)
                         const isVpk = fullPath.toLowerCase().endsWith(".vpk")
 
-                        if (hasMaterials || hasModels || isVpk) {
-                            // Add the parent folder if it's a VPK
-                            if (isVpk) {
-                                resourcePaths.push(fullPath)
-                                logger.debug(`    ✅ Added VPK: ${fullPath}`)
-                            }
-
-                            // Add materials subfolder if it exists
-                            if (hasMaterials) {
-                                resourcePaths.push(materialsPath)
-                                logger.debug(
-                                    `    ✅ Added materials: ${materialsPath}`,
-                                )
-                            }
-
-                            // Add models subfolder if it exists
-                            if (hasModels) {
-                                resourcePaths.push(modelsPath)
-                                logger.debug(
-                                    `    ✅ Added models: ${modelsPath}`,
-                                )
-                            }
+                        if (isVpk) {
+                            // Only add VPK files to avoid directory scanning issues
+                            resourcePaths.push(fullPath)
+                            logger.debug(`    ✅ Added VPK: ${fullPath}`)
                         } else {
-                            logger.debug(
-                                `    ⚠️ Path exists but no materials/models: ${fullPath}`,
-                            )
+                            // For custom content (BEE2, mods), we allow directories with materials/models
+                            // These are typically clean and won't cause VMF2OBJ crashes
+                            const materialsPath = path.join(fullPath, "materials")
+                            const modelsPath = path.join(fullPath, "models")
+                            const hasMaterials = fs.existsSync(materialsPath)
+                            const hasModels = fs.existsSync(modelsPath)
+
+                            if (hasMaterials || hasModels) {
+                                resourcePaths.push(fullPath)
+                                logger.debug(
+                                    `    ✅ Added custom content folder: ${fullPath}`,
+                                )
+                            } else {
+                                logger.debug(
+                                    `    ⚠️ Path exists but no materials/models/VPK: ${fullPath}`,
+                                )
+                            }
                         }
                     } else {
                         logger.debug(`    ❌ Path does not exist: ${fullPath}`)
@@ -372,7 +378,7 @@ app.whenReady().then(async () => {
                         `  📁 Processing DLC: ${dlc.name} at ${dlc.path}`,
                     )
 
-                    // Add DLC VPK if it exists
+                    // Add DLC VPK if it exists (VPK files are safe)
                     const dlcVpkPath = path.join(dlc.path, "pak01_dir.vpk")
                     if (fs.existsSync(dlcVpkPath)) {
                         resourcePaths.push(dlcVpkPath)
@@ -381,29 +387,8 @@ app.whenReady().then(async () => {
                         logger.debug(`    ❌ DLC VPK not found: ${dlcVpkPath}`)
                     }
 
-                    // Add DLC materials and models folders for custom content
-                    const dlcMaterialsPath = path.join(dlc.path, "materials")
-                    const dlcModelsPath = path.join(dlc.path, "models")
-
-                    if (fs.existsSync(dlcMaterialsPath)) {
-                        resourcePaths.push(dlcMaterialsPath)
-                        logger.debug(
-                            `    ✅ Added DLC materials: ${dlcMaterialsPath}`,
-                        )
-                    } else {
-                        logger.debug(
-                            `    ❌ DLC materials not found: ${dlcMaterialsPath}`,
-                        )
-                    }
-
-                    if (fs.existsSync(dlcModelsPath)) {
-                        resourcePaths.push(dlcModelsPath)
-                        logger.debug(`    ✅ Added DLC models: ${dlcModelsPath}`)
-                    } else {
-                        logger.debug(
-                            `    ❌ DLC models not found: ${dlcModelsPath}`,
-                        )
-                    }
+                    // Note: We don't add DLC folders directly to avoid VMF2OBJ
+                    // scanning issues. VPK files contain all necessary content.
                 }
             } else {
                 logger.debug(`⚠️ No DLC folders found`)
@@ -413,7 +398,7 @@ app.whenReady().then(async () => {
             logger.info("VMF2OBJ resource paths configured:", resourcePaths)
         }
     } catch (error) {
-        logger.warn("Could not setup Portal 2 resource paths:", error)
+        logger.warn("Could not setup Portal 2 resource paths:", error?.message || error)
     }
 })
 

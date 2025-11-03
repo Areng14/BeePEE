@@ -3,7 +3,7 @@
     "main": "backend/main.js",
     "private": true,
     "version": "0.0.0",
-    "description": "Beemod Package Editor",
+    "description": "BEEmod Package Editor",
     "author": "Areng",
     "scripts": {
         "dev": "concurrently -k \"vite\" \"electron .\"",
@@ -15,7 +15,7 @@
     },
     "build": {
         "appId": "com.beepee.app",
-        "productName": "BeePee",
+        "productName": "BeePEE",
         "icon": "public/icon.png",
         "files": [
             "dist/**/*",
@@ -43,24 +43,6 @@
                     "name": "BEEmod Package",
                     "description": "BEEmod Package File",
                     "icon": "public/icon.ico",
-                    "role": "Editor"
-                }
-            ]
-        },
-        "mac": {
-            "target": "dmg",
-            "icon": "public/icon.icns",
-            "fileAssociations": [
-                {
-                    "ext": "bpee",
-                    "name": "BeePEE Package",
-                    "description": "BeePEE Package File",
-                    "role": "Editor"
-                },
-                {
-                    "ext": "bee_pack",
-                    "name": "BEEmod Package",
-                    "description": "BEEmod Package File",
                     "role": "Editor"
                 }
             ]
@@ -99,7 +81,8 @@
             },
             {
                 "from": "backend/libs/VMF2OBJ",
-                "to": "extraResources/VMF2OBJ"
+                "to": "extraResources/VMF2OBJ",
+                "filter": ["**/*"]
             },
             {
                 "from": "backend/libs/areng_cartoonify",
@@ -108,6 +91,11 @@
             {
                 "from": "backend/libs/areng_obj23ds",
                 "to": "extraResources/areng_obj23ds"
+            },
+            {
+                "from": "backend/libs/areng_vmfMerge",
+                "to": "extraResources/areng_vmfMerge",
+                "filter": ["**/*"]
             }
         ]
     },
