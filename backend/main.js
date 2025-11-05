@@ -414,6 +414,21 @@ app.whenReady().then(async () => {
     }
 })
 
+// Handle uncaught exceptions and unhandled rejections
+process.on("uncaughtException", (error) => {
+    logger.error("Uncaught Exception:", error)
+    if (logger.originalConsole) {
+        logger.originalConsole.error("Uncaught Exception:", error)
+    }
+})
+
+process.on("unhandledRejection", (reason, promise) => {
+    logger.error("Unhandled Rejection at:", promise, "reason:", reason)
+    if (logger.originalConsole) {
+        logger.originalConsole.error("Unhandled Rejection at:", promise, "reason:", reason)
+    }
+})
+
 // Clean up packages directory when app exits
 app.on("before-quit", async () => {
     try {
