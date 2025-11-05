@@ -664,166 +664,20 @@ function InputOutputConfigDialog({
         )
     }
 
-    // Fallback mode: Simple text input mode when Portal 2 is not found
-    if (useFallbackMode) {
-        return (
-            <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-                <DialogTitle>{title}</DialogTitle>
-                <DialogContent>
-                    <Stack spacing={2} sx={{ mt: 1 }}>
-                        <Alert severity="warning">
-                            Portal 2 not detected. Using manual text input mode.
-                            Commands must be entered manually in the format:{" "}
-                            <code>entity,input,parameter,delay,maxfires</code>
-                        </Alert>
-
-                        {isInput && (
-                            <>
-                                <TextField
-                                    select
-                                    label="Input Type"
-                                    value={formData.Type}
-                                    onChange={(e) =>
-                                        updateFormData("Type", e.target.value)
-                                    }
-                                    fullWidth
-                                    helperText="Choose the type of input behavior">
-                                    {INPUT_TYPES.map((option) => (
-                                        <MenuItem
-                                            key={option.value}
-                                            value={option.value}>
-                                            {option.label}
-                                        </MenuItem>
-                                    ))}
-                                </TextField>
-
-                                <TextField
-                                    label="Enable Command"
-                                    value={formData.Enable_cmd}
-                                    onChange={(e) =>
-                                        updateFormData("Enable_cmd", e.target.value)
-                                    }
-                                    fullWidth
-                                    placeholder="entity_name,InputName,param,0,-1"
-                                    helperText="Format: entity,input,parameter,delay,maxfires"
-                                />
-
-                                {isDualInput && (
-                                    <>
-                                        <TextField
-                                            label="Disable Command"
-                                            value={formData.Disable_cmd}
-                                            onChange={(e) =>
-                                                updateFormData(
-                                                    "Disable_cmd",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            fullWidth
-                                            placeholder="entity_name,InputName,param,0,-1"
-                                            helperText="Format: entity,input,parameter,delay,maxfires"
-                                        />
-                                        <TextField
-                                            label="Secondary Enable Command"
-                                            value={formData.Sec_Enable_cmd}
-                                            onChange={(e) =>
-                                                updateFormData(
-                                                    "Sec_Enable_cmd",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            fullWidth
-                                            placeholder="entity_name,InputName,param,0,-1"
-                                            helperText="Format: entity,input,parameter,delay,maxfires"
-                                        />
-                                        <TextField
-                                            label="Secondary Disable Command"
-                                            value={formData.Sec_Disable_cmd}
-                                            onChange={(e) =>
-                                                updateFormData(
-                                                    "Sec_Disable_cmd",
-                                                    e.target.value,
-                                                )
-                                            }
-                                            fullWidth
-                                            placeholder="entity_name,InputName,param,0,-1"
-                                            helperText="Format: entity,input,parameter,delay,maxfires"
-                                        />
-                                    </>
-                                )}
-                            </>
-                        )}
-
-                        {!isInput && (
-                            <>
-                                <TextField
-                                    label="Activate Command"
-                                    value={formData.Out_Activate}
-                                    onChange={(e) =>
-                                        updateFormData("Out_Activate", e.target.value)
-                                    }
-                                    fullWidth
-                                    placeholder="entity_name,OutputName,param,0,-1"
-                                    helperText="Format: entity,output,parameter,delay,maxfires"
-                                />
-                                <TextField
-                                    label="Deactivate Command"
-                                    value={formData.Out_Deactivate}
-                                    onChange={(e) =>
-                                        updateFormData(
-                                            "Out_Deactivate",
-                                            e.target.value,
-                                        )
-                                    }
-                                    fullWidth
-                                    placeholder="entity_name,OutputName,param,0,-1"
-                                    helperText="Format: entity,output,parameter,delay,maxfires"
-                                />
-                                <TextField
-                                    label="Secondary Enable Command"
-                                    value={formData.Sec_Enable_cmd}
-                                    onChange={(e) =>
-                                        updateFormData(
-                                            "Sec_Enable_cmd",
-                                            e.target.value,
-                                        )
-                                    }
-                                    fullWidth
-                                    placeholder="entity_name,InputName,param,0,-1"
-                                    helperText="Optional. Format: entity,input,parameter,delay,maxfires"
-                                />
-                                <TextField
-                                    label="Secondary Disable Command"
-                                    value={formData.Sec_Disable_cmd}
-                                    onChange={(e) =>
-                                        updateFormData(
-                                            "Sec_Disable_cmd",
-                                            e.target.value,
-                                        )
-                                    }
-                                    fullWidth
-                                    placeholder="entity_name,InputName,param,0,-1"
-                                    helperText="Optional. Format: entity,input,parameter,delay,maxfires"
-                                />
-                            </>
-                        )}
-                    </Stack>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSave} variant="contained">
-                        {isEdit ? "Update" : "Add"}
-                    </Button>
-                </DialogActions>
-            </Dialog>
-        )
-    }
+    // Hybrid mode: We always use the rich UI now, even without Portal 2
+    // The difference is that without FGD data, input/output fields become text inputs
+    const hasFgdData = !useFallbackMode
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
             <DialogTitle>{title}</DialogTitle>
             <DialogContent sx={{ overflowX: "hidden" }}>
                 <Stack spacing={3} sx={{ mt: 1 }}>
+                    {!hasFgdData && (
+                        <Alert severity="info">
+                            Portal 2 FGD not detected. Entity selector is available, but input/output names must be entered manually.
+                        </Alert>
+                    )}
                     {isInput && (
                         <>
                             <TextField
@@ -968,53 +822,72 @@ function InputOutputConfigDialog({
                                                         )}
                                                     </TextField>
 
-                                                    <TextField
-                                                        select
-                                                        label="Enable Input"
-                                                        value={enableInput}
-                                                        onChange={(e) =>
-                                                            setEnableInput(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        disabled={!enableEntity}
-                                                        size="small"
-                                                        sx={{
-                                                            minWidth: "180px",
-                                                            height: "56px",
-                                                        }}>
-                                                        {getAvailableInputsForEntity(
-                                                            enableEntity,
-                                                        ).map((input) => (
-                                                            <MenuItem
-                                                                key={input.name}
-                                                                value={
-                                                                    input.name
-                                                                }>
-                                                                <Box
-                                                                    sx={{
-                                                                        display:
-                                                                            "flex",
-                                                                        alignItems:
-                                                                            "center",
-                                                                        justifyContent:
-                                                                            "space-between",
-                                                                        width: "100%",
-                                                                    }}>
-                                                                    {input.name}
-                                                                    {input.needsParam && (
-                                                                        <EditNote
-                                                                            sx={{
-                                                                                fontSize: 16,
-                                                                                opacity: 0.6,
-                                                                                color: "text.secondary",
-                                                                            }}
-                                                                        />
-                                                                    )}
-                                                                </Box>
-                                                            </MenuItem>
-                                                        ))}
-                                                    </TextField>
+                                                    {hasFgdData ? (
+                                                        <TextField
+                                                            select
+                                                            label="Enable Input"
+                                                            value={enableInput}
+                                                            onChange={(e) =>
+                                                                setEnableInput(
+                                                                    e.target.value,
+                                                                )
+                                                            }
+                                                            disabled={!enableEntity}
+                                                            size="small"
+                                                            sx={{
+                                                                minWidth: "180px",
+                                                                height: "56px",
+                                                            }}>
+                                                            {getAvailableInputsForEntity(
+                                                                enableEntity,
+                                                            ).map((input) => (
+                                                                <MenuItem
+                                                                    key={input.name}
+                                                                    value={
+                                                                        input.name
+                                                                    }>
+                                                                    <Box
+                                                                        sx={{
+                                                                            display:
+                                                                                "flex",
+                                                                            alignItems:
+                                                                                "center",
+                                                                            justifyContent:
+                                                                                "space-between",
+                                                                            width: "100%",
+                                                                        }}>
+                                                                        {input.name}
+                                                                        {input.needsParam && (
+                                                                            <EditNote
+                                                                                sx={{
+                                                                                    fontSize: 16,
+                                                                                    opacity: 0.6,
+                                                                                    color: "text.secondary",
+                                                                                }}
+                                                                            />
+                                                                        )}
+                                                                    </Box>
+                                                                </MenuItem>
+                                                            ))}
+                                                        </TextField>
+                                                    ) : (
+                                                        <TextField
+                                                            label="Enable Input"
+                                                            value={enableInput}
+                                                            onChange={(e) =>
+                                                                setEnableInput(
+                                                                    e.target.value,
+                                                                )
+                                                            }
+                                                            disabled={!enableEntity}
+                                                            placeholder="InputName"
+                                                            size="small"
+                                                            sx={{
+                                                                minWidth: "180px",
+                                                                height: "56px",
+                                                            }}
+                                                        />
+                                                    )}
 
                                                     <Tooltip title="Additional parameter value to pass to the input (if required)">
                                                         <TextField
@@ -1027,15 +900,15 @@ function InputOutputConfigDialog({
                                                                 )
                                                             }
                                                             placeholder={
-                                                                inputNeedsParam(
+                                                                hasFgdData && inputNeedsParam(
                                                                     enableEntity,
                                                                     enableInput,
                                                                 )
                                                                     ? "param"
-                                                                    : "not required"
+                                                                    : hasFgdData ? "not required" : "optional"
                                                             }
                                                             disabled={
-                                                                !inputNeedsParam(
+                                                                hasFgdData && !inputNeedsParam(
                                                                     enableEntity,
                                                                     enableInput,
                                                                 )
@@ -1060,7 +933,7 @@ function InputOutputConfigDialog({
                                                         type="number"
                                                         slotProps={{
                                                             htmlInput: {
-                                                                step: 0.1,
+                                                                step: 1,
                                                                 min: 0,
                                                             },
                                                         }}
@@ -1212,55 +1085,74 @@ function InputOutputConfigDialog({
                                                         )}
                                                     </TextField>
 
-                                                    <TextField
-                                                        select
-                                                        label="Disable Input"
-                                                        value={disableInput}
-                                                        onChange={(e) =>
-                                                            setDisableInput(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        disabled={
-                                                            !disableEntity
-                                                        }
-                                                        size="small"
-                                                        sx={{
-                                                            minWidth: "180px",
-                                                            height: "56px",
-                                                        }}>
-                                                        {getAvailableInputsForEntity(
-                                                            disableEntity,
-                                                        ).map((input) => (
-                                                            <MenuItem
-                                                                key={input.name}
-                                                                value={
-                                                                    input.name
-                                                                }>
-                                                                <Box
-                                                                    sx={{
-                                                                        display:
-                                                                            "flex",
-                                                                        alignItems:
-                                                                            "center",
-                                                                        justifyContent:
-                                                                            "space-between",
-                                                                        width: "100%",
-                                                                    }}>
-                                                                    {input.name}
-                                                                    {input.needsParam && (
-                                                                        <EditNote
-                                                                            sx={{
-                                                                                fontSize: 16,
-                                                                                opacity: 0.6,
-                                                                                color: "text.secondary",
-                                                                            }}
-                                                                        />
-                                                                    )}
-                                                                </Box>
-                                                            </MenuItem>
-                                                        ))}
-                                                    </TextField>
+                                                    {hasFgdData ? (
+                                                        <TextField
+                                                            select
+                                                            label="Disable Input"
+                                                            value={disableInput}
+                                                            onChange={(e) =>
+                                                                setDisableInput(
+                                                                    e.target.value,
+                                                                )
+                                                            }
+                                                            disabled={
+                                                                !disableEntity
+                                                            }
+                                                            size="small"
+                                                            sx={{
+                                                                minWidth: "180px",
+                                                                height: "56px",
+                                                            }}>
+                                                            {getAvailableInputsForEntity(
+                                                                disableEntity,
+                                                            ).map((input) => (
+                                                                <MenuItem
+                                                                    key={input.name}
+                                                                    value={
+                                                                        input.name
+                                                                    }>
+                                                                    <Box
+                                                                        sx={{
+                                                                            display:
+                                                                                "flex",
+                                                                            alignItems:
+                                                                                "center",
+                                                                            justifyContent:
+                                                                                "space-between",
+                                                                            width: "100%",
+                                                                        }}>
+                                                                        {input.name}
+                                                                        {input.needsParam && (
+                                                                            <EditNote
+                                                                                sx={{
+                                                                                    fontSize: 16,
+                                                                                    opacity: 0.6,
+                                                                                    color: "text.secondary",
+                                                                                }}
+                                                                            />
+                                                                        )}
+                                                                    </Box>
+                                                                </MenuItem>
+                                                            ))}
+                                                        </TextField>
+                                                    ) : (
+                                                        <TextField
+                                                            label="Disable Input"
+                                                            value={disableInput}
+                                                            onChange={(e) =>
+                                                                setDisableInput(
+                                                                    e.target.value,
+                                                                )
+                                                            }
+                                                            disabled={!disableEntity}
+                                                            placeholder="InputName"
+                                                            size="small"
+                                                            sx={{
+                                                                minWidth: "180px",
+                                                                height: "56px",
+                                                            }}
+                                                        />
+                                                    )}
 
                                                     <Tooltip title="Additional parameter value to pass to the input (if required)">
                                                         <TextField
@@ -1273,15 +1165,15 @@ function InputOutputConfigDialog({
                                                                 )
                                                             }
                                                             placeholder={
-                                                                inputNeedsParam(
+                                                                hasFgdData && inputNeedsParam(
                                                                     disableEntity,
                                                                     disableInput,
                                                                 )
                                                                     ? "param"
-                                                                    : "not required"
+                                                                    : hasFgdData ? "not required" : "optional"
                                                             }
                                                             disabled={
-                                                                !inputNeedsParam(
+                                                                hasFgdData && !inputNeedsParam(
                                                                     disableEntity,
                                                                     disableInput,
                                                                 )
@@ -1306,7 +1198,7 @@ function InputOutputConfigDialog({
                                                         type="number"
                                                         slotProps={{
                                                             htmlInput: {
-                                                                step: 0.1,
+                                                                step: 1,
                                                                 min: 0,
                                                             },
                                                         }}
@@ -1519,63 +1411,82 @@ function InputOutputConfigDialog({
                                                             )}
                                                         </TextField>
 
-                                                        <TextField
-                                                            select
-                                                            label="Enable Input (B)"
-                                                            value={
-                                                                secEnableInput
-                                                            }
-                                                            onChange={(e) =>
-                                                                setSecEnableInput(
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            disabled={
-                                                                !secEnableEntity
-                                                            }
-                                                            size="small"
-                                                            sx={{
-                                                                minWidth:
-                                                                    "180px",
-                                                                height: "56px",
-                                                            }}>
-                                                            {getAvailableInputsForEntity(
-                                                                secEnableEntity,
-                                                            ).map((input) => (
-                                                                <MenuItem
-                                                                    key={
-                                                                        input.name
-                                                                    }
-                                                                    value={
-                                                                        input.name
-                                                                    }>
-                                                                    <Box
-                                                                        sx={{
-                                                                            display:
-                                                                                "flex",
-                                                                            alignItems:
-                                                                                "center",
-                                                                            justifyContent:
-                                                                                "space-between",
-                                                                            width: "100%",
-                                                                        }}>
-                                                                        {
+                                                        {hasFgdData ? (
+                                                            <TextField
+                                                                select
+                                                                label="Enable Input (B)"
+                                                                value={
+                                                                    secEnableInput
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setSecEnableInput(
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    !secEnableEntity
+                                                                }
+                                                                size="small"
+                                                                sx={{
+                                                                    minWidth:
+                                                                        "180px",
+                                                                    height: "56px",
+                                                                }}>
+                                                                {getAvailableInputsForEntity(
+                                                                    secEnableEntity,
+                                                                ).map((input) => (
+                                                                    <MenuItem
+                                                                        key={
                                                                             input.name
                                                                         }
-                                                                        {input.needsParam && (
-                                                                            <EditNote
-                                                                                sx={{
-                                                                                    fontSize: 16,
-                                                                                    opacity: 0.6,
-                                                                                    color: "text.secondary",
-                                                                                }}
-                                                                            />
-                                                                        )}
-                                                                    </Box>
-                                                                </MenuItem>
-                                                            ))}
-                                                        </TextField>
+                                                                        value={
+                                                                            input.name
+                                                                        }>
+                                                                        <Box
+                                                                            sx={{
+                                                                                display:
+                                                                                    "flex",
+                                                                                alignItems:
+                                                                                    "center",
+                                                                                justifyContent:
+                                                                                    "space-between",
+                                                                                width: "100%",
+                                                                            }}>
+                                                                            {
+                                                                                input.name
+                                                                            }
+                                                                            {input.needsParam && (
+                                                                                <EditNote
+                                                                                    sx={{
+                                                                                        fontSize: 16,
+                                                                                        opacity: 0.6,
+                                                                                        color: "text.secondary",
+                                                                                    }}
+                                                                                />
+                                                                            )}
+                                                                        </Box>
+                                                                    </MenuItem>
+                                                                ))}
+                                                            </TextField>
+                                                        ) : (
+                                                            <TextField
+                                                                label="Enable Input (B)"
+                                                                value={secEnableInput}
+                                                                onChange={(e) =>
+                                                                    setSecEnableInput(
+                                                                        e.target.value,
+                                                                    )
+                                                                }
+                                                                disabled={!secEnableEntity}
+                                                                placeholder="InputName"
+                                                                size="small"
+                                                                sx={{
+                                                                    minWidth: "180px",
+                                                                    height: "56px",
+                                                                }}
+                                                            />
+                                                        )}
 
                                                         <Tooltip title="Additional parameter value to pass to the input (if required)">
                                                             <TextField
@@ -1590,15 +1501,15 @@ function InputOutputConfigDialog({
                                                                     )
                                                                 }
                                                                 placeholder={
-                                                                    inputNeedsParam(
+                                                                    hasFgdData && inputNeedsParam(
                                                                         secEnableEntity,
                                                                         secEnableInput,
                                                                     )
                                                                         ? "param"
-                                                                        : "not required"
+                                                                        : hasFgdData ? "not required" : "optional"
                                                                 }
                                                                 disabled={
-                                                                    !inputNeedsParam(
+                                                                    hasFgdData && !inputNeedsParam(
                                                                         secEnableEntity,
                                                                         secEnableInput,
                                                                     )
@@ -1626,7 +1537,7 @@ function InputOutputConfigDialog({
                                                             type="number"
                                                             slotProps={{
                                                                 htmlInput: {
-                                                                    step: 0.1,
+                                                                    step: 1,
                                                                     min: 0,
                                                                 },
                                                             }}
@@ -1789,63 +1700,82 @@ function InputOutputConfigDialog({
                                                             )}
                                                         </TextField>
 
-                                                        <TextField
-                                                            select
-                                                            label="Disable Input (B)"
-                                                            value={
-                                                                secDisableInput
-                                                            }
-                                                            onChange={(e) =>
-                                                                setSecDisableInput(
-                                                                    e.target
-                                                                        .value,
-                                                                )
-                                                            }
-                                                            disabled={
-                                                                !secDisableEntity
-                                                            }
-                                                            size="small"
-                                                            sx={{
-                                                                minWidth:
-                                                                    "180px",
-                                                                height: "56px",
-                                                            }}>
-                                                            {getAvailableInputsForEntity(
-                                                                secDisableEntity,
-                                                            ).map((input) => (
-                                                                <MenuItem
-                                                                    key={
-                                                                        input.name
-                                                                    }
-                                                                    value={
-                                                                        input.name
-                                                                    }>
-                                                                    <Box
-                                                                        sx={{
-                                                                            display:
-                                                                                "flex",
-                                                                            alignItems:
-                                                                                "center",
-                                                                            justifyContent:
-                                                                                "space-between",
-                                                                            width: "100%",
-                                                                        }}>
-                                                                        {
+                                                        {hasFgdData ? (
+                                                            <TextField
+                                                                select
+                                                                label="Disable Input (B)"
+                                                                value={
+                                                                    secDisableInput
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setSecDisableInput(
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    !secDisableEntity
+                                                                }
+                                                                size="small"
+                                                                sx={{
+                                                                    minWidth:
+                                                                        "180px",
+                                                                    height: "56px",
+                                                                }}>
+                                                                {getAvailableInputsForEntity(
+                                                                    secDisableEntity,
+                                                                ).map((input) => (
+                                                                    <MenuItem
+                                                                        key={
                                                                             input.name
                                                                         }
-                                                                        {input.needsParam && (
-                                                                            <EditNote
-                                                                                sx={{
-                                                                                    fontSize: 16,
-                                                                                    opacity: 0.6,
-                                                                                    color: "text.secondary",
-                                                                                }}
-                                                                            />
-                                                                        )}
-                                                                    </Box>
-                                                                </MenuItem>
-                                                            ))}
-                                                        </TextField>
+                                                                        value={
+                                                                            input.name
+                                                                        }>
+                                                                        <Box
+                                                                            sx={{
+                                                                                display:
+                                                                                    "flex",
+                                                                                alignItems:
+                                                                                    "center",
+                                                                                justifyContent:
+                                                                                    "space-between",
+                                                                                width: "100%",
+                                                                            }}>
+                                                                            {
+                                                                                input.name
+                                                                            }
+                                                                            {input.needsParam && (
+                                                                                <EditNote
+                                                                                    sx={{
+                                                                                        fontSize: 16,
+                                                                                        opacity: 0.6,
+                                                                                        color: "text.secondary",
+                                                                                    }}
+                                                                                />
+                                                                            )}
+                                                                        </Box>
+                                                                    </MenuItem>
+                                                                ))}
+                                                            </TextField>
+                                                        ) : (
+                                                            <TextField
+                                                                label="Disable Input (B)"
+                                                                value={secDisableInput}
+                                                                onChange={(e) =>
+                                                                    setSecDisableInput(
+                                                                        e.target.value,
+                                                                    )
+                                                                }
+                                                                disabled={!secDisableEntity}
+                                                                placeholder="InputName"
+                                                                size="small"
+                                                                sx={{
+                                                                    minWidth: "180px",
+                                                                    height: "56px",
+                                                                }}
+                                                            />
+                                                        )}
 
                                                         <Tooltip title="Additional parameter value to pass to the input (if required)">
                                                             <TextField
@@ -1860,15 +1790,15 @@ function InputOutputConfigDialog({
                                                                     )
                                                                 }
                                                                 placeholder={
-                                                                    inputNeedsParam(
+                                                                    hasFgdData && inputNeedsParam(
                                                                         secDisableEntity,
                                                                         secDisableInput,
                                                                     )
                                                                         ? "param"
-                                                                        : "not required"
+                                                                        : hasFgdData ? "not required" : "optional"
                                                                 }
                                                                 disabled={
-                                                                    !inputNeedsParam(
+                                                                    hasFgdData && !inputNeedsParam(
                                                                         secDisableEntity,
                                                                         secDisableInput,
                                                                     )
@@ -1896,7 +1826,7 @@ function InputOutputConfigDialog({
                                                             type="number"
                                                             slotProps={{
                                                                 htmlInput: {
-                                                                    step: 0.1,
+                                                                    step: 1,
                                                                     min: 0,
                                                                 },
                                                             }}
@@ -2104,51 +2034,70 @@ function InputOutputConfigDialog({
                                                     )}
                                                 </TextField>
 
-                                                <TextField
-                                                    select
-                                                    label="Activate Output"
-                                                    value={activateOutput}
-                                                    onChange={(e) =>
-                                                        setActivateOutput(
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    disabled={!activateEntity}
-                                                    size="small"
-                                                    sx={{
-                                                        minWidth: "180px",
-                                                        height: "56px",
-                                                    }}>
-                                                    {getAvailableOutputsForEntity(
-                                                        activateEntity,
-                                                    ).map((output) => (
-                                                        <MenuItem
-                                                            key={output.name}
-                                                            value={output.name}>
-                                                            <Box
-                                                                sx={{
-                                                                    display:
-                                                                        "flex",
-                                                                    alignItems:
-                                                                        "center",
-                                                                    justifyContent:
-                                                                        "space-between",
-                                                                    width: "100%",
-                                                                }}>
-                                                                {output.name}
-                                                                {output.needsParam && (
-                                                                    <EditNote
-                                                                        sx={{
-                                                                            fontSize: 16,
-                                                                            opacity: 0.6,
-                                                                            color: "text.secondary",
-                                                                        }}
-                                                                    />
-                                                                )}
-                                                            </Box>
-                                                        </MenuItem>
-                                                    ))}
-                                                </TextField>
+                                                {hasFgdData ? (
+                                                    <TextField
+                                                        select
+                                                        label="Activate Output"
+                                                        value={activateOutput}
+                                                        onChange={(e) =>
+                                                            setActivateOutput(
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        disabled={!activateEntity}
+                                                        size="small"
+                                                        sx={{
+                                                            minWidth: "180px",
+                                                            height: "56px",
+                                                        }}>
+                                                        {getAvailableOutputsForEntity(
+                                                            activateEntity,
+                                                        ).map((output) => (
+                                                            <MenuItem
+                                                                key={output.name}
+                                                                value={output.name}>
+                                                                <Box
+                                                                    sx={{
+                                                                        display:
+                                                                            "flex",
+                                                                        alignItems:
+                                                                            "center",
+                                                                        justifyContent:
+                                                                            "space-between",
+                                                                        width: "100%",
+                                                                    }}>
+                                                                    {output.name}
+                                                                    {output.needsParam && (
+                                                                        <EditNote
+                                                                            sx={{
+                                                                                fontSize: 16,
+                                                                                opacity: 0.6,
+                                                                                color: "text.secondary",
+                                                                            }}
+                                                                        />
+                                                                    )}
+                                                                </Box>
+                                                            </MenuItem>
+                                                        ))}
+                                                    </TextField>
+                                                ) : (
+                                                    <TextField
+                                                        label="Activate Output"
+                                                        value={activateOutput}
+                                                        onChange={(e) =>
+                                                            setActivateOutput(
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        disabled={!activateEntity}
+                                                        placeholder="OutputName"
+                                                        size="small"
+                                                        sx={{
+                                                            minWidth: "180px",
+                                                            height: "56px",
+                                                        }}
+                                                    />
+                                                )}
 
                                                 <Tooltip title="Additional parameter value to pass with the output (if required)">
                                                     <TextField
@@ -2160,15 +2109,15 @@ function InputOutputConfigDialog({
                                                             )
                                                         }
                                                         placeholder={
-                                                            outputNeedsParam(
+                                                            hasFgdData && outputNeedsParam(
                                                                 activateEntity,
                                                                 activateOutput,
                                                             )
                                                                 ? "param"
-                                                                : "not required"
+                                                                : hasFgdData ? "not required" : "optional"
                                                         }
                                                         disabled={
-                                                            !outputNeedsParam(
+                                                            hasFgdData && !outputNeedsParam(
                                                                 activateEntity,
                                                                 activateOutput,
                                                             )
@@ -2192,7 +2141,7 @@ function InputOutputConfigDialog({
                                                     type="number"
                                                     slotProps={{
                                                         htmlInput: {
-                                                            step: 0.1,
+                                                            step: 1,
                                                             min: 0,
                                                         },
                                                     }}
@@ -2334,51 +2283,70 @@ function InputOutputConfigDialog({
                                                     )}
                                                 </TextField>
 
-                                                <TextField
-                                                    select
-                                                    label="Deactivate Output"
-                                                    value={deactivateOutput}
-                                                    onChange={(e) =>
-                                                        setDeactivateOutput(
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    disabled={!deactivateEntity}
-                                                    size="small"
-                                                    sx={{
-                                                        minWidth: "180px",
-                                                        height: "56px",
-                                                    }}>
-                                                    {getAvailableOutputsForEntity(
-                                                        deactivateEntity,
-                                                    ).map((output) => (
-                                                        <MenuItem
-                                                            key={output.name}
-                                                            value={output.name}>
-                                                            <Box
-                                                                sx={{
-                                                                    display:
-                                                                        "flex",
-                                                                    alignItems:
-                                                                        "center",
-                                                                    justifyContent:
-                                                                        "space-between",
-                                                                    width: "100%",
-                                                                }}>
-                                                                {output.name}
-                                                                {output.needsParam && (
-                                                                    <EditNote
-                                                                        sx={{
-                                                                            fontSize: 16,
-                                                                            opacity: 0.6,
-                                                                            color: "text.secondary",
-                                                                        }}
-                                                                    />
-                                                                )}
-                                                            </Box>
-                                                        </MenuItem>
-                                                    ))}
-                                                </TextField>
+                                                {hasFgdData ? (
+                                                    <TextField
+                                                        select
+                                                        label="Deactivate Output"
+                                                        value={deactivateOutput}
+                                                        onChange={(e) =>
+                                                            setDeactivateOutput(
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        disabled={!deactivateEntity}
+                                                        size="small"
+                                                        sx={{
+                                                            minWidth: "180px",
+                                                            height: "56px",
+                                                        }}>
+                                                        {getAvailableOutputsForEntity(
+                                                            deactivateEntity,
+                                                        ).map((output) => (
+                                                            <MenuItem
+                                                                key={output.name}
+                                                                value={output.name}>
+                                                                <Box
+                                                                    sx={{
+                                                                        display:
+                                                                            "flex",
+                                                                        alignItems:
+                                                                            "center",
+                                                                        justifyContent:
+                                                                            "space-between",
+                                                                        width: "100%",
+                                                                    }}>
+                                                                    {output.name}
+                                                                    {output.needsParam && (
+                                                                        <EditNote
+                                                                            sx={{
+                                                                                fontSize: 16,
+                                                                                opacity: 0.6,
+                                                                                color: "text.secondary",
+                                                                            }}
+                                                                        />
+                                                                    )}
+                                                                </Box>
+                                                            </MenuItem>
+                                                        ))}
+                                                    </TextField>
+                                                ) : (
+                                                    <TextField
+                                                        label="Deactivate Output"
+                                                        value={deactivateOutput}
+                                                        onChange={(e) =>
+                                                            setDeactivateOutput(
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        disabled={!deactivateEntity}
+                                                        placeholder="OutputName"
+                                                        size="small"
+                                                        sx={{
+                                                            minWidth: "180px",
+                                                            height: "56px",
+                                                        }}
+                                                    />
+                                                )}
 
                                                 <Tooltip title="Additional parameter value to pass with the output (if required)">
                                                     <TextField
@@ -2390,15 +2358,15 @@ function InputOutputConfigDialog({
                                                             )
                                                         }
                                                         placeholder={
-                                                            outputNeedsParam(
+                                                            hasFgdData && outputNeedsParam(
                                                                 deactivateEntity,
                                                                 deactivateOutput,
                                                             )
                                                                 ? "param"
-                                                                : "not required"
+                                                                : hasFgdData ? "not required" : "optional"
                                                         }
                                                         disabled={
-                                                            !outputNeedsParam(
+                                                            hasFgdData && !outputNeedsParam(
                                                                 deactivateEntity,
                                                                 deactivateOutput,
                                                             )
@@ -2422,7 +2390,7 @@ function InputOutputConfigDialog({
                                                     type="number"
                                                     slotProps={{
                                                         htmlInput: {
-                                                            step: 0.1,
+                                                            step: 1,
                                                             min: 0,
                                                         },
                                                     }}
