@@ -37,7 +37,7 @@ function createItemEditor(item, mainWindow) {
     })
 
     if (isDev) {
-        window.loadURL(`http://localhost:5173/editor`)
+        window.loadURL(`http://localhost:5173/?route=editor`)
     } else {
         // Use app.getAppPath() for reliable path resolution in packaged app
         const appPath = app.getAppPath()
@@ -95,7 +95,7 @@ function createItemCreationWindow(mainWindow) {
     })
 
     if (isDev) {
-        createItemWindow.loadURL(`http://localhost:5173/create-item`)
+        createItemWindow.loadURL(`http://localhost:5173/?route=create-item`)
     } else {
         // Use app.getAppPath() for reliable path resolution in packaged app
         const appPath = app.getAppPath()
@@ -136,7 +136,7 @@ function createPackageCreationWindow(mainWindow) {
     })
 
     if (isDev) {
-        createPackageWindow.loadURL(`http://localhost:5173/create-package`)
+        createPackageWindow.loadURL(`http://localhost:5173/?route=create-package`)
     } else {
         // Use app.getAppPath() for reliable path resolution in packaged app
         const appPath = app.getAppPath()
@@ -181,7 +181,7 @@ function createPackageInformationWindow(mainWindow) {
 
     if (isDev) {
         packageInformationWindow.loadURL(
-            `http://localhost:5173/package-information`,
+            `http://localhost:5173/?route=package-information`,
         )
     } else {
         // Use app.getAppPath() for reliable path resolution in packaged app

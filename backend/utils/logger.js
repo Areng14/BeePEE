@@ -49,9 +49,79 @@ class Logger {
             if (this.stream) {
                 this.stream.write(formattedMessage)
             }
+
+            // Intercept all console methods to route through logger
+            this.interceptConsole()
         } catch (error) {
             // Fallback to console if logger initialization fails
             console.error("Failed to initialize logger:", error)
+        }
+    }
+
+    /**
+     * Intercept console methods to route all output through logger
+     */
+    interceptConsole() {
+        // Store original console methods
+        if (!this.originalConsole) {
+            this.originalConsole = {
+                log: console.log.bind(console),
+                error: console.error.bind(console),
+                warn: console.warn.bind(console),
+                info: console.info.bind(console),
+                debug: console.debug.bind(console),
+                trace: console.trace.bind(console),
+            }
+        }
+
+        // Override console.log
+        console.log = (...args) => {
+            this.originalConsole.log(...args)
+            this.writeLog("info", ...args)
+        }
+
+        // Override console.error
+        console.error = (...args) => {
+            this.originalConsole.error(...args)
+            this.writeLog("error", ...args)
+        }
+
+        // Override console.warn
+        console.warn = (...args) => {
+            this.originalConsole.warn(...args)
+            this.writeLog("warn", ...args)
+        }
+
+        // Override console.info
+        console.info = (...args) => {
+            this.originalConsole.info(...args)
+            this.writeLog("info", ...args)
+        }
+
+        // Override console.debug
+        console.debug = (...args) => {
+            this.originalConsole.debug(...args)
+            this.writeLog("debug", ...args)
+        }
+
+        // Override console.trace
+        console.trace = (...args) => {
+            this.originalConsole.trace(...args)
+            this.writeLog("trace", ...args)
+        }
+    }
+
+    /**
+     * Restore original console methods (for testing or cleanup)
+     */
+    restoreConsole() {
+        if (this.originalConsole) {
+            console.log = this.originalConsole.log
+            console.error = this.originalConsole.error
+            console.warn = this.originalConsole.warn
+            console.info = this.originalConsole.info
+            console.debug = this.originalConsole.debug
+            console.trace = this.originalConsole.trace
         }
     }
 
@@ -123,24 +193,51 @@ class Logger {
     /**
      * Write to log file
      */
-    writeLog(level, message, ...args) {
-        const formattedMessage = this.formatMessage(level, message, ...args)
-
-        // Always write to console for development
-        if (level === "error") {
-            console.error(formattedMessage.trim())
-        } else if (level === "warn") {
-            console.warn(formattedMessage.trim())
-        } else {
-            console.log(formattedMessage.trim())
+    writeLog(level, ...args) {
+        // Handle all arguments - they could be strings, objects, etc.
+        // If no args provided, use empty message
+        if (args.length === 0) {
+            args = [""]
         }
 
-        // Write to file if initialized
+        // Separate message (first arg if string) from additional args
+        let logMessage = ""
+        let logArgs = []
+
+        if (args.length === 1) {
+            // Single argument
+            if (typeof args[0] === "string") {
+                logMessage = args[0]
+            } else {
+                logMessage = ""
+                logArgs = args
+            }
+        } else {
+            // Multiple arguments - first is message if string, rest are args
+            if (typeof args[0] === "string") {
+                logMessage = args[0]
+                logArgs = args.slice(1)
+            } else {
+                // First arg is not a string, treat all as args
+                logMessage = ""
+                logArgs = args
+            }
+        }
+
+        const formattedMessage = this.formatMessage(level, logMessage, ...logArgs)
+
+        // Write to file if initialized (avoid double logging to console since we intercept it)
         if (this.isInitialized && this.stream) {
             try {
                 this.stream.write(formattedMessage)
             } catch (error) {
-                console.error("Failed to write to log file:", error)
+                // Use original console to avoid recursion
+                if (this.originalConsole) {
+                    this.originalConsole.error("Failed to write to log file:", error)
+                } else {
+                    // Fallback if original console not stored yet
+                    process.stderr.write(`Failed to write to log file: ${error}\n`)
+                }
             }
         }
     }
@@ -176,11 +273,27 @@ class Logger {
     }
 
     /**
+     * Log trace message
+     */
+    trace(message, ...args) {
+        this.writeLog("trace", message, ...args)
+    }
+
+    /**
      * Close the log stream
      */
     close() {
         if (this.stream) {
-            this.stream.end()
+            // Write final log entry
+            const finalMessage = this.formatMessage("info", "Logger closing")
+            try {
+                this.stream.write(finalMessage)
+                this.stream.end()
+            } catch (error) {
+                if (this.originalConsole) {
+                    this.originalConsole.error("Error closing logger:", error)
+                }
+            }
             this.stream = null
         }
         this.isInitialized = false
