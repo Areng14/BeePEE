@@ -27,7 +27,16 @@ async function autopackInstance(instancePath, packageDir, itemName) {
         // Get Portal 2 directory
         const portal2Resources = await findPortal2Resources()
         if (!portal2Resources || !portal2Resources.root) {
-            throw new Error("Could not find Portal 2 directory")
+            console.warn(
+                "Portal 2 not found - autopacking skipped. Assets must be manually packed.",
+            )
+            return {
+                success: true,
+                skipped: true,
+                reason: "Portal 2 not installed",
+                totalAssets: 0,
+                packedAssets: 0,
+            }
         }
         const portal2Dir = portal2Resources.root
 

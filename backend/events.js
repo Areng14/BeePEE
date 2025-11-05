@@ -3252,10 +3252,14 @@ function reg_events(mainWindow) {
 
                     console.log("Value to instance map:", valueInstanceMap)
 
-                    // Handle DEFAULT: use the first registered instance and run single conversion
-                    if (String(instanceKey).toUpperCase() === "DEFAULT") {
+                    // Handle DEFAULT or "First Instance": use the first registered instance and run single conversion
+                    const normalizedKey = String(instanceKey).toUpperCase()
+                    if (
+                        normalizedKey === "DEFAULT" ||
+                        normalizedKey === "FIRST INSTANCE"
+                    ) {
                         console.log(
-                            "DEFAULT selected: using the first registered instance for model generation",
+                            "First Instance selected: using the first registered instance for model generation",
                         )
                         const instanceKeys = Object.keys(item.instances).sort(
                             (a, b) => parseInt(a, 10) - parseInt(b, 10),
@@ -4122,6 +4126,41 @@ function reg_events(mainWindow) {
             return { success: true, ...resources }
         } catch (error) {
             return { success: false, error: error.message }
+        }
+    })
+
+    // Get Portal 2 installation status
+    ipcMain.handle("get-portal2-status", async () => {
+        try {
+            const { findPortal2Resources } = require("./data")
+            const resources = await findPortal2Resources(console)
+
+            // Check if Portal 2 is installed and what features are available
+            const isInstalled = resources !== null && resources.root !== null
+
+            return {
+                success: true,
+                isInstalled,
+                features: {
+                    modelGeneration: isInstalled && resources.root !== null, // Needs Portal 2 dir for STUDIOMDL
+                    autopacking: isInstalled && resources.root !== null, // Needs Portal 2 dir to find assets
+                    fgdData: isInstalled && resources.entities !== null, // Needs FGD files
+                    hammerEditor: isInstalled && resources.hammer !== null, // Needs Hammer executable
+                },
+                portal2Path: resources?.root || null,
+            }
+        } catch (error) {
+            return {
+                success: true,
+                isInstalled: false,
+                features: {
+                    modelGeneration: false,
+                    autopacking: false,
+                    fgdData: false,
+                    hammerEditor: false,
+                },
+                portal2Path: null,
+            }
         }
     })
 
