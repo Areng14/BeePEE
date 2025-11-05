@@ -3493,8 +3493,24 @@ function reg_events(mainWindow) {
                         }
                         finalInstanceMap = completeTimerMap
                         console.log(
-                            `Final map has ${finalInstanceMap.size} entries.`,
+                            `Final timer map has ${finalInstanceMap.size} entries (must be exactly 31).`,
                         )
+                        // Ensure exactly 31 entries for timer (0-30)
+                        if (finalInstanceMap.size !== 31) {
+                            console.warn(
+                                `⚠️ Timer map has ${finalInstanceMap.size} entries, expected 31. Trimming to 0-30 range.`,
+                            )
+                            const trimmedMap = new Map()
+                            for (let i = 0; i <= 30; i++) {
+                                const keyStr = String(i)
+                                if (completeTimerMap.has(keyStr)) {
+                                    trimmedMap.set(keyStr, completeTimerMap.get(keyStr))
+                                } else {
+                                    trimmedMap.set(keyStr, baseInstance)
+                                }
+                            }
+                            finalInstanceMap = trimmedMap
+                        }
                     }
 
                     // Step 2: Use VMF Atlas - merge all VMFs into a grid, convert once, then split
@@ -3782,17 +3798,48 @@ function reg_events(mainWindow) {
                     editorItems.Item.Editor.SubTypeProperty =
                         toPascalCase(instanceKey)
 
-                    // Create new SubTypes for each converted model
+                    // Create new SubTypes
                     const newSubTypes = []
                     let isFirstSubType = true
+                    
+                    // Check if this is a timer variable
+                    const isTimer = String(instanceKey).toLowerCase().includes("timer")
+                    
+                    // Get the default model path (use first successful conversion result)
+                    const defaultResult = successfulResults[0]
+                    if (!defaultResult || !defaultResult.modelPath) {
+                        throw new Error("No successful model conversions found for default subtype")
+                    }
+                    const defaultModelPath = defaultResult.modelPath
+                    
+                    // Create a map of value -> model path for quick lookup
+                    const valueToModelMap = new Map()
                     for (const [
                         value,
                         instancePath,
                     ] of finalInstanceMap.entries()) {
+                        // For timer variables, only consider values 0-30
+                        if (isTimer) {
+                            const numValue = Number(value)
+                            if (isNaN(numValue) || numValue < 0 || numValue > 30) {
+                                continue // Skip values outside 0-30 range for timers
+                            }
+                        }
                         const result = conversionResults.find(
                             (r) => r.instancePath === instancePath,
                         )
                         if (result && result.modelPath) {
+                            valueToModelMap.set(String(value), result.modelPath)
+                        }
+                    }
+                    
+                    if (isTimer) {
+                        // For timer variables: ALWAYS generate exactly 31 subtypes (0-30)
+                        console.log("Timer variable detected: Generating exactly 31 subtypes (0-30)")
+                        for (let i = 0; i <= 30; i++) {
+                            const valueStr = String(i)
+                            const modelPath = valueToModelMap.get(valueStr) || defaultModelPath
+                            
                             let newSubType
 
                             if (isFirstSubType) {
@@ -3827,19 +3874,74 @@ function reg_events(mainWindow) {
                             if (!newSubType.Model) {
                                 newSubType.Model = {}
                             }
-                            newSubType.Model.ModelName = result.modelPath
-
-                            // Add 3DS collision model if available
-                            // DISABLED: Don't include 3DS files in editoritems.txt
-                            // if (result.threeDSPath) {
-                            //     newSubType.Model.CollisionModelName = result.threeDSPath
-                            // }
+                            newSubType.Model.ModelName = modelPath
 
                             // Keep the name as-is (don't add variant number)
                             newSubType.Name = baseSubType.Name
 
                             newSubTypes.push(newSubType)
                         }
+                    } else {
+                        // For non-timer variables: generate subtypes based on actual models found
+                        for (const [
+                            value,
+                            instancePath,
+                        ] of finalInstanceMap.entries()) {
+                            const result = conversionResults.find(
+                                (r) => r.instancePath === instancePath,
+                            )
+                            if (result && result.modelPath) {
+                                let newSubType
+
+                                if (isFirstSubType) {
+                                    // First SubType: Keep everything (Palette, Sounds, Animations, etc.)
+                                    newSubType = JSON.parse(
+                                        JSON.stringify(baseSubType),
+                                    ) // Deep clone
+                                    isFirstSubType = false
+                                } else {
+                                    // Other SubTypes: Name, Model, Sounds, Animations (NO Palette)
+                                    newSubType = {
+                                        Name: baseSubType.Name,
+                                        Model: {},
+                                    }
+
+                                    // Copy Sounds if present
+                                    if (baseSubType.Sounds) {
+                                        newSubType.Sounds = JSON.parse(
+                                            JSON.stringify(baseSubType.Sounds),
+                                        )
+                                    }
+
+                                    // Copy Animations if present
+                                    if (baseSubType.Animations) {
+                                        newSubType.Animations = JSON.parse(
+                                            JSON.stringify(baseSubType.Animations),
+                                        )
+                                    }
+                                }
+
+                                // Update model path (MDL for display)
+                                if (!newSubType.Model) {
+                                    newSubType.Model = {}
+                                }
+                                newSubType.Model.ModelName = result.modelPath
+
+                                // Keep the name as-is (don't add variant number)
+                                newSubType.Name = baseSubType.Name
+
+                                newSubTypes.push(newSubType)
+                            }
+                        }
+                    }
+
+                    // Safety check: For timer variables, ensure exactly 31 subtypes
+                    if (isTimer && newSubTypes.length !== 31) {
+                        console.error(
+                            `❌ ERROR: Generated ${newSubTypes.length} subtypes for timer, expected 31. Trimming to exactly 31.`,
+                        )
+                        // Trim to exactly 31 (keep first 31)
+                        newSubTypes.splice(31)
                     }
 
                     // Replace existing SubTypes with the new ones
@@ -3847,7 +3949,7 @@ function reg_events(mainWindow) {
                     item.saveEditorItems(editorItems)
 
                     console.log(
-                        `📝 Updated editoritems.json with ${newSubTypes.length} SubTypes`,
+                        `📝 Updated editoritems.json with ${newSubTypes.length} SubTypes${isTimer ? " (timer: exactly 31)" : ""}`,
                     )
 
                     // Show summary dialog
