@@ -12,6 +12,8 @@ import {
     Select,
     MenuItem,
     CircularProgress,
+    Alert,
+    Tooltip,
 } from "@mui/material"
 import {
     Visibility,
@@ -33,6 +35,7 @@ function Info({ item, formData, onUpdate }) {
     const [conversionProgress, setConversionProgress] = useState("")
     const [textureStyle, setTextureStyle] = useState("cartoon")
     const [vbspVariables, setVbspVariables] = useState([])
+    const [portal2Status, setPortal2Status] = useState(null)
 
     useEffect(() => {
         // Load the icon when item changes or when staged icon changes
@@ -51,21 +54,60 @@ function Info({ item, formData, onUpdate }) {
         }
     }, [item, formData.stagedIconPath])
 
+    // Check Portal 2 installation status on mount
+    useEffect(() => {
+        const checkPortal2 = async () => {
+            try {
+                const status = await window.package?.getPortal2Status?.()
+                setPortal2Status(status)
+            } catch (error) {
+                console.error("Failed to check Portal 2 status:", error)
+                setPortal2Status({
+                    isInstalled: false,
+                    features: {
+                        modelGeneration: false,
+                        autopacking: false,
+                        fgdData: false,
+                        hammerEditor: false,
+                    },
+                })
+            }
+        }
+        checkPortal2()
+    }, [])
+
     const handleIconError = () => {
         setIconError(true)
     }
 
+    // Helper function to convert "TIMER DELAY" to "Timer Delay"
+    const formatVariableName = (name) => {
+        return name
+            .split(/[\s_]+/)
+            .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(" ")
+    }
+
     // Extract all variables used by the item
     useEffect(() => {
-        const variables = ["DEFAULT"] // Always include DEFAULT
+        const variables = []
+
+        // Check if item has any instances - only add "First Instance" if there are instances
+        const hasInstances =
+            formData?.instances &&
+            Object.keys(formData.instances).length > 0
+
+        if (hasInstances) {
+            variables.push("First Instance")
+        }
 
         // Add all item variables
         if (Array.isArray(formData?.variables)) {
             // Variables are an array of objects with displayName and fixupName
             formData.variables.forEach((varObj) => {
                 if (varObj && varObj.displayName) {
-                    // Use the displayName directly, convert to uppercase
-                    const displayName = varObj.displayName.toUpperCase()
+                    // Format the display name nicely (Timer Delay instead of TIMER DELAY)
+                    const displayName = formatVariableName(varObj.displayName)
                     if (!variables.includes(displayName)) {
                         variables.push(displayName)
                     }
@@ -74,7 +116,7 @@ function Info({ item, formData, onUpdate }) {
         }
 
         setVbspVariables(variables)
-    }, [formData?.variables])
+    }, [formData?.variables, formData?.instances])
 
     // Keep selected variable in sync when variables change
     useEffect(() => {
@@ -85,8 +127,8 @@ function Info({ item, formData, onUpdate }) {
         setSelectedInstanceKey((prev) => {
             // Check if previous selection still exists in variables list
             const stillExists = vbspVariables.includes(prev)
-            // Default to "DEFAULT" if previous selection doesn't exist
-            return stillExists ? prev : "DEFAULT"
+            // Default to "First Instance" if previous selection doesn't exist
+            return stillExists ? prev : "First Instance"
         })
     }, [vbspVariables])
 
@@ -498,8 +540,25 @@ function Info({ item, formData, onUpdate }) {
                     <Typography variant="subtitle1" sx={{ mb: 1 }}>
                         Instance Model
                     </Typography>
+                    {!portal2Status?.features?.modelGeneration && (
+                        <Alert severity="warning" sx={{ mb: 2 }}>
+                            Portal 2 not detected. Model generation requires Portal 2
+                            to be installed for STUDIOMDL compilation.
+                        </Alert>
+                    )}
+                    {vbspVariables.length === 0 && (
+                        <Alert severity="info" sx={{ mb: 2 }}>
+                            Add at least one instance to enable model generation.
+                        </Alert>
+                    )}
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                        <FormControl size="small" sx={{ minWidth: 160 }}>
+                        <FormControl
+                            size="small"
+                            sx={{ minWidth: 160 }}
+                            disabled={
+                                !portal2Status?.features?.modelGeneration ||
+                                vbspVariables.length === 0
+                            }>
                             <InputLabel id="texture-style-label">
                                 Textures
                             </InputLabel>
@@ -510,11 +569,19 @@ function Info({ item, formData, onUpdate }) {
                                 onChange={(e) =>
                                     setTextureStyle(e.target.value)
                                 }>
+                                {portal2Status?.features?.modelGeneration && (
+                                    <MenuItem value="raw">Raw</MenuItem>
+                                )}
                                 <MenuItem value="cartoon">Cartoonish</MenuItem>
-                                <MenuItem value="raw">Raw</MenuItem>
                             </Select>
                         </FormControl>
-                        <FormControl size="small" fullWidth>
+                        <FormControl
+                            size="small"
+                            fullWidth
+                            disabled={
+                                !portal2Status?.features?.modelGeneration ||
+                                vbspVariables.length === 0
+                            }>
                             <InputLabel id="variable-select-label">
                                 Variable
                             </InputLabel>
@@ -541,31 +608,62 @@ function Info({ item, formData, onUpdate }) {
                         </FormControl>
                     </Stack>
                     <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                        <Button
-                            variant="outlined"
-                            onClick={handlePreview}
-                            disabled={!selectedInstanceKey}
-                            startIcon={<Preview />}
-                            sx={{ flexShrink: 0 }}>
-                            Preview
-                        </Button>
-                        <Button
-                            variant="contained"
-                            onClick={handleMakeModel}
-                            disabled={!selectedInstanceKey || isConverting}
-                            fullWidth
-                            startIcon={
-                                isConverting ? (
-                                    <CircularProgress
-                                        size={20}
-                                        color="inherit"
-                                    />
-                                ) : null
+                        <Tooltip
+                            title={
+                                vbspVariables.length === 0
+                                    ? "Add at least one instance"
+                                    : !portal2Status?.features?.modelGeneration
+                                      ? "Portal 2 required"
+                                      : ""
                             }>
-                            {isConverting
-                                ? conversionProgress || "Converting..."
-                                : "Make Model"}
-                        </Button>
+                            <span>
+                                <Button
+                                    variant="outlined"
+                                    onClick={handlePreview}
+                                    disabled={
+                                        !selectedInstanceKey ||
+                                        !portal2Status?.features?.modelGeneration ||
+                                        vbspVariables.length === 0
+                                    }
+                                    startIcon={<Preview />}
+                                    sx={{ flexShrink: 0 }}>
+                                    Preview
+                                </Button>
+                            </span>
+                        </Tooltip>
+                        <Tooltip
+                            title={
+                                vbspVariables.length === 0
+                                    ? "Add at least one instance"
+                                    : !portal2Status?.features?.modelGeneration
+                                      ? "Portal 2 required"
+                                      : ""
+                            }>
+                            <span style={{ flexGrow: 1 }}>
+                                <Button
+                                    variant="contained"
+                                    onClick={handleMakeModel}
+                                    disabled={
+                                        !selectedInstanceKey ||
+                                        isConverting ||
+                                        !portal2Status?.features?.modelGeneration ||
+                                        vbspVariables.length === 0
+                                    }
+                                    fullWidth
+                                    startIcon={
+                                        isConverting ? (
+                                            <CircularProgress
+                                                size={20}
+                                                color="inherit"
+                                            />
+                                        ) : null
+                                    }>
+                                    {isConverting
+                                        ? conversionProgress || "Converting..."
+                                        : "Make Model"}
+                                </Button>
+                            </span>
+                        </Tooltip>
                     </Stack>
                 </Box>
             </Stack>

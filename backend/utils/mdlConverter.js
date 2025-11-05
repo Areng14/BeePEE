@@ -1009,13 +1009,14 @@ function mapVariableValuesToInstances(blocksOrVbsp, targetVariable, item = null)
         return valueInstanceMap
     }
 
-    // Handle "DEFAULT" specially - it means use the first registered instance
-    if (targetVariable === "DEFAULT") {
-        console.log("   📌 DEFAULT selected - this is handled separately")
-        return valueInstanceMap // Empty map for DEFAULT
+    // Handle "DEFAULT" or "First Instance" specially - it means use the first registered instance
+    const normalizedVariable = targetVariable.toUpperCase()
+    if (normalizedVariable === "DEFAULT" || normalizedVariable === "FIRST INSTANCE") {
+        console.log("   📌 First Instance selected - this is handled separately")
+        return valueInstanceMap // Empty map for First Instance
     }
 
-    // Convert target variable to fixup format (e.g., "TIMER DELAY" -> "$timer_delay")
+    // Convert target variable to fixup format (e.g., "Timer Delay" -> "$timer_delay")
     const fixupVariable = `$${targetVariable.replace(/ /g, "_").toLowerCase()}`
     console.log(`   Converted to fixup format: "${fixupVariable}"`)
 

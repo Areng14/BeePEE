@@ -71,6 +71,8 @@ function InputOutputConfigDialog({
     const [entities, setEntities] = useState({})
     const [fgdData, setFgdData] = useState({})
     const [loading, setLoading] = useState(false)
+    const [portal2Status, setPortal2Status] = useState(null)
+    const [useFallbackMode, setUseFallbackMode] = useState(false)
 
     // State for building commands with dropdowns
     const [enableEntity, setEnableEntity] = useState("")
@@ -159,6 +161,10 @@ function InputOutputConfigDialog({
     const loadEntityData = async () => {
         setLoading(true)
         try {
+            // Check Portal 2 status first
+            const p2Status = await window.package?.getPortal2Status?.()
+            setPortal2Status(p2Status)
+
             const [entitiesResult, fgdResult] = await Promise.all([
                 window.package.getItemEntities(itemId),
                 window.package.getFgdData(),
@@ -170,15 +176,19 @@ function InputOutputConfigDialog({
                 console.error("Failed to get entities:", entitiesResult.error)
             }
 
-            if (fgdResult.success) {
+            if (fgdResult.success && Object.keys(fgdResult.entities || {}).length > 0) {
                 setFgdData(fgdResult.entities)
+                setUseFallbackMode(false)
             } else {
-                console.error("Failed to get FGD data:", fgdResult.error)
+                console.warn("FGD data not available - using fallback text mode")
+                setFgdData({})
+                setUseFallbackMode(true)
             }
 
             // Parse existing commands will be handled by the useEffect below
         } catch (error) {
             console.error("Failed to load entity data:", error)
+            setUseFallbackMode(true)
         } finally {
             setLoading(false)
         }
@@ -650,6 +660,161 @@ function InputOutputConfigDialog({
                 <DialogContent sx={{ textAlign: "center", py: 4 }}>
                     <Typography>Loading entity data...</Typography>
                 </DialogContent>
+            </Dialog>
+        )
+    }
+
+    // Fallback mode: Simple text input mode when Portal 2 is not found
+    if (useFallbackMode) {
+        return (
+            <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+                <DialogTitle>{title}</DialogTitle>
+                <DialogContent>
+                    <Stack spacing={2} sx={{ mt: 1 }}>
+                        <Alert severity="warning">
+                            Portal 2 not detected. Using manual text input mode.
+                            Commands must be entered manually in the format:{" "}
+                            <code>entity,input,parameter,delay,maxfires</code>
+                        </Alert>
+
+                        {isInput && (
+                            <>
+                                <TextField
+                                    select
+                                    label="Input Type"
+                                    value={formData.Type}
+                                    onChange={(e) =>
+                                        updateFormData("Type", e.target.value)
+                                    }
+                                    fullWidth
+                                    helperText="Choose the type of input behavior">
+                                    {INPUT_TYPES.map((option) => (
+                                        <MenuItem
+                                            key={option.value}
+                                            value={option.value}>
+                                            {option.label}
+                                        </MenuItem>
+                                    ))}
+                                </TextField>
+
+                                <TextField
+                                    label="Enable Command"
+                                    value={formData.Enable_cmd}
+                                    onChange={(e) =>
+                                        updateFormData("Enable_cmd", e.target.value)
+                                    }
+                                    fullWidth
+                                    placeholder="entity_name,InputName,param,0,-1"
+                                    helperText="Format: entity,input,parameter,delay,maxfires"
+                                />
+
+                                {isDualInput && (
+                                    <>
+                                        <TextField
+                                            label="Disable Command"
+                                            value={formData.Disable_cmd}
+                                            onChange={(e) =>
+                                                updateFormData(
+                                                    "Disable_cmd",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            fullWidth
+                                            placeholder="entity_name,InputName,param,0,-1"
+                                            helperText="Format: entity,input,parameter,delay,maxfires"
+                                        />
+                                        <TextField
+                                            label="Secondary Enable Command"
+                                            value={formData.Sec_Enable_cmd}
+                                            onChange={(e) =>
+                                                updateFormData(
+                                                    "Sec_Enable_cmd",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            fullWidth
+                                            placeholder="entity_name,InputName,param,0,-1"
+                                            helperText="Format: entity,input,parameter,delay,maxfires"
+                                        />
+                                        <TextField
+                                            label="Secondary Disable Command"
+                                            value={formData.Sec_Disable_cmd}
+                                            onChange={(e) =>
+                                                updateFormData(
+                                                    "Sec_Disable_cmd",
+                                                    e.target.value,
+                                                )
+                                            }
+                                            fullWidth
+                                            placeholder="entity_name,InputName,param,0,-1"
+                                            helperText="Format: entity,input,parameter,delay,maxfires"
+                                        />
+                                    </>
+                                )}
+                            </>
+                        )}
+
+                        {!isInput && (
+                            <>
+                                <TextField
+                                    label="Activate Command"
+                                    value={formData.Out_Activate}
+                                    onChange={(e) =>
+                                        updateFormData("Out_Activate", e.target.value)
+                                    }
+                                    fullWidth
+                                    placeholder="entity_name,OutputName,param,0,-1"
+                                    helperText="Format: entity,output,parameter,delay,maxfires"
+                                />
+                                <TextField
+                                    label="Deactivate Command"
+                                    value={formData.Out_Deactivate}
+                                    onChange={(e) =>
+                                        updateFormData(
+                                            "Out_Deactivate",
+                                            e.target.value,
+                                        )
+                                    }
+                                    fullWidth
+                                    placeholder="entity_name,OutputName,param,0,-1"
+                                    helperText="Format: entity,output,parameter,delay,maxfires"
+                                />
+                                <TextField
+                                    label="Secondary Enable Command"
+                                    value={formData.Sec_Enable_cmd}
+                                    onChange={(e) =>
+                                        updateFormData(
+                                            "Sec_Enable_cmd",
+                                            e.target.value,
+                                        )
+                                    }
+                                    fullWidth
+                                    placeholder="entity_name,InputName,param,0,-1"
+                                    helperText="Optional. Format: entity,input,parameter,delay,maxfires"
+                                />
+                                <TextField
+                                    label="Secondary Disable Command"
+                                    value={formData.Sec_Disable_cmd}
+                                    onChange={(e) =>
+                                        updateFormData(
+                                            "Sec_Disable_cmd",
+                                            e.target.value,
+                                        )
+                                    }
+                                    fullWidth
+                                    placeholder="entity_name,InputName,param,0,-1"
+                                    helperText="Optional. Format: entity,input,parameter,delay,maxfires"
+                                />
+                            </>
+                        )}
+                    </Stack>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleSave} variant="contained">
+                        {isEdit ? "Update" : "Add"}
+                    </Button>
+                </DialogActions>
             </Dialog>
         )
     }

@@ -182,6 +182,11 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.invoke("show-model-preview", { objPath, mtlPath, title }),
 
     // ========================================
+    // PORTAL 2 DETECTION
+    // ========================================
+    getPortal2Status: () => ipcRenderer.invoke("get-portal2-status"),
+
+    // ========================================
     // ENTITY AND FGD DATA FUNCTIONS
     // ========================================
     getItemEntities: (itemId) =>
