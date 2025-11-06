@@ -4606,6 +4606,17 @@ function reg_events(mainWindow) {
         }
         return { success: false, error: "Updater not initialized" }
     })
+
+    // Show native message box
+    ipcMain.handle("show-message-box", async (event, options) => {
+        try {
+            const result = await dialog.showMessageBox(BrowserWindow.getFocusedWindow(), options)
+            return { success: true, response: result.response, checkboxChecked: result.checkboxChecked }
+        } catch (error) {
+            console.error("Failed to show message box:", error)
+            return { success: false, error: error.message }
+        }
+    })
 }
 
 module.exports = { reg_events }

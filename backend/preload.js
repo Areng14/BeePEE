@@ -5,6 +5,8 @@ contextBridge.exposeInMainWorld("electron", {
     invoke: (channel, data) => ipcRenderer.invoke(channel, data),
     showOpenDialog: (options) =>
         ipcRenderer.invoke("show-open-dialog", options),
+    showMessageBox: (options) =>
+        ipcRenderer.invoke("show-message-box", options),
 })
 
 // Expose general event API for progress updates, etc.
