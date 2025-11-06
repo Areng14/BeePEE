@@ -269,17 +269,25 @@ function Info({ item, formData, onUpdate }) {
                     console.log(
                         `   Model path: ${result.mdlResult.relativeModelPath}`,
                     )
-                    alert(
-                        `Model generated successfully!\n\nOBJ: ${result.objPath}\nMDL: ${result.mdlResult.relativeModelPath}\n\nThe editoritems.json has been updated with your custom model.`,
-                    )
+                    await window.electron.showMessageBox({
+                        type: 'info',
+                        title: 'Model Generated Successfully',
+                        message: 'Model generated successfully!',
+                        detail: `OBJ: ${result.objPath}\nMDL: ${result.mdlResult.relativeModelPath}\n\nThe editoritems.json has been updated with your custom model.`,
+                        buttons: ['OK']
+                    })
                 } else if (result.mdlResult?.error) {
                     console.warn(
                         "⚠️ OBJ created but MDL conversion failed:",
                         result.mdlResult.error,
                     )
-                    alert(
-                        `OBJ model created successfully, but MDL conversion failed:\n\n${result.mdlResult.error}\n\nYou can still preview the OBJ model.`,
-                    )
+                    await window.electron.showMessageBox({
+                        type: 'warning',
+                        title: 'Partial Success',
+                        message: 'OBJ model created successfully, but MDL conversion failed',
+                        detail: `${result.mdlResult.error}\n\nYou can still preview the OBJ model.`,
+                        buttons: ['OK']
+                    })
                 } else {
                     console.log("OBJ created (MDL conversion skipped)")
                 }
@@ -301,7 +309,12 @@ function Info({ item, formData, onUpdate }) {
         const mtlPath = getMtlPath()
 
         if (!objPath) {
-            alert("No OBJ path found. Please generate the model first.")
+            await window.electron.showMessageBox({
+                type: 'warning',
+                title: 'Model Not Found',
+                message: 'No OBJ path found. Please generate the model first.',
+                buttons: ['OK']
+            })
             return
         }
 
@@ -309,15 +322,21 @@ function Info({ item, formData, onUpdate }) {
         try {
             const stats = await window.package?.getFileStats?.(objPath)
             if (!stats) {
-                alert(
-                    'Model file not found. Please click "Make Model" first to generate the 3D model.',
-                )
+                await window.electron.showMessageBox({
+                    type: 'warning',
+                    title: 'Model File Not Found',
+                    message: 'Model file not found. Please click "Make Model" first to generate the 3D model.',
+                    buttons: ['OK']
+                })
                 return
             }
         } catch (e) {
-            alert(
-                'Model file not found. Please click "Make Model" first to generate the 3D model.',
-            )
+            await window.electron.showMessageBox({
+                type: 'warning',
+                title: 'Model File Not Found',
+                message: 'Model file not found. Please click "Make Model" first to generate the 3D model.',
+                buttons: ['OK']
+            })
             return
         }
 
