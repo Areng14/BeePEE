@@ -2191,10 +2191,71 @@ class Item {
             const editoritems = this.getEditorItems()
             const editor = editoritems.Item.Editor
 
-            // Handle both single SubType and array of SubTypes
-            if (Array.isArray(editor.SubType)) {
-                // Update all SubTypes
-                editor.SubType.forEach((subType) => {
+            // Check if this is a preset model (not "Custom" and ends with .3ds)
+            const isPresetModel = modelName && 
+                modelName.trim() !== "" && 
+                modelName !== "Custom" && 
+                modelName.endsWith(".3ds")
+
+            // If preset model, ensure we only have ONE subtype
+            if (isPresetModel) {
+                const currentSubType = editor.SubType
+                let singleSubType
+
+                // Get the first subtype if it's an array, otherwise use the single one
+                if (Array.isArray(currentSubType) && currentSubType.length > 0) {
+                    singleSubType = currentSubType[0]
+                } else if (Array.isArray(currentSubType) && currentSubType.length === 0) {
+                    // If array is empty, create a new subtype
+                    singleSubType = {}
+                } else {
+                    singleSubType = currentSubType || {}
+                }
+
+                // Update the model name
+                if (!singleSubType.Model) {
+                    singleSubType.Model = {}
+                }
+                singleSubType.Model.ModelName = modelName
+
+                // Rebuild Editor object without SubTypeProperty and with single SubType
+                const otherEditorProps = {}
+                for (const [key, value] of Object.entries(editor)) {
+                    if (key !== "SubType" && key !== "SubTypeProperty") {
+                        otherEditorProps[key] = value
+                    }
+                }
+
+                editoritems.Item.Editor = {
+                    SubType: singleSubType,
+                    ...otherEditorProps,
+                }
+
+                console.log(
+                    `Preset model selected: Reduced to single SubType and removed SubTypeProperty`,
+                )
+            } else {
+                // For custom models or empty modelName, handle both single and array SubTypes
+                if (Array.isArray(editor.SubType)) {
+                    // Update all SubTypes
+                    editor.SubType.forEach((subType) => {
+                        if (!subType.Model) {
+                            subType.Model = {}
+                        }
+                        if (modelName && modelName.trim() !== "") {
+                            subType.Model.ModelName = modelName
+                        } else {
+                            // Remove ModelName if empty
+                            delete subType.Model.ModelName
+                            // Clean up empty Model object
+                            if (Object.keys(subType.Model).length === 0) {
+                                delete subType.Model
+                            }
+                        }
+                    })
+                } else {
+                    // Single SubType
+                    const subType = editor.SubType
                     if (!subType.Model) {
                         subType.Model = {}
                     }
@@ -2207,22 +2268,6 @@ class Item {
                         if (Object.keys(subType.Model).length === 0) {
                             delete subType.Model
                         }
-                    }
-                })
-            } else {
-                // Single SubType
-                const subType = editor.SubType
-                if (!subType.Model) {
-                    subType.Model = {}
-                }
-                if (modelName && modelName.trim() !== "") {
-                    subType.Model.ModelName = modelName
-                } else {
-                    // Remove ModelName if empty
-                    delete subType.Model.ModelName
-                    // Clean up empty Model object
-                    if (Object.keys(subType.Model).length === 0) {
-                        delete subType.Model
                     }
                 }
             }
