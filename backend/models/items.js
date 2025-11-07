@@ -2033,6 +2033,7 @@ class Item {
         const fileDates = this.getFileDates()
 
         // Create default metadata structure with actual file dates
+        // Note: createdVersion is NOT set here - it's set explicitly when creating new items
         const defaultMetadata = {
             created: fileDates.created.toISOString(),
             lastModified: fileDates.lastModified.toISOString(),
