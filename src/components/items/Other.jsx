@@ -40,6 +40,7 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
     const [conversionProgress, setConversionProgress] = useState("")
     const [vbspVariables, setVbspVariables] = useState([])
     const [portal2Status, setPortal2Status] = useState(null)
+    const [objFileExists, setObjFileExists] = useState(false)
 
     // Check Portal 2 installation status on mount
     useEffect(() => {
@@ -142,13 +143,46 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
         }
     }, [])
 
+    // Auto-detect custom models: if modelName starts with "bpee/", set to "Custom"
+    useEffect(() => {
+        if (formData?.modelName && typeof formData.modelName === 'string') {
+            if (formData.modelName.startsWith('bpee/')) {
+                // Model is a custom BeePEE model - ensure selector shows "Custom"
+                // Don't call onUpdate here to avoid infinite loop, just let the selector display correctly
+                console.log(`Detected custom BeePEE model: ${formData.modelName}`)
+            }
+        }
+    }, [formData?.modelName])
+
+    // Check if OBJ file exists for preview
+    useEffect(() => {
+        const checkObjExists = async () => {
+            const objPath = getObjPath()
+            if (!objPath) {
+                setObjFileExists(false)
+                return
+            }
+
+            try {
+                // Check if directory exists and contains OBJ files
+                const exists = await window.electron.invoke('check-file-exists', objPath)
+                setObjFileExists(exists)
+            } catch (error) {
+                console.error('Failed to check OBJ file existence:', error)
+                setObjFileExists(false)
+            }
+        }
+
+        checkObjExists()
+    }, [item?.packagePath, item?.id, isConverting])
+
     // Get the expected OBJ file path for the model
     // After multi-model generation, files are named after instance names (e.g., half_glass_0.obj)
-    // Just return the temp_models directory - backend will find the first OBJ file
+    // Just return the .bpee/tempmdl directory - backend will find the first OBJ file
     const getObjPath = () => {
         if (!item?.id || !item?.packagePath) return null
 
-        const tempDir = `${item.packagePath}/temp_models`
+        const tempDir = `${item.packagePath}/.bpee/tempmdl`
 
         // Return directory path - backend will find first OBJ file
         return tempDir
@@ -325,7 +359,11 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                                 </Box>
                             </li>
                         )}
-                        value={formData.modelName || ""}
+                        value={
+                            formData.modelName && formData.modelName.startsWith('bpee/')
+                                ? "Custom"
+                                : formData.modelName || ""
+                        }
                         onChange={(event, newValue) => {
                             // Handle both object (selected from list) and string (typed in)
                             const modelValue =
@@ -345,8 +383,8 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                     />
                 </Box>
 
-                {/* Model Generator - shown when "Custom" is selected */}
-                <Collapse in={formData.modelName === "Custom"} timeout={300}>
+                {/* Model Generator - shown when "Custom" is selected OR custom bpee/ model exists */}
+                <Collapse in={formData.modelName === "Custom" || (formData.modelName && formData.modelName.startsWith('bpee/'))} timeout={300}>
                     <Divider sx={{ my: 1 }} />
 
                     <Box>
@@ -408,62 +446,122 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                             </FormControl>
                         </Box>
                         <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                            <Tooltip
-                                title={
-                                    vbspVariables.length === 0
-                                        ? "Add at least one instance"
-                                        : !portal2Status?.features?.modelGeneration
-                                          ? "Portal 2 required"
-                                          : ""
-                                }>
-                                <span>
-                                    <Button
-                                        variant="outlined"
-                                        onClick={handlePreview}
-                                        disabled={
-                                            !selectedInstanceKey ||
-                                            !portal2Status?.features?.modelGeneration ||
+                            {/* If custom bpee/ model exists, Preview becomes primary (large) button */}
+                            {formData.modelName && formData.modelName.startsWith('bpee/') ? (
+                                <>
+                                    <Tooltip
+                                        title={
                                             vbspVariables.length === 0
-                                        }
-                                        startIcon={<Preview />}
-                                        sx={{ flexShrink: 0 }}>
-                                        Preview
-                                    </Button>
-                                </span>
-                            </Tooltip>
-                            <Tooltip
-                                title={
-                                    vbspVariables.length === 0
-                                        ? "Add at least one instance"
-                                        : !portal2Status?.features?.modelGeneration
-                                          ? "Portal 2 required"
-                                          : ""
-                                }>
-                                <span style={{ flexGrow: 1 }}>
-                                    <Button
-                                        variant="contained"
-                                        onClick={handleMakeModel}
-                                        disabled={
-                                            !selectedInstanceKey ||
-                                            isConverting ||
-                                            !portal2Status?.features?.modelGeneration ||
-                                            vbspVariables.length === 0
-                                        }
-                                        fullWidth
-                                        startIcon={
-                                            isConverting ? (
-                                                <CircularProgress
-                                                    size={20}
-                                                    color="inherit"
-                                                />
-                                            ) : null
+                                                ? "Add at least one instance"
+                                                : !portal2Status?.features?.modelGeneration
+                                                  ? "Portal 2 required"
+                                                  : !objFileExists
+                                                    ? "Generate model first"
+                                                    : ""
                                         }>
-                                        {isConverting
-                                            ? conversionProgress || "Converting..."
-                                            : "Make Model"}
-                                    </Button>
-                                </span>
-                            </Tooltip>
+                                        <span style={{ flexGrow: 1 }}>
+                                            <Button
+                                                variant="contained"
+                                                onClick={handlePreview}
+                                                disabled={
+                                                    !selectedInstanceKey ||
+                                                    !portal2Status?.features?.modelGeneration ||
+                                                    vbspVariables.length === 0 ||
+                                                    !objFileExists
+                                                }
+                                                startIcon={<Preview />}
+                                                fullWidth>
+                                                Preview
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
+                                    <Tooltip
+                                        title={
+                                            vbspVariables.length === 0
+                                                ? "Add at least one instance"
+                                                : !portal2Status?.features?.modelGeneration
+                                                  ? "Portal 2 required"
+                                                  : ""
+                                        }>
+                                        <span>
+                                            <Button
+                                                variant="outlined"
+                                                onClick={handleMakeModel}
+                                                disabled={
+                                                    !selectedInstanceKey ||
+                                                    isConverting ||
+                                                    !portal2Status?.features?.modelGeneration ||
+                                                    vbspVariables.length === 0
+                                                }
+                                                sx={{ flexShrink: 0 }}>
+                                                {isConverting ? conversionProgress : "Regenerate"}
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
+                                </>
+                            ) : (
+                                <>
+                                    <Tooltip
+                                        title={
+                                            vbspVariables.length === 0
+                                                ? "Add at least one instance"
+                                                : !portal2Status?.features?.modelGeneration
+                                                  ? "Portal 2 required"
+                                                  : !objFileExists
+                                                    ? "Generate model first"
+                                                    : ""
+                                        }>
+                                        <span>
+                                            <Button
+                                                variant="outlined"
+                                                onClick={handlePreview}
+                                                disabled={
+                                                    !selectedInstanceKey ||
+                                                    !portal2Status?.features?.modelGeneration ||
+                                                    vbspVariables.length === 0 ||
+                                                    !objFileExists
+                                                }
+                                                startIcon={<Preview />}
+                                                sx={{ flexShrink: 0 }}>
+                                                Preview
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
+                                    <Tooltip
+                                        title={
+                                            vbspVariables.length === 0
+                                                ? "Add at least one instance"
+                                                : !portal2Status?.features?.modelGeneration
+                                                  ? "Portal 2 required"
+                                                  : ""
+                                        }>
+                                        <span style={{ flexGrow: 1 }}>
+                                            <Button
+                                                variant="contained"
+                                                onClick={handleMakeModel}
+                                                disabled={
+                                                    !selectedInstanceKey ||
+                                                    isConverting ||
+                                                    !portal2Status?.features?.modelGeneration ||
+                                                    vbspVariables.length === 0
+                                                }
+                                                fullWidth
+                                                startIcon={
+                                                    isConverting ? (
+                                                        <CircularProgress
+                                                            size={20}
+                                                            color="inherit"
+                                                        />
+                                                    ) : null
+                                                }>
+                                                {isConverting
+                                                    ? conversionProgress || "Converting..."
+                                                    : "Make Model"}
+                                            </Button>
+                                        </span>
+                                    </Tooltip>
+                                </>
+                            )}
                         </Stack>
                     </Box>
                 </Collapse>

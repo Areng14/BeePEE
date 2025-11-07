@@ -840,6 +840,16 @@ function reg_events(mainWindow) {
         return await dialog.showOpenDialog(options)
     })
 
+    // Check if a file or directory exists
+    ipcMain.handle("check-file-exists", async (event, filePath) => {
+        try {
+            return fs.existsSync(filePath)
+        } catch (error) {
+            console.error("Error checking file existence:", error)
+            return false
+        }
+    })
+
     // Register item saving
     ipcMain.handle("save-item", async (event, itemData) => {
         return handleItemSave(itemData, event, mainWindow)
