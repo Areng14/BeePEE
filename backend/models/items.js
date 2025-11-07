@@ -208,6 +208,7 @@ class Item {
             // Mark as imported in meta.json
             // Frontend will check this flag and skip auto-conversion
             meta._vbsp_imported = true
+            meta.isImported = true
             this.saveMetadata(meta)
 
             console.log(

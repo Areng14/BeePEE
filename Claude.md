@@ -61,6 +61,29 @@ BeePEE is an Electron-based application for creating and editing Portal 2 Puzzle
     - Validates random selection blocks
     - Uses `Hive` icon for visual representation
 
+### Item Metadata Tracking
+
+- **Implemented**: Automatic tracking of item characteristics in `meta.json`
+- **Features**:
+    - **Timestamps**: Automatically tracks creation and last modified dates
+    - **Custom Model Status**: Tracks when an item has a custom BeePEE-generated model (`hasCustomModel`)
+    - **Import Status**: Tracks when an item was imported from VBSP config (`isImported`, `_vbsp_imported`)
+    - Displayed in Metadata tab of item editor
+    - Automatically updated when:
+        - Custom models are generated and saved
+        - Items are imported from VBSP
+        - Item files are modified
+- **File Structure**:
+    ```json
+    {
+        "created": "2025-11-07T19:31:24.862Z",
+        "lastModified": "2025-11-07T19:31:25.013Z",
+        "hasCustomModel": true,
+        "isImported": true,
+        "_vbsp_imported": true
+    }
+    ```
+
 ## Key Technical Architecture
 
 ### Electron IPC Communication
