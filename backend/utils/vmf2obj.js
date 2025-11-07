@@ -312,28 +312,14 @@ async function convertVmfToObj(vmfPath, options = {}) {
                 }
             }
         } catch {}
-        // Add package resources folder if VMF is under .../resources/instances/...
-        try {
-            const instancesDir = path.dirname(vmfPath)
-            const resourcesDir = path.dirname(instancesDir) // up from instances -> resources
-            if (path.basename(resourcesDir).toLowerCase() === "resources") {
-                resourcePaths.push(resourcesDir)
-            }
-        } catch {}
     }
 
-    // If textureStyle is raw, also include the portal2 folder for direct material/model lookup
-    try {
-        if (options.textureStyle === "raw") {
-            const p2 = await findPortal2Resources(console)
-            if (p2?.root) {
-                const portal2Folder = path.join(p2.root, "portal2")
-                if (fs.existsSync(portal2Folder)) {
-                    resourcePaths.push(portal2Folder)
-                }
-            }
-        }
-    } catch {}
+    // Add the package's resources as a resource as they might have stuff packed in there also
+    const instancesDir = path.dirname(vmfPath)
+    const resourcesDir = path.dirname(instancesDir) // up from instances -> resources
+    if (path.basename(resourcesDir).toLowerCase() === "resources") {
+        resourcePaths.push(resourcesDir)
+    }
 
     // Merge extras, then de-duplicate
     resourcePaths = uniquePaths([
