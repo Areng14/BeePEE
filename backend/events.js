@@ -1157,20 +1157,31 @@ function reg_events(mainWindow) {
                 info.Item.push(newItemInfo)
                 fs.writeFileSync(infoPath, JSON.stringify(info, null, 4))
 
-                // Create the Item instance
-                const newItem = new Item({
-                    packagePath: currentPackage.packageDir,
-                    itemJSON: newItemInfo,
-                })
+            // Create the Item instance
+            const newItem = new Item({
+                packagePath: currentPackage.packageDir,
+                itemJSON: newItemInfo,
+            })
 
-                // Add to package
-                currentPackage.items.push(newItem)
+            // Set createdVersion in metadata
+            try {
+                const packageJson = require("../package.json")
+                const appVersion = packageJson.version
+                if (appVersion) {
+                    newItem.updateMetadata({ createdVersion: appVersion })
+                }
+            } catch (error) {
+                console.warn("Failed to set createdVersion:", error.message)
+            }
 
-                // Send updates to frontend (main window)
-                const updatedItems = currentPackage.items.map((item) =>
-                    item.toJSONWithExistence(),
-                )
-                mainWindow.webContents.send("package:loaded", updatedItems)
+            // Add to package
+            currentPackage.items.push(newItem)
+
+            // Send updates to frontend (main window)
+            const updatedItems = currentPackage.items.map((item) =>
+                item.toJSONWithExistence(),
+            )
+            mainWindow.webContents.send("package:loaded", updatedItems)
 
                 // Close the create item window if it's open
                 const createWindow = getCreateItemWindow()
@@ -1336,6 +1347,17 @@ function reg_events(mainWindow) {
                 packagePath: currentPackage.packageDir,
                 itemJSON: newItemInfo,
             })
+
+            // Set createdVersion in metadata
+            try {
+                const packageJson = require("../package.json")
+                const appVersion = packageJson.version
+                if (appVersion) {
+                    newItem.updateMetadata({ createdVersion: appVersion })
+                }
+            } catch (error) {
+                console.warn("Failed to set createdVersion:", error.message)
+            }
 
             // Add to package
             currentPackage.items.push(newItem)

@@ -111,6 +111,31 @@ const Metadata = ({ item }) => {
                     </Typography>
                 </Box>
 
+                {/* App Version */}
+                {(metadata.createdVersion || metadata.importedVersion) && (
+                    <Box>
+                        <Typography
+                            variant="subtitle2"
+                            color="text.secondary"
+                            gutterBottom>
+                            App Version
+                        </Typography>
+                        <Typography variant="body2">
+                            {metadata.createdVersion && (
+                                <Box component="span">
+                                    Created with: {metadata.createdVersion}
+                                    {metadata.importedVersion && " • "}
+                                </Box>
+                            )}
+                            {metadata.importedVersion && (
+                                <Box component="span">
+                                    Imported with: {metadata.importedVersion}
+                                </Box>
+                            )}
+                        </Typography>
+                    </Box>
+                )}
+
                 <Typography
                     variant="body2"
                     color="text.secondary"
