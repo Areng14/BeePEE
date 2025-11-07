@@ -52,6 +52,10 @@ function ItemEditor() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
 
+    // Model generation staging
+    const [isGeneratingModel, setIsGeneratingModel] = useState(false)
+    const [stagedEditorItems, setStagedEditorItems] = useState(null)
+
     // Undo/Redo system
     const [undoStack, setUndoStack] = useState([])
     const [redoStack, setRedoStack] = useState([])
@@ -296,6 +300,27 @@ function ItemEditor() {
             document.body.classList.remove("item-editor-active")
         }
     }, [])
+
+    // Functions to manage model generation state (passed to Other tab)
+    const handleModelGenerationStart = () => {
+        setIsGeneratingModel(true)
+    }
+
+    const handleModelGenerationComplete = (editorItems) => {
+        setIsGeneratingModel(false)
+        if (editorItems) {
+            setStagedEditorItems(editorItems)
+            // Mark as modified so Save button becomes enabled
+            setFormData((prev) => ({
+                ...prev,
+                _modified: {
+                    ...prev._modified,
+                    other: true,
+                },
+            }))
+            window.package?.setUnsavedChanges?.(true)
+        }
+    }
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue)
@@ -712,6 +737,33 @@ function ItemEditor() {
                 }
             }
 
+            // Save staged model/material files from model generation (if any)
+            if (stagedEditorItems) {
+                try {
+                    // Step 1: Copy staged model/material files from .bpee/ to resources/
+                    console.log("Copying staged model/material files to final location...")
+                    const copyResult = await window.electron.invoke("copy-staged-model-files", {
+                        itemId: item.id,
+                    })
+
+                    if (copyResult.success && copyResult.copied) {
+                        console.log("✅ Staged model/material files copied successfully")
+                    }
+
+                    // Step 2: Save staged editoritems.json changes
+                    console.log("Saving staged editoritems from model generation...")
+                    await window.electron.invoke("save-staged-editoritems", {
+                        itemId: item.id,
+                        stagedEditorItems: stagedEditorItems,
+                    })
+                    console.log("✅ Staged editoritems saved successfully")
+                } catch (error) {
+                    console.error("Failed to save staged model changes:", error)
+                    hasErrors = true
+                    throw new Error(`Staged model changes: ${error.message}`)
+                }
+            }
+
             // Wait for all saves to complete
             if (savePromises.length > 0) {
                 await Promise.all(savePromises)
@@ -723,7 +775,7 @@ function ItemEditor() {
                 setSaveError(null)
                 setTimeout(() => setShowSaveSuccess(false), 2000)
 
-                // Clear all modified flags and staged icon data
+                // Clear all modified flags and staged data
                 setFormData((prev) => ({
                     ...prev,
                     // Clear staged icon data after successful save
@@ -740,6 +792,9 @@ function ItemEditor() {
                         other: false,
                     },
                 }))
+
+                // Clear staged editoritems from model generation
+                setStagedEditorItems(null)
 
                 // Clear unsaved changes indicator
                 window.package?.setUnsavedChanges?.(false)
@@ -982,6 +1037,8 @@ function ItemEditor() {
                             formData={formData}
                             onUpdate={updateFormData}
                             onUpdateOther={updateOtherData}
+                            onModelGenerationStart={handleModelGenerationStart}
+                            onModelGenerationComplete={handleModelGenerationComplete}
                         />
                     </Box>
                     <Box sx={{ display: tabValue === 6 ? "block" : "none" }}>
@@ -1074,8 +1131,10 @@ function ItemEditor() {
                                 (!Object.values(formData._modified).some(
                                     (modified) => modified,
                                 ) &&
-                                    Object.keys(editingNames).length === 0) ||
-                                isSaving
+                                    Object.keys(editingNames).length === 0 &&
+                                    !stagedEditorItems) ||
+                                isSaving ||
+                                isGeneratingModel
                             }
                             sx={{ flex: 1 }}>
                             {isSaving

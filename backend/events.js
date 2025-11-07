@@ -1871,7 +1871,7 @@ function reg_events(mainWindow) {
 
                     if (!objFile) {
                         throw new Error(
-                            "No OBJ files found in temp_models directory",
+                            "No OBJ files found in .bpee/tempmdl directory",
                         )
                     }
 
@@ -3169,6 +3169,118 @@ function reg_events(mainWindow) {
         }
     })
 
+    // Save staged editoritems (from model generation)
+    ipcMain.handle("save-staged-editoritems", async (event, { itemId, stagedEditorItems }) => {
+        try {
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+
+            if (!stagedEditorItems) {
+                throw new Error("No staged editoritems provided")
+            }
+
+            // Save the staged editoritems to disk
+            item.saveEditorItems(stagedEditorItems)
+            console.log(`✅ Saved staged editoritems for item: ${item.name}`)
+
+            // Send updated item data to frontend
+            const updatedItem = item.toJSONWithExistence()
+            mainWindow.webContents.send("item-updated", updatedItem)
+            sendItemUpdateToEditor(itemId, updatedItem)
+
+            return { success: true }
+        } catch (error) {
+            console.error("Failed to save staged editoritems:", error)
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Copy staged model/material files from .bpee/ to resources/
+    ipcMain.handle("copy-staged-model-files", async (event, { itemId }) => {
+        try {
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+
+            const packagePath = item.packagePath
+            const stagingDir = path.join(packagePath, ".bpee")
+
+            if (!fs.existsSync(stagingDir)) {
+                console.log("No staged files found, skipping copy")
+                return { success: true, copied: false }
+            }
+
+            console.log(`📋 Copying staged files from .bpee/ to resources/...`)
+
+            // Copy staged models (.bpee/models/ -> resources/models/)
+            const stagedModelsDir = path.join(stagingDir, "models")
+            if (fs.existsSync(stagedModelsDir)) {
+                const targetModelsDir = path.join(packagePath, "resources", "models")
+
+                // Recursively copy all files
+                const copyRecursive = (src, dest) => {
+                    if (!fs.existsSync(src)) return
+
+                    if (fs.statSync(src).isDirectory()) {
+                        if (!fs.existsSync(dest)) {
+                            fs.mkdirSync(dest, { recursive: true })
+                        }
+                        for (const file of fs.readdirSync(src)) {
+                            copyRecursive(path.join(src, file), path.join(dest, file))
+                        }
+                    } else {
+                        fs.copyFileSync(src, dest)
+                        console.log(`  Copied: ${path.relative(packagePath, dest)}`)
+                    }
+                }
+
+                copyRecursive(stagedModelsDir, targetModelsDir)
+            }
+
+            // Copy staged materials (.bpee/materials/ -> resources/materials/)
+            const stagedMaterialsDir = path.join(stagingDir, "materials")
+            if (fs.existsSync(stagedMaterialsDir)) {
+                const targetMaterialsDir = path.join(packagePath, "resources", "materials")
+
+                const copyRecursive = (src, dest) => {
+                    if (!fs.existsSync(src)) return
+
+                    if (fs.statSync(src).isDirectory()) {
+                        if (!fs.existsSync(dest)) {
+                            fs.mkdirSync(dest, { recursive: true })
+                        }
+                        for (const file of fs.readdirSync(src)) {
+                            copyRecursive(path.join(src, file), path.join(dest, file))
+                        }
+                    } else {
+                        fs.copyFileSync(src, dest)
+                        console.log(`  Copied: ${path.relative(packagePath, dest)}`)
+                    }
+                }
+
+                copyRecursive(stagedMaterialsDir, targetMaterialsDir)
+            }
+
+            // Clean up staging directory after successful copy
+            console.log(`🧹 Cleaning up staging directory...`)
+            if (fs.existsSync(stagedModelsDir)) {
+                fs.rmSync(stagedModelsDir, { recursive: true, force: true })
+            }
+            if (fs.existsSync(stagedMaterialsDir)) {
+                fs.rmSync(stagedMaterialsDir, { recursive: true, force: true })
+            }
+
+            console.log(`✅ Staged files copied successfully`)
+            return { success: true, copied: true }
+        } catch (error) {
+            console.error("Failed to copy staged files:", error)
+            return { success: false, error: error.message }
+        }
+    })
+
     // Conditions management handlers
     ipcMain.handle("get-conditions", async (event, { itemId }) => {
         try {
@@ -3319,7 +3431,8 @@ function reg_events(mainWindow) {
                         )
                         const tempDir = path.join(
                             item.packagePath,
-                            "temp_models",
+                            ".bpee",
+                            "tempmdl",
                         )
                         if (!fs.existsSync(tempDir)) {
                             fs.mkdirSync(tempDir, { recursive: true })
@@ -3362,6 +3475,7 @@ function reg_events(mainWindow) {
                                 mdlResult.success &&
                                 mdlResult.relativeModelPath
                             ) {
+                                // STAGING: Don't save immediately, return staged data for save handler
                                 const editorItems = item.getEditorItems()
                                 const subType = Array.isArray(
                                     editorItems.Item.Editor.SubType,
@@ -3385,7 +3499,9 @@ function reg_events(mainWindow) {
                                 ) {
                                     editorItems.Item.Editor.SubType = [subType]
                                 }
-                                item.saveEditorItems(editorItems)
+
+                                // Return staged editoritems changes (don't save yet)
+                                mdlResult.stagedEditorItems = editorItems
                             }
                         } catch (mdlError) {
                             console.error(
@@ -3567,7 +3683,7 @@ function reg_events(mainWindow) {
                         stage: "merge",
                         message: `Preparing to merge ${uniqueInstances.length} instances into grid...`,
                     })
-                    const tempDir = path.join(item.packagePath, "temp_models")
+                    const tempDir = path.join(item.packagePath, ".bpee", "tempmdl")
                     if (!fs.existsSync(tempDir)) {
                         fs.mkdirSync(tempDir, { recursive: true })
                     }
@@ -3691,9 +3807,10 @@ function reg_events(mainWindow) {
                     // Shared folder name - lowercase item ID
                     const sharedFolderName = item.id.toLowerCase()
 
+                    // STAGING: Materials go to .bpee/materials/ instead of resources/materials/
                     const sharedMaterialsPath = path.join(
                         item.packagePath,
-                        "resources",
+                        ".bpee",
                         "materials",
                         "models",
                         "props_map_editor",
@@ -3986,12 +4103,11 @@ function reg_events(mainWindow) {
                         newSubTypes.splice(31)
                     }
 
-                    // Replace existing SubTypes with the new ones
+                    // STAGING: Replace existing SubTypes with the new ones (don't save yet)
                     editorItems.Item.Editor.SubType = newSubTypes
-                    item.saveEditorItems(editorItems)
 
                     console.log(
-                        `📝 Updated editoritems.json with ${newSubTypes.length} SubTypes${isTimer ? " (timer: exactly 31)" : ""}`,
+                        `📝 Staged editoritems.json with ${newSubTypes.length} SubTypes${isTimer ? " (timer: exactly 31)" : ""}`,
                     )
 
                     // Show summary dialog
@@ -4002,15 +4118,15 @@ function reg_events(mainWindow) {
 
                     if (failedResults.length > 0) {
                         dialogOptions.type = "warning"
-                        dialogOptions.detail = `Failed conversions:\n${failedResults.map((r) => `• ${path.basename(r.instancePath)}: ${r.error}`).join("\n")}`
+                        dialogOptions.detail = `Failed conversions:\n${failedResults.map((r) => `• ${path.basename(r.instancePath)}: ${r.error}`).join("\n")}\n\nChanges will be applied when you save the item.`
                     } else {
                         dialogOptions.type = "info"
-                        dialogOptions.detail = `All models converted successfully and editoritems.json has been updated with ${newSubTypes.length} SubTypes.`
+                        dialogOptions.detail = `All models converted successfully!\n\nClick Save in the editor to apply ${newSubTypes.length} SubTypes to editoritems.json.`
                     }
 
                     dialog.showMessageBox(dialogOptions)
 
-                    return { success: true, results: conversionResults }
+                    return { success: true, results: conversionResults, stagedEditorItems: editorItems }
                 }
 
                 // --- Original single-instance conversion logic ---
@@ -4060,10 +4176,10 @@ function reg_events(mainWindow) {
                         { scale: options.scale || 1.0 },
                     )
 
-                    // Update editoritems.json to reference the custom model
+                    // STAGING: Update editoritems.json to reference the custom model (don't save yet)
                     if (mdlResult.success && mdlResult.relativeModelPath) {
                         console.log(
-                            "📝 Updating editoritems.json with custom model...",
+                            "📝 Staging editoritems.json with custom model...",
                         )
 
                         const editorItems = item.getEditorItems()
@@ -4090,14 +4206,15 @@ function reg_events(mainWindow) {
                             editorItems.Item.Editor.SubType = [subType]
                         }
 
-                        item.saveEditorItems(editorItems)
+                        // Return staged editoritems changes (don't save yet)
+                        mdlResult.stagedEditorItems = editorItems
 
                         console.log(
-                            `✅ Updated editoritems with model: ${mdlResult.relativeModelPath}`,
+                            `✅ Staged editoritems with model: ${mdlResult.relativeModelPath}`,
                         )
                         if (mdlResult.threeDSResult?.relativeModelPath) {
                             console.log(
-                                `✅ Updated editoritems with collision: ${mdlResult.threeDSResult.relativeModelPath}`,
+                                `✅ Staged editoritems with collision: ${mdlResult.threeDSResult.relativeModelPath}`,
                             )
                         }
                     }
