@@ -4,38 +4,26 @@ import {
     Box,
     Typography,
     IconButton,
-    Button,
     InputAdornment,
     Divider,
     FormControl,
     InputLabel,
     Select,
     MenuItem,
-    CircularProgress,
-    Alert,
-    Tooltip,
 } from "@mui/material"
 import {
     Visibility,
     Edit,
     FolderOpen,
     Image,
-    Preview,
 } from "@mui/icons-material"
 import ReactMarkdown from "react-markdown"
 import { useState, useEffect } from "react"
-import missingIcon from "../../assets/missing.png"
 
 function Info({ item, formData, onUpdate }) {
     const [iconSrc, setIconSrc] = useState(null)
     const [iconError, setIconError] = useState(false)
     const [isPreview, setIsPreview] = useState(false)
-    const [selectedInstanceKey, setSelectedInstanceKey] = useState("")
-    const [isConverting, setIsConverting] = useState(false)
-    const [conversionProgress, setConversionProgress] = useState("")
-    const [textureStyle, setTextureStyle] = useState("cartoon")
-    const [vbspVariables, setVbspVariables] = useState([])
-    const [portal2Status, setPortal2Status] = useState(null)
 
     useEffect(() => {
         // Load the icon when item changes or when staged icon changes
@@ -54,110 +42,9 @@ function Info({ item, formData, onUpdate }) {
         }
     }, [item, formData.stagedIconPath])
 
-    // Check Portal 2 installation status on mount
-    useEffect(() => {
-        const checkPortal2 = async () => {
-            try {
-                const status = await window.package?.getPortal2Status?.()
-                setPortal2Status(status)
-            } catch (error) {
-                console.error("Failed to check Portal 2 status:", error)
-                setPortal2Status({
-                    isInstalled: false,
-                    features: {
-                        modelGeneration: false,
-                        autopacking: false,
-                        fgdData: false,
-                        hammerEditor: false,
-                    },
-                })
-            }
-        }
-        checkPortal2()
-    }, [])
-
     const handleIconError = () => {
         setIconError(true)
     }
-
-    // Helper function to convert "TIMER DELAY" to "Timer Delay"
-    const formatVariableName = (name) => {
-        return name
-            .split(/[\s_]+/)
-            .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-            .join(" ")
-    }
-
-    // Extract all variables used by the item
-    useEffect(() => {
-        const variables = []
-
-        // Check if item has any instances - only add "First Instance" if there are instances
-        const hasInstances =
-            formData?.instances &&
-            Object.keys(formData.instances).length > 0
-
-        if (hasInstances) {
-            variables.push("First Instance")
-        }
-
-        // Add all item variables
-        if (Array.isArray(formData?.variables)) {
-            // Variables are an array of objects with displayName and fixupName
-            formData.variables.forEach((varObj) => {
-                if (varObj && varObj.displayName) {
-                    // Format the display name nicely (Timer Delay instead of TIMER DELAY)
-                    const displayName = formatVariableName(varObj.displayName)
-                    if (!variables.includes(displayName)) {
-                        variables.push(displayName)
-                    }
-                }
-            })
-        }
-
-        setVbspVariables(variables)
-    }, [formData?.variables, formData?.instances])
-
-    // Keep selected variable in sync when variables change
-    useEffect(() => {
-        if (vbspVariables.length === 0) {
-            setSelectedInstanceKey("")
-            return
-        }
-        setSelectedInstanceKey((prev) => {
-            // Check if previous selection still exists in variables list
-            const stillExists = vbspVariables.includes(prev)
-            // Default to "First Instance" if previous selection doesn't exist
-            return stillExists ? prev : "First Instance"
-        })
-    }, [vbspVariables])
-
-    // Listen for conversion progress updates from backend
-    useEffect(() => {
-        const handleProgress = (event, progressData) => {
-            const { stage, message, detail } = progressData
-
-            // Update progress message based on stage
-            const stageMessages = {
-                merge: "📐 Merging VMFs into grid...",
-                vmf2obj: "🔄 Converting to OBJ...",
-                split: "✂️ Splitting models...",
-                mdl: "🔨 Converting to MDL...",
-            }
-
-            setConversionProgress(
-                stageMessages[stage] || message || "Converting...",
-            )
-        }
-
-        // Register listener
-        window.api?.on?.("conversion-progress", handleProgress)
-
-        // Cleanup
-        return () => {
-            window.api?.off?.("conversion-progress", handleProgress)
-        }
-    }, [])
 
     // Get relative path from package root (show staged path if available)
     const getRelativeIconPath = () => {
@@ -218,134 +105,6 @@ function Info({ item, formData, onUpdate }) {
                 {children}
             </Box>
         ),
-    }
-
-    // Get the expected OBJ file path for the model
-    // After multi-model generation, files are named after instance names (e.g., half_glass_0.obj)
-    // Just return the temp_models directory - backend will find the first OBJ file
-    const getObjPath = () => {
-        if (!item?.id || !item?.packagePath) return null
-
-        const tempDir = `${item.packagePath}/temp_models`
-
-        // Return directory path - backend will find first OBJ file
-        return tempDir
-    }
-
-    // Get the expected MTL file path for the model
-    const getMtlPath = () => {
-        const objPath = getObjPath()
-        if (!objPath) return null
-        return objPath.replace(/\.obj$/i, ".mtl")
-    }
-
-    // Get display name for the current selection
-    const getInstanceDisplayName = () => {
-        if (!selectedInstanceKey) return null
-        return selectedInstanceKey // Just return the variable name (e.g., "TIMER DELAY", "DEFAULT")
-    }
-
-    const handleMakeModel = async () => {
-        if (!selectedInstanceKey || isConverting) return
-
-        setIsConverting(true)
-        setConversionProgress("🚀 Starting conversion...")
-        try {
-            // selectedInstanceKey now contains the selected variable name (e.g., "TIMER DELAY", "DEFAULT")
-            // Backend will handle mapping variable to appropriate instance
-
-            // Ask backend to resolve the VMF path and convert
-            const result = await window.package.convertInstanceToObj(
-                item.id,
-                selectedInstanceKey, // This is now a variable name, not an instance key
-                { textureStyle, isVariable: true },
-            )
-            if (result?.success) {
-                console.log("VMF2OBJ conversion completed successfully")
-
-                // Check MDL conversion result
-                if (result.mdlResult?.success) {
-                    console.log("✅ MDL conversion successful!")
-                    console.log(
-                        `   Model path: ${result.mdlResult.relativeModelPath}`,
-                    )
-                    await window.electron.showMessageBox({
-                        type: 'info',
-                        title: 'Model Generated Successfully',
-                        message: 'Model generated successfully!',
-                        detail: `OBJ: ${result.objPath}\nMDL: ${result.mdlResult.relativeModelPath}\n\nThe editoritems.json has been updated with your custom model.`,
-                        buttons: ['OK']
-                    })
-                } else if (result.mdlResult?.error) {
-                    console.warn(
-                        "⚠️ OBJ created but MDL conversion failed:",
-                        result.mdlResult.error,
-                    )
-                    await window.electron.showMessageBox({
-                        type: 'warning',
-                        title: 'Partial Success',
-                        message: 'OBJ model created successfully, but MDL conversion failed',
-                        detail: `${result.mdlResult.error}\n\nYou can still preview the OBJ model.`,
-                        buttons: ['OK']
-                    })
-                } else {
-                    console.log("OBJ created (MDL conversion skipped)")
-                }
-            } else {
-                console.error("VMF2OBJ failed:", result?.error)
-            }
-        } catch (error) {
-            console.error("Failed to make model:", error)
-        } finally {
-            setIsConverting(false)
-            setConversionProgress("")
-        }
-    }
-
-    const handlePreview = async () => {
-        if (!selectedInstanceKey) return
-
-        const objPath = getObjPath()
-        const mtlPath = getMtlPath()
-
-        if (!objPath) {
-            await window.electron.showMessageBox({
-                type: 'warning',
-                title: 'Model Not Found',
-                message: 'No OBJ path found. Please generate the model first.',
-                buttons: ['OK']
-            })
-            return
-        }
-
-        // Check if the OBJ file exists
-        try {
-            const stats = await window.package?.getFileStats?.(objPath)
-            if (!stats) {
-                await window.electron.showMessageBox({
-                    type: 'warning',
-                    title: 'Model File Not Found',
-                    message: 'Model file not found. Please click "Make Model" first to generate the 3D model.',
-                    buttons: ['OK']
-                })
-                return
-            }
-        } catch (e) {
-            await window.electron.showMessageBox({
-                type: 'warning',
-                title: 'Model File Not Found',
-                message: 'Model file not found. Please click "Make Model" first to generate the 3D model.',
-                buttons: ['OK']
-            })
-            return
-        }
-
-        const title = `${getInstanceDisplayName() || "Instance"} — ${item?.name || "Model"}`
-        try {
-            await window.package?.showModelPreview?.(objPath, mtlPath, title)
-        } catch (e) {
-            console.error("Failed to open model preview:", e)
-        }
     }
 
     return (
@@ -551,140 +310,6 @@ function Info({ item, formData, onUpdate }) {
                     </Select>
                 </FormControl>
 
-                {/* Section divider */}
-                <Divider sx={{ my: 1 }} />
-
-                {/* Instance -> Model section */}
-                <Box>
-                    <Typography variant="subtitle1" sx={{ mb: 1 }}>
-                        Instance Model
-                    </Typography>
-                    {!portal2Status?.features?.modelGeneration && (
-                        <Alert severity="warning" sx={{ mb: 2 }}>
-                            Portal 2 not detected. Model generation requires Portal 2
-                            to be installed for STUDIOMDL compilation.
-                        </Alert>
-                    )}
-                    {vbspVariables.length === 0 && (
-                        <Alert severity="info" sx={{ mb: 2 }}>
-                            Add at least one instance to enable model generation.
-                        </Alert>
-                    )}
-                    <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                        <FormControl
-                            size="small"
-                            sx={{ minWidth: 160 }}
-                            disabled={
-                                !portal2Status?.features?.modelGeneration ||
-                                vbspVariables.length === 0
-                            }>
-                            <InputLabel id="texture-style-label">
-                                Textures
-                            </InputLabel>
-                            <Select
-                                labelId="texture-style-label"
-                                label="Textures"
-                                value={textureStyle}
-                                onChange={(e) =>
-                                    setTextureStyle(e.target.value)
-                                }>
-                                {portal2Status?.features?.modelGeneration && (
-                                    <MenuItem value="raw">Raw</MenuItem>
-                                )}
-                                <MenuItem value="cartoon">Cartoonish</MenuItem>
-                            </Select>
-                        </FormControl>
-                        <FormControl
-                            size="small"
-                            fullWidth
-                            disabled={
-                                !portal2Status?.features?.modelGeneration ||
-                                vbspVariables.length === 0
-                            }>
-                            <InputLabel id="variable-select-label">
-                                Variable
-                            </InputLabel>
-                            <Select
-                                labelId="variable-select-label"
-                                label="Variable"
-                                value={selectedInstanceKey}
-                                onChange={(e) =>
-                                    setSelectedInstanceKey(e.target.value)
-                                }
-                                fullWidth>
-                                {vbspVariables.length === 0 ? (
-                                    <MenuItem value="" disabled>
-                                        No variables
-                                    </MenuItem>
-                                ) : (
-                                    vbspVariables.map((varName) => (
-                                        <MenuItem key={varName} value={varName}>
-                                            {varName}
-                                        </MenuItem>
-                                    ))
-                                )}
-                            </Select>
-                        </FormControl>
-                    </Stack>
-                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                        <Tooltip
-                            title={
-                                vbspVariables.length === 0
-                                    ? "Add at least one instance"
-                                    : !portal2Status?.features?.modelGeneration
-                                      ? "Portal 2 required"
-                                      : ""
-                            }>
-                            <span>
-                                <Button
-                                    variant="outlined"
-                                    onClick={handlePreview}
-                                    disabled={
-                                        !selectedInstanceKey ||
-                                        !portal2Status?.features?.modelGeneration ||
-                                        vbspVariables.length === 0
-                                    }
-                                    startIcon={<Preview />}
-                                    sx={{ flexShrink: 0 }}>
-                                    Preview
-                                </Button>
-                            </span>
-                        </Tooltip>
-                        <Tooltip
-                            title={
-                                vbspVariables.length === 0
-                                    ? "Add at least one instance"
-                                    : !portal2Status?.features?.modelGeneration
-                                      ? "Portal 2 required"
-                                      : ""
-                            }>
-                            <span style={{ flexGrow: 1 }}>
-                                <Button
-                                    variant="contained"
-                                    onClick={handleMakeModel}
-                                    disabled={
-                                        !selectedInstanceKey ||
-                                        isConverting ||
-                                        !portal2Status?.features?.modelGeneration ||
-                                        vbspVariables.length === 0
-                                    }
-                                    fullWidth
-                                    startIcon={
-                                        isConverting ? (
-                                            <CircularProgress
-                                                size={20}
-                                                color="inherit"
-                                            />
-                                        ) : null
-                                    }>
-                                    {isConverting
-                                        ? conversionProgress || "Converting..."
-                                        : "Make Model"}
-                                </Button>
-                            </span>
-                        </Tooltip>
-                    </Stack>
-                </Box>
             </Stack>
         </Box>
     )

@@ -136,6 +136,7 @@ function ItemEditor() {
         author: "",
         description: "",
         movementHandle: "HANDLE_4_DIRECTIONS",
+        modelName: "",
         // Icon staging
         stagedIconPath: null,
         stagedIconName: null,
@@ -192,11 +193,13 @@ function ItemEditor() {
                         outputResult,
                         variablesResult,
                         conditionsResult,
+                        modelNameResult,
                     ] = await Promise.all([
                         window.package.getInputs(item.id),
                         window.package.getOutputs(item.id),
                         window.package.getVariables(item.id),
                         window.package.getConditions(item.id),
+                        window.package.getModelName(item.id),
                     ])
 
                     // Handle conditions - can be either blocks or VBSP format
@@ -214,6 +217,7 @@ function ItemEditor() {
                         description: description,
                         movementHandle:
                             item.movementHandle || "HANDLE_4_DIRECTIONS",
+                        modelName: modelNameResult.success ? modelNameResult.modelName : "",
                         inputs: inputResult.success ? inputResult.inputs : {},
                         outputs: outputResult.success
                             ? outputResult.outputs
@@ -691,10 +695,16 @@ function ItemEditor() {
                 }
             }
 
-            // Save other data if modified
+            // Save other data if modified (including modelName)
             if (formData._modified.other) {
                 try {
                     await window.package.saveOther?.(item.id, formData.other)
+                    // Save model name
+                    await window.package?.saveModelName?.(item.id, formData.modelName).catch((error) => {
+                        console.error("Failed to save model name:", error)
+                        hasErrors = true
+                        throw new Error(`Model name: ${error.message}`)
+                    })
                 } catch (error) {
                     console.error("Failed to save other data:", error)
                     hasErrors = true
@@ -899,9 +909,8 @@ function ItemEditor() {
                             }
                         />
                     </Tooltip>
-                    {/* Other is unused for now, since 1.0 doesnt have plans for this YET. */}
-                    {/* <Tooltip
-                        title="Other - Additional item settings"
+                    <Tooltip
+                        title="Other - Model chooser and generator"
                         placement="right">
                         <Tab
                             icon={
@@ -913,7 +922,7 @@ function ItemEditor() {
                                 </Badge>
                             }
                         />
-                    </Tooltip> */} 
+                    </Tooltip>
                     <Tooltip
                         title="Metadata - Item metadata and tags"
                         placement="right">
