@@ -31,7 +31,7 @@ const predefinedModels = [
     { category: "Buttons", label: "Floor Button (Weighted)", value: "buttonweight.3ds" },
     { category: "Buttons", label: "Floor Button (Cube)", value: "buttoncube.3ds" },
     { category: "Buttons", label: "Floor Button (Sphere)", value: "buttonball.3ds" },
-    { category: "Other", label: "Custom", value: "Custom" },
+    { category: "Other", label: "Generate", value: "Generate" },
 ]
 
 function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart, onModelGenerationComplete }) {
@@ -389,7 +389,7 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                                 // If modelName starts with "bpee/" and OBJ exists, show "Custom"
                                 // If modelName starts with "bpee/" and NO OBJ exists, show raw path
                                 if (formData.modelName && formData.modelName.startsWith('bpee/')) {
-                                    return objFileExists ? "Custom" : formData.modelName
+                                    return objFileExists ? "Generate" : formData.modelName
                                 }
                                 return formData.modelName || ""
                             })()
@@ -414,7 +414,7 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                 </Box>
 
                 {/* Model Generator - shown when "Custom" is selected OR custom bpee/ model exists with OBJ files */}
-                <Collapse in={formData.modelName === "Custom" || (formData.modelName && formData.modelName.startsWith('bpee/') && objFileExists)} timeout={300}>
+                <Collapse in={formData.modelName === "Generate" || (formData.modelName && formData.modelName.startsWith('bpee/') && objFileExists)} timeout={300}>
                     <Divider sx={{ my: 1 }} />
 
                     <Box>
@@ -594,6 +594,13 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                             )}
                         </Stack>
                     </Box>
+                    <Alert severity="warning" sx={{ mb: 2 , mt: 1}}>
+                        Always view the model after generation. 
+                        Model generation from VMFs are not always accurate.
+                    </Alert>
+                    <Alert severity="warning" sx={{ mb: 2 , mt: 1}}>
+                        You will not be able to preview after you hit save.
+                    </Alert>
                 </Collapse>
             </Stack>
         </Box>
