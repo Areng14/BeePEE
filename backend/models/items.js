@@ -2170,6 +2170,71 @@ class Item {
         }
     }
 
+    // Model management methods
+    getModelName() {
+        try {
+            const editoritems = this.getEditorItems()
+            const editor = editoritems?.Item?.Editor
+            const subType = Array.isArray(editor?.SubType)
+                ? editor.SubType[0]
+                : editor?.SubType
+
+            return subType?.Model?.ModelName || ""
+        } catch (error) {
+            console.error(`Failed to get model name for ${this.id}:`, error.message)
+            return ""
+        }
+    }
+
+    setModelName(modelName) {
+        try {
+            const editoritems = this.getEditorItems()
+            const editor = editoritems.Item.Editor
+
+            // Handle both single SubType and array of SubTypes
+            if (Array.isArray(editor.SubType)) {
+                // Update all SubTypes
+                editor.SubType.forEach((subType) => {
+                    if (!subType.Model) {
+                        subType.Model = {}
+                    }
+                    if (modelName && modelName.trim() !== "") {
+                        subType.Model.ModelName = modelName
+                    } else {
+                        // Remove ModelName if empty
+                        delete subType.Model.ModelName
+                        // Clean up empty Model object
+                        if (Object.keys(subType.Model).length === 0) {
+                            delete subType.Model
+                        }
+                    }
+                })
+            } else {
+                // Single SubType
+                const subType = editor.SubType
+                if (!subType.Model) {
+                    subType.Model = {}
+                }
+                if (modelName && modelName.trim() !== "") {
+                    subType.Model.ModelName = modelName
+                } else {
+                    // Remove ModelName if empty
+                    delete subType.Model.ModelName
+                    // Clean up empty Model object
+                    if (Object.keys(subType.Model).length === 0) {
+                        delete subType.Model
+                    }
+                }
+            }
+
+            this.saveEditorItems(editoritems)
+            return true
+        } catch (error) {
+            console.error(`Failed to set model name for ${this.id}:`, error.message)
+            return false
+        }
+    }
+
     toJSON() {
         return {
             id: this.id,

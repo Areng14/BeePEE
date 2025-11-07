@@ -3131,6 +3131,44 @@ function reg_events(mainWindow) {
         }
     })
 
+    // Model name management handlers
+    ipcMain.handle("get-model-name", async (event, { itemId }) => {
+        try {
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+
+            return { success: true, modelName: item.getModelName() }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    ipcMain.handle("save-model-name", async (event, { itemId, modelName }) => {
+        try {
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+
+            const success = item.setModelName(modelName)
+            if (!success) {
+                throw new Error("Failed to save model name to editoritems.json")
+            }
+
+            // Send updated item data to frontend
+            const updatedItem = item.toJSONWithExistence()
+            mainWindow.webContents.send("item-updated", updatedItem)
+            sendItemUpdateToEditor(itemId, updatedItem)
+
+            return { success: true }
+        } catch (error) {
+            dialog.showErrorBox("Failed to Save Model Name", error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
     // Conditions management handlers
     ipcMain.handle("get-conditions", async (event, { itemId }) => {
         try {

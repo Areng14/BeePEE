@@ -153,6 +153,13 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.invoke("save-variables", { itemId, variables }),
 
     // ========================================
+    // MODEL NAME MANAGEMENT FUNCTIONS
+    // ========================================
+    getModelName: (itemId) => ipcRenderer.invoke("get-model-name", { itemId }),
+    saveModelName: (itemId, modelName) =>
+        ipcRenderer.invoke("save-model-name", { itemId, modelName }),
+
+    // ========================================
     // CONDITIONS MANAGEMENT FUNCTIONS
     // ========================================
     getConditions: (itemId) => ipcRenderer.invoke("get-conditions", { itemId }),
