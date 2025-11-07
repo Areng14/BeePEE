@@ -632,13 +632,15 @@ async function copyMDLToPackage(
     itemName,
     materialsSourceDir = null,
     sharedFolder = null,
+    useStaging = false,
 ) {
-    // Target directory in package: resources/models/props_map_editor/bpee/{itemID}/
-    // Use sharedFolder if provided (for multi-model items), otherwise use itemName
+    // STAGING MODE: Copy to .bpee/models/ instead of resources/models/ (applied on Save)
+    // FINAL MODE: Copy directly to resources/models/ (used when saving staged files)
     const folderName = sharedFolder || itemName
+    const baseDir = useStaging ? ".bpee" : "resources"
     const targetDir = path.join(
         packagePath,
-        "resources",
+        baseDir,
         "models",
         "props_map_editor",
         "bpee",
@@ -751,7 +753,9 @@ async function convertAndInstallMDL(
     console.log(`  Package: ${packagePath}`)
     console.log(`  Item: ${itemName}`)
 
-    const tempDir = path.join(packagePath, "temp_models")
+    // STAGING MODE: Use .bpee/tempmdl instead of temp_models
+    const useStaging = options.useStaging !== false  // Default to true
+    const tempDir = path.join(packagePath, ".bpee", "tempmdl")
 
     // Step 1: Convert materials from PNG to VTF/VMT FIRST (unless using shared materials)
     let materialTargetDir
@@ -764,9 +768,12 @@ async function convertAndInstallMDL(
     } else {
         console.log(`📦 Step 1: Converting materials to VTF/VMT format...`)
         const materialsSourceDir = path.join(tempDir, "materials")
+
+        // STAGING MODE: Copy to .bpee/materials/ instead of resources/materials/
+        const baseDir = useStaging ? ".bpee" : "resources"
         materialTargetDir = path.join(
             packagePath,
-            "resources",
+            baseDir,
             "materials",
             "models",
             "props_map_editor",
@@ -800,14 +807,15 @@ async function convertAndInstallMDL(
         modelFolder: modelFolderName, // Use shared folder for all model variants
     })
 
-    // Step 3: Copy MDL files to package resources (materials are already there)
-    console.log(`📋 Step 3: Copying compiled MDL to package...`)
+    // Step 3: Copy MDL files to package (STAGING MODE or final location)
+    console.log(`📋 Step 3: Copying compiled MDL to ${useStaging ? "staging" : "final location"}...`)
     const result = await copyMDLToPackage(
         compiledFiles,
         packagePath,
         itemName,
         null,
         modelFolderName,
+        useStaging,
     )
 
     console.log(`✅ MDL conversion and installation complete!`)
@@ -835,7 +843,7 @@ async function convertAndInstallMDL(
             collisionYaw,
         )
 
-        // Copy 3DS to package resources
+        // Copy 3DS to package (STAGING MODE or final location)
         // Use sharedModelFolder if provided (for multi-model items), otherwise use itemName
         const folderName = options.sharedModelFolder || itemName
         threeDSResult = await copy3DSToPackage(
@@ -843,6 +851,7 @@ async function convertAndInstallMDL(
             packagePath,
             folderName,
             itemName,
+            useStaging,
         )
 
         console.log(`✅ 3DS collision model created!`)
@@ -864,6 +873,13 @@ async function convertAndInstallMDL(
         ...result,
         compiledFiles,
         threeDSResult,
+        // Staging information
+        isStaged: useStaging,
+        stagingPaths: useStaging ? {
+            models: path.join(packagePath, ".bpee", "models"),
+            materials: path.join(packagePath, ".bpee", "materials"),
+            tempmdl: tempDir,
+        } : null,
     }
 }
 
@@ -1277,16 +1293,17 @@ async function copy3DSToPackage(
     packagePath,
     folderName,
     itemName,
+    useStaging = false,
 ) {
     if (!threeDSPath || !fs.existsSync(threeDSPath)) {
         throw new Error(`3DS file not found: ${threeDSPath}`)
     }
 
-    // Target directory: resources/models/puzzlemaker/selection_bpee/{folderName}/
-    // This matches the Portal 2 selection mesh pattern where "selection_" is added to the start of the path
+    // STAGING MODE: Copy to .bpee/models/puzzlemaker instead of resources/models/puzzlemaker
+    const baseDir = useStaging ? ".bpee" : "resources"
     const targetDir = path.join(
         packagePath,
-        "resources",
+        baseDir,
         "models",
         "puzzlemaker",
         "selection_bpee",

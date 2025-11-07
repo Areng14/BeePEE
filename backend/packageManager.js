@@ -1037,10 +1037,10 @@ async function exportPackageAsBeePack(packageDir, outputBeePackPath) {
                 const entries = fs.readdirSync(src, { withFileTypes: true })
 
                 for (const entry of entries) {
-                    // Skip temp_models directory - it's only used for local model generation
-                    if (entry.name === "temp_models") {
+                    // Skip .bpee directory - it's only used for local staging and temp files
+                    if (entry.name === ".bpee") {
                         console.log(
-                            "Skipping temp_models directory during export",
+                            "Skipping .bpee directory during export",
                         )
                         continue
                     }

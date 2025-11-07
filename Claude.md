@@ -282,31 +282,61 @@ const showCreateItem = routeParam === "create-item"
 
 ### Overview
 
-Automatically converts VMF instances → OBJ files → Source Engine MDL files, and integrates them into the package's editoritems.json.
+Automatically converts VMF instances → OBJ files → Source Engine MDL files, and **stages** changes to editoritems.json (applied on Save).
+
+### Model Generation Staging System
+
+**IMPORTANT**: Model generation now uses a **complete staging system** - changes are NOT applied immediately to the package files. Instead:
+
+1. **Temporary files** are generated in `.bpee/tempmdl/` (OBJ, QC, extracted textures)
+2. **Model files** (MDL, VVD, VTX) are staged in `.bpee/models/` (not `resources/models/`)
+3. **Material files** (VTF, VMT) are staged in `.bpee/materials/` (not `resources/materials/`)
+4. **3DS collision models** are staged in `.bpee/models/puzzlemaker/`
+5. **editoritems.json changes** are staged in memory and returned to the frontend
+6. The Save button becomes enabled with pending model changes
+7. User must click **Save** in the Item Editor to:
+   - Copy all staged files from `.bpee/` to `resources/`
+   - Apply editoritems.json changes to disk
+   - Clean up staging directories (models and materials copied, staging deleted)
+8. The Save button is **blocked** during model generation to prevent mid-generation saves
 
 ### What Happens When You Click "Make Model"
 
-1. **VMF → OBJ Conversion** (existing functionality)
+1. **VMF → OBJ Conversion**
     - Converts the VMF instance file to OBJ format
     - Extracts textures and applies optional cartoonish styling
-    - Outputs to: `{package}/temp_models/{instance}.obj`
+    - Outputs to: `{package}/.bpee/tempmdl/{instance}.obj`
 
-2. **OBJ → MDL Conversion** (NEW!)
+2. **Material Staging**
+    - Converts PNG/TGA textures to VTF format
+    - Generates VMT material files
+    - **Stages in**: `{package}/.bpee/materials/models/props_map_editor/bpee/{itemName}/`
+    - **NOT copied to resources/ until Save is clicked**
+
+3. **OBJ → MDL Conversion**
     - Generates a QC (QuakeC) file that describes the model compilation
     - Uses STUDIOMDL from the Source SDK to compile the OBJ into MDL
     - Compiles to Portal 2 directory (STUDIOMDL requirement)
     - Creates multiple files: `.mdl`, `.vvd`, `.vtx` (various formats: plain, dx90, dx80, sw)
-    - **Copies ALL files** to: `{package}/resources/models/props_map_editor/bpee/item/`
+    - **Stages in**: `{package}/.bpee/models/props_map_editor/bpee/{itemName}/`
+    - **NOT copied to resources/ until Save is clicked**
     - **Cleans up Portal 2 directory** - deletes compiled files and empty folders
 
-3. **editoritems.json Update** (NEW!)
-    - Automatically updates the item's editoritems.json
+4. **3DS Collision Model Staging**
+    - Converts OBJ to 3DS format for collision detection
+    - **Stages in**: `{package}/.bpee/models/puzzlemaker/selection_bpee/{itemName}/`
+    - **NOT copied to resources/ until Save is clicked**
+
+5. **editoritems.json Staging** (STAGED - not saved immediately!)
+    - Creates a modified copy of editoritems.json in memory (not saved to disk)
     - Adds/updates the Model section:
         ```json
         "Model": {
             "ModelName": "bpee/item/bpee_myitem_areng_a3f9.mdl"
         }
         ```
+    - Returns staged editoritems to frontend via `stagedEditorItems` field
+    - **User must click Save** in the Item Editor to apply changes
     - Uses the item ID as the model filename to ensure each item has a unique model
 
 ### Files Created
@@ -321,8 +351,17 @@ Automatically converts VMF instances → OBJ files → Source Engine MDL files, 
 
 **Updated Files:**
 
-- `backend/events.js` - Enhanced `convert-instance-to-obj` handler with MDL conversion
-- `src/components/items/Info.jsx` - Added user feedback for MDL conversion
+- `backend/events.js` - Enhanced `convert-instance-to-obj` handler with MDL conversion and staging system
+  - Added `save-staged-editoritems` IPC handler to save staged changes on demand
+  - Model generation now returns `stagedEditorItems` instead of saving immediately
+- `src/components/ItemEditor.jsx` - Added model generation state management
+  - `isGeneratingModel` state blocks Save button during generation
+  - `stagedEditorItems` state holds pending editoritems changes
+  - Save handler applies staged changes via `save-staged-editoritems` IPC call
+- `src/components/items/Other.jsx` - Added generation callbacks
+  - Calls `onModelGenerationStart()` when generation begins
+  - Calls `onModelGenerationComplete(stagedEditorItems)` when complete
+  - Extracts `stagedEditorItems` from backend response
 - `package.json` - Added extraResources configuration for STUDIOMDL
 
 ### QC File Structure
@@ -385,9 +424,19 @@ C:\...\Portal 2\portal2\models\props_map_editor\bpee\item\
 
 **Success Messages:**
 
-- ✅ Full Success: "Model generated successfully! OBJ: ... MDL: ... The editoritems.json has been updated."
+- ✅ Full Success: "Model generated successfully! OBJ: ... MDL: ... **Changes will be applied when you click Save in the editor.**"
 - ⚠️ Partial Success: "OBJ created but MDL conversion failed" (OBJ preview still works)
 - ❌ Failure: Specific error message with details
+
+**Workflow:**
+
+1. User clicks "Make Model" in the Other tab
+2. Save button becomes **disabled** during generation
+3. Model files are created and copied to package
+4. editoritems changes are **staged in memory** (not saved to disk)
+5. Save button becomes **enabled** with pending changes
+6. User clicks **Save** to apply staged editoritems changes
+7. Staged changes are cleared after successful save
 
 ### Error Handling
 
@@ -395,8 +444,10 @@ Graceful degradation:
 
 - If MDL conversion fails, OBJ file is still available for preview
 - Error messages include specific failure reasons
-- editoritems.json is only updated if MDL conversion succeeds
+- editoritems.json changes are **staged only if MDL conversion succeeds**
+- Staged changes are **not applied** if user discards without saving
 - Portal 2 directory cleanup continues even if individual file deletion fails
+- Save button is blocked during generation to prevent corruption
 
 ### Compilation Flow
 
@@ -404,7 +455,9 @@ Graceful degradation:
 2. **Copy**: All `.mdl`, `.vvd`, and any `.vtx` files copied to package `resources/models/props_map_editor/bpee/item/`
 3. **Cleanup**: Delete all compiled files from Portal 2 directory
 4. **Cleanup Directories**: Remove empty `item/` and `bpee/` folders if empty
-5. **Update**: Add Model section to editoritems.json with path `bpee/item/{itemId}.mdl`
+5. **Stage**: Create modified editoritems.json in memory with Model section (`bpee/item/{itemId}.mdl`)
+6. **Return**: Send staged editoritems to frontend via `stagedEditorItems` field
+7. **Wait for Save**: User must click Save button to apply changes to disk via `save-staged-editoritems` IPC
 
 ### Why Portal 2 Directory is Used
 
@@ -417,9 +470,12 @@ Graceful degradation:
 
 When exporting packages:
 
-- `temp_models/` directory is **automatically excluded** from exports
-- This folder only contains temporary build files (QC, OBJ, MTL, extracted textures)
-- Final MDL files are already in `resources/models/` and will be included
+- `.bpee/` directory is **automatically excluded** from exports
+- This folder only contains:
+  - Temporary build files (`.bpee/tempmdl/`: OBJ, QC, MTL, extracted textures)
+  - Staged model files (`.bpee/models/`: MDL, VVD, VTX, 3DS - only if not yet saved)
+  - Staged material files (`.bpee/materials/`: VTF, VMT - only if not yet saved)
+- Final MDL and material files are in `resources/` after the user clicks Save and will be included in exports
 
 ---
 

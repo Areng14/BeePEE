@@ -34,7 +34,7 @@ const predefinedModels = [
     { category: "Other", label: "Custom", value: "Custom" },
 ]
 
-function Other({ item, formData, onUpdate, onUpdateOther }) {
+function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart, onModelGenerationComplete }) {
     const [selectedInstanceKey, setSelectedInstanceKey] = useState("")
     const [isConverting, setIsConverting] = useState(false)
     const [conversionProgress, setConversionProgress] = useState("")
@@ -172,6 +172,10 @@ function Other({ item, formData, onUpdate, onUpdateOther }) {
 
         setIsConverting(true)
         setConversionProgress("🚀 Starting conversion...")
+
+        // Notify parent that generation is starting
+        onModelGenerationStart?.()
+
         try {
             // selectedInstanceKey now contains the selected variable name (e.g., "TIMER DELAY", "DEFAULT")
             // Backend will handle mapping variable to appropriate instance
@@ -185,6 +189,12 @@ function Other({ item, formData, onUpdate, onUpdateOther }) {
             if (result?.success) {
                 console.log("VMF2OBJ conversion completed successfully")
 
+                // Extract staged editoritems from result
+                const stagedEditorItems = result.mdlResult?.stagedEditorItems || result.stagedEditorItems
+
+                // Notify parent that generation is complete with staged data
+                onModelGenerationComplete?.(stagedEditorItems)
+
                 // Check MDL conversion result
                 if (result.mdlResult?.success) {
                     console.log("✅ MDL conversion successful!")
@@ -195,7 +205,7 @@ function Other({ item, formData, onUpdate, onUpdateOther }) {
                         type: 'info',
                         title: 'Model Generated Successfully',
                         message: 'Model generated successfully!',
-                        detail: `OBJ: ${result.objPath}\nMDL: ${result.mdlResult.relativeModelPath}\n\nThe editoritems.json has been updated with your custom model.`,
+                        detail: `OBJ: ${result.objPath}\nMDL: ${result.mdlResult.relativeModelPath}\n\nChanges will be applied when you click Save in the editor.`,
                         buttons: ['OK']
                     })
                 } else if (result.mdlResult?.error) {
@@ -215,9 +225,13 @@ function Other({ item, formData, onUpdate, onUpdateOther }) {
                 }
             } else {
                 console.error("VMF2OBJ failed:", result?.error)
+                // Notify parent that generation is complete (no staged data)
+                onModelGenerationComplete?.(null)
             }
         } catch (error) {
             console.error("Failed to make model:", error)
+            // Notify parent that generation is complete (no staged data)
+            onModelGenerationComplete?.(null)
         } finally {
             setIsConverting(false)
             setConversionProgress("")
