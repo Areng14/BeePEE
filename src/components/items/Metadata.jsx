@@ -85,6 +85,32 @@ const Metadata = ({ item }) => {
                     </Typography>
                 </Box>
 
+                {/* Custom Model Status */}
+                <Box>
+                    <Typography
+                        variant="subtitle2"
+                        color="text.secondary"
+                        gutterBottom>
+                        Has Custom Model
+                    </Typography>
+                    <Typography variant="body2">
+                        {metadata.hasCustomModel ? "Yes" : "No"}
+                    </Typography>
+                </Box>
+
+                {/* Import Status */}
+                <Box>
+                    <Typography
+                        variant="subtitle2"
+                        color="text.secondary"
+                        gutterBottom>
+                        Imported Item
+                    </Typography>
+                    <Typography variant="body2">
+                        {metadata._vbsp_imported || metadata.isImported ? "Yes" : "No"}
+                    </Typography>
+                </Box>
+
                 <Typography
                     variant="body2"
                     color="text.secondary"

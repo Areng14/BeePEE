@@ -143,16 +143,15 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
         }
     }, [])
 
-    // Auto-detect custom models: if modelName starts with "bpee/", set to "Custom"
+    // Auto-detect custom models: if modelName starts with "bpee/", check if OBJ exists
     useEffect(() => {
         if (formData?.modelName && typeof formData.modelName === 'string') {
             if (formData.modelName.startsWith('bpee/')) {
-                // Model is a custom BeePEE model - ensure selector shows "Custom"
-                // Don't call onUpdate here to avoid infinite loop, just let the selector display correctly
-                console.log(`Detected custom BeePEE model: ${formData.modelName}`)
+                // Model is a BeePEE model - check if OBJ exists to determine if it's custom
+                console.log(`Detected BeePEE model: ${formData.modelName} (OBJ exists: ${objFileExists})`)
             }
         }
-    }, [formData?.modelName])
+    }, [formData?.modelName, objFileExists])
 
     // Check if OBJ file exists for preview
     useEffect(() => {
@@ -174,7 +173,7 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
         }
 
         checkObjExists()
-    }, [item?.packagePath, item?.id, isConverting])
+    }, [item?.packagePath, item?.id, isConverting, formData?.modelName])
 
     // Get the expected OBJ file path for the model
     // After multi-model generation, files are named after instance names (e.g., half_glass_0.obj)
@@ -338,7 +337,33 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                     </Typography>
                     <Autocomplete
                         freeSolo
-                        options={predefinedModels}
+                        options={(() => {
+                            // Build options list: predefined models + generated models (if any)
+                            const options = [...predefinedModels]
+                            
+                            // If modelName starts with "bpee/" but no OBJ exists, add it to "Generated Models"
+                            if (formData.modelName && 
+                                typeof formData.modelName === 'string' && 
+                                formData.modelName.startsWith('bpee/') && 
+                                !objFileExists) {
+                                // Extract a display name from the model path
+                                const modelPath = formData.modelName
+                                const fileName = modelPath.split('/').pop() || modelPath
+                                const displayName = fileName.replace(/\.mdl$/i, '')
+                                
+                                // Add to Generated Models category if not already in options
+                                const alreadyExists = options.some(opt => opt.value === modelPath)
+                                if (!alreadyExists) {
+                                    options.push({
+                                        category: "Generated Models",
+                                        label: displayName,
+                                        value: modelPath
+                                    })
+                                }
+                            }
+                            
+                            return options
+                        })()}
                         groupBy={(option) => option.category}
                         getOptionLabel={(option) => {
                             // Handle both string (custom) and object (predefined) values
@@ -360,9 +385,14 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                             </li>
                         )}
                         value={
-                            formData.modelName && formData.modelName.startsWith('bpee/')
-                                ? "Custom"
-                                : formData.modelName || ""
+                            (() => {
+                                // If modelName starts with "bpee/" and OBJ exists, show "Custom"
+                                // If modelName starts with "bpee/" and NO OBJ exists, show raw path
+                                if (formData.modelName && formData.modelName.startsWith('bpee/')) {
+                                    return objFileExists ? "Custom" : formData.modelName
+                                }
+                                return formData.modelName || ""
+                            })()
                         }
                         onChange={(event, newValue) => {
                             // Handle both object (selected from list) and string (typed in)
@@ -383,8 +413,8 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                     />
                 </Box>
 
-                {/* Model Generator - shown when "Custom" is selected OR custom bpee/ model exists */}
-                <Collapse in={formData.modelName === "Custom" || (formData.modelName && formData.modelName.startsWith('bpee/'))} timeout={300}>
+                {/* Model Generator - shown when "Custom" is selected OR custom bpee/ model exists with OBJ files */}
+                <Collapse in={formData.modelName === "Custom" || (formData.modelName && formData.modelName.startsWith('bpee/') && objFileExists)} timeout={300}>
                     <Divider sx={{ my: 1 }} />
 
                     <Box>
@@ -446,8 +476,8 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                             </FormControl>
                         </Box>
                         <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                            {/* If custom bpee/ model exists, Preview becomes primary (large) button */}
-                            {formData.modelName && formData.modelName.startsWith('bpee/') ? (
+                            {/* If custom bpee/ model exists with OBJ files, Preview becomes primary (large) button */}
+                            {formData.modelName && formData.modelName.startsWith('bpee/') && objFileExists ? (
                                 <>
                                     <Tooltip
                                         title={
