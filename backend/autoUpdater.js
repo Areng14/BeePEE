@@ -1,31 +1,42 @@
-const { autoUpdater } = require("electron-updater")
 const { dialog } = require("electron")
 const { logger } = require("./utils/logger")
 const isDev = require("./utils/isDev")
+
+// Lazy-load autoUpdater to avoid accessing app before it's ready
+let _autoUpdater = null
+function getAutoUpdater() {
+    if (!_autoUpdater) {
+        _autoUpdater = require("electron-updater").autoUpdater
+    }
+    return _autoUpdater
+}
 
 class AutoUpdater {
     constructor(mainWindow) {
         this.mainWindow = mainWindow
         this.updateCheckInterval = null
+        this.autoUpdater = getAutoUpdater()
 
         // Configure auto-updater
-        autoUpdater.logger = logger
-        autoUpdater.autoDownload = false // Don't auto-download, ask user first
-        autoUpdater.autoInstallOnAppQuit = true
+        this.autoUpdater.logger = logger
+        this.autoUpdater.autoDownload = false // Don't auto-download, ask user first
+        this.autoUpdater.autoInstallOnAppQuit = true
 
         // Set up event listeners
         this.setupEventListeners()
     }
 
     setupEventListeners() {
+        const updater = this.autoUpdater
+
         // Checking for updates
-        autoUpdater.on("checking-for-update", () => {
+        updater.on("checking-for-update", () => {
             logger.info("Checking for updates...")
             this.sendStatusToWindow("checking-for-update")
         })
 
         // Update available
-        autoUpdater.on("update-available", (info) => {
+        updater.on("update-available", (info) => {
             logger.info("Update available:", info.version)
             this.sendStatusToWindow("update-available", {
                 version: info.version,
@@ -38,7 +49,7 @@ class AutoUpdater {
         })
 
         // Update not available
-        autoUpdater.on("update-not-available", (info) => {
+        updater.on("update-not-available", (info) => {
             logger.info("Update not available. Current version is the latest.")
             this.sendStatusToWindow("update-not-available", {
                 version: info.version,
@@ -46,7 +57,7 @@ class AutoUpdater {
         })
 
         // Update error
-        autoUpdater.on("error", (err) => {
+        updater.on("error", (err) => {
             logger.error("Error in auto-updater:", err)
             this.sendStatusToWindow("update-error", {
                 message: err.message || err.toString(),
@@ -54,7 +65,7 @@ class AutoUpdater {
         })
 
         // Download progress
-        autoUpdater.on("download-progress", (progressObj) => {
+        updater.on("download-progress", (progressObj) => {
             const message = `Download speed: ${progressObj.bytesPerSecond} - Downloaded ${progressObj.percent}% (${progressObj.transferred}/${progressObj.total})`
             logger.info(message)
             this.sendStatusToWindow("download-progress", {
@@ -66,7 +77,7 @@ class AutoUpdater {
         })
 
         // Update downloaded
-        autoUpdater.on("update-downloaded", (info) => {
+        updater.on("update-downloaded", (info) => {
             logger.info("Update downloaded:", info.version)
             this.sendStatusToWindow("update-downloaded", {
                 version: info.version,
@@ -116,7 +127,7 @@ class AutoUpdater {
 
         if (response === 0) {
             // User clicked Restart Now
-            autoUpdater.quitAndInstall(false, true)
+            this.autoUpdater.quitAndInstall(false, true)
         }
     }
 
@@ -135,7 +146,7 @@ class AutoUpdater {
         }
 
         try {
-            await autoUpdater.checkForUpdates()
+            await this.autoUpdater.checkForUpdates()
         } catch (error) {
             logger.error("Failed to check for updates:", error)
             if (!silent) {
@@ -150,11 +161,11 @@ class AutoUpdater {
     downloadUpdate() {
         logger.info("Starting update download...")
         this.sendStatusToWindow("download-started")
-        autoUpdater.downloadUpdate()
+        this.autoUpdater.downloadUpdate()
     }
 
     quitAndInstall() {
-        autoUpdater.quitAndInstall(false, true)
+        this.autoUpdater.quitAndInstall(false, true)
     }
 
     // Check for updates on app startup

@@ -44,6 +44,18 @@ const createWindow = () => {
         show: false, // Don't show until ready
     })
 
+    // Pipe renderer console output into main-process logger for easier debugging
+    win.webContents.on("console-message", (event, level, message, line, sourceId) => {
+        const prefix = `[renderer:${sourceId}:${line}] ${message}`
+        if (level >= 2) {
+            logger.error(prefix)
+        } else if (level === 1) {
+            logger.warn(prefix)
+        } else {
+            logger.info(prefix)
+        }
+    })
+
     // Initialize window title manager
     const titleManager = new WindowTitleManager(win)
     global.titleManager = titleManager
