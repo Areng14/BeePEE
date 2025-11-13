@@ -1181,7 +1181,13 @@ function reg_events(mainWindow) {
             const updatedItems = currentPackage.items.map((item) =>
                 item.toJSONWithExistence(),
             )
-            mainWindow.webContents.send("package:loaded", updatedItems)
+            const updatedSignages = currentPackage.signages.map((signage) =>
+                signage.toJSON(),
+            )
+            mainWindow.webContents.send("package:loaded", {
+                items: updatedItems,
+                signages: updatedSignages,
+            })
 
                 // Close the create item window if it's open
                 const createWindow = getCreateItemWindow()
@@ -1366,7 +1372,13 @@ function reg_events(mainWindow) {
             const updatedItems = currentPackage.items.map((item) =>
                 item.toJSONWithExistence(),
             )
-            mainWindow.webContents.send("package:loaded", updatedItems)
+            const updatedSignages = currentPackage.signages.map((signage) =>
+                signage.toJSON(),
+            )
+            mainWindow.webContents.send("package:loaded", {
+                items: updatedItems,
+                signages: updatedSignages,
+            })
 
             // Close the create item window if it's open
             const createWindow = getCreateItemWindow()
@@ -1476,7 +1488,13 @@ function reg_events(mainWindow) {
             const updatedItems = pkg.items.map((item) =>
                 item.toJSONWithExistence(),
             )
-            mainWindow.webContents.send("package:loaded", updatedItems)
+            const updatedSignages = pkg.signages.map((signage) =>
+                signage.toJSON(),
+            )
+            mainWindow.webContents.send("package:loaded", {
+                items: updatedItems,
+                signages: updatedSignages,
+            })
 
             console.log(`Successfully deleted item: ${item.name}`)
             return { success: true }
@@ -1546,6 +1564,22 @@ function reg_events(mainWindow) {
             )
         } catch (error) {
             console.error("Failed to get current items:", error)
+            return []
+        }
+    })
+
+    // Register get current signages handler
+    ipcMain.handle("get-current-signages", async () => {
+        try {
+            if (packages.length === 0) {
+                return []
+            }
+            const currentPackage = packages[0]
+            return currentPackage.signages.map((signage) =>
+                signage.toJSON(),
+            )
+        } catch (error) {
+            console.error("Failed to get current signages:", error)
             return []
         }
     })
@@ -1652,7 +1686,10 @@ function reg_events(mainWindow) {
             // Send package loaded event to main window
             mainWindow.webContents.send(
                 "package:loaded",
-                pkg.items.map((item) => item.toJSONWithExistence()),
+                {
+                    items: pkg.items.map((item) => item.toJSONWithExistence()),
+                    signages: pkg.signages.map((signage) => signage.toJSON()),
+                }
             )
 
             // Close the create package window
@@ -1838,7 +1875,10 @@ function reg_events(mainWindow) {
             // Send package loaded event to main window
             mainWindow.webContents.send(
                 "package:loaded",
-                pkg.items.map((item) => item.toJSONWithExistence()),
+                {
+                    items: pkg.items.map((item) => item.toJSONWithExistence()),
+                    signages: pkg.signages.map((signage) => signage.toJSON()),
+                }
             )
 
             return { success: true }

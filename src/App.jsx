@@ -1,6 +1,6 @@
 import { HashRouter, Routes, Route } from "react-router-dom"
 import { useState, useEffect } from "react"
-import ItemBrowser from "./components/ItemBrowser"
+import BrowserView from "./components/BrowserView"
 import ItemEditor from "./components/ItemEditor"
 import CreateItemPage from "./pages/CreateItemPage"
 import CreatePackagePage from "./pages/CreatePackagePage"
@@ -49,7 +49,8 @@ function App() {
         }
 
         // Listen for package loaded event
-        const handlePackageLoaded = (items) => {
+        const handlePackageLoaded = (data) => {
+            console.log("App.jsx: Package loaded with data:", data)
             setPackageLoaded(true)
         }
 
@@ -106,9 +107,9 @@ function App() {
                                     packageLoaded
                                         ? (() => {
                                               console.log(
-                                                  "Rendering ItemBrowser (packageLoaded=true)",
+                                                  "Rendering BrowserView (packageLoaded=true)",
                                               )
-                                              return <ItemBrowser />
+                                              return <BrowserView />
                                           })()
                                         : (() => {
                                               console.log(

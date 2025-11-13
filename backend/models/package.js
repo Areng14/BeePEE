@@ -1,6 +1,7 @@
 const fs = require("fs")
 const path = require("path")
 const { Item } = require("./items")
+const { Signage } = require("./signages")
 const { getPackagesDir } = require("../utils/packagesDir")
 
 class Package {
@@ -10,6 +11,7 @@ class Package {
         const packageName = path.parse(this.path).name
         this.packageDir = path.join(getPackagesDir(), packageName)
         this.items = []
+        this.signages = []
     }
 
     isLoaded() {
@@ -91,12 +93,42 @@ class Package {
                 console.log(`⏭️ No VBSP instances to import in ${this.name}\n`)
             }
 
+            // Signages
+            console.log(`🔍 DEBUG: Checking for signages in package ${this.name}`)
+            console.log(`🔍 DEBUG: parsedInfo keys:`, Object.keys(parsedInfo))
+            
+            let rawSignages = parsedInfo["Signage"]
+            console.log(`🔍 DEBUG: rawSignages type:`, typeof rawSignages)
+            console.log(`🔍 DEBUG: rawSignages value:`, rawSignages)
+            
+            if (rawSignages) {
+                // Convert single signage to array
+                if (!Array.isArray(rawSignages)) {
+                    rawSignages = [rawSignages]
+                }
+
+                // Create signages directly in this package
+                this.signages = rawSignages.map(
+                    (element) =>
+                        new Signage({
+                            packagePath: this.packageDir,
+                            signageJSON: element,
+                        }),
+                )
+                
+                console.log(`📋 Loaded ${this.signages.length} signage(s) from ${this.name}`)
+            } else {
+                console.log(`⏭️ No signages found in ${this.name}`)
+                this.signages = []
+            }
+
             return this.items
         } catch (error) {
             console.error(
                 `[package : ${this.name}]: Failed to load - ${error.message}`,
             )
             this.items = []
+            this.signages = []
             throw error
         }
     }
@@ -135,6 +167,22 @@ class Package {
 
     removeAllItems() {
         this.items.length = 0
+    }
+
+    getSignageById(id) {
+        if (!id) {
+            throw new Error("ID is empty!")
+        }
+
+        return this.signages.find((signage) => signage.id === id)
+    }
+
+    getSignageByName(name) {
+        if (!name) {
+            throw new Error("Name is empty!")
+        }
+
+        return this.signages.find((signage) => signage.name === name)
     }
 
     // Static method for creating and loading a package

@@ -507,7 +507,10 @@ async function handleFileOpen(filePath, isStartup = false) {
             logger.info("Loading .bpee package...")
             const { loadPackage } = require("./packageManager")
             const pkg = await loadPackage(filePath)
-            mainWindow.webContents.send("package:loaded", pkg.items)
+            mainWindow.webContents.send("package:loaded", {
+                items: pkg.items.map((item) => item.toJSONWithExistence()),
+                signages: pkg.signages.map((signage) => signage.toJSON()),
+            })
             logger.info("Package loaded successfully")
         } else if (ext === ".bee_pack") {
             // Import .bee_pack package
@@ -529,7 +532,10 @@ async function handleFileOpen(filePath, isStartup = false) {
                 message: "Package imported and loaded successfully!",
             })
 
-            mainWindow.webContents.send("package:loaded", pkg.items)
+            mainWindow.webContents.send("package:loaded", {
+                items: pkg.items.map((item) => item.toJSONWithExistence()),
+                signages: pkg.signages.map((signage) => signage.toJSON()),
+            })
             logger.info("Package imported and loaded successfully")
         } else {
             logger.warn(`Unsupported file type: ${ext}`)
