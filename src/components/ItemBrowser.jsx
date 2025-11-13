@@ -32,9 +32,20 @@ function ItemBrowser() {
         fetchCurrentItems()
 
         // Handle initial package load and updates (includes create/delete)
-        const handlePackageLoaded = (loadedItems) => {
+        const handlePackageLoaded = (data) => {
             console.log("Package loaded callback fired")
-            console.log("loadedItems:", loadedItems)
+            console.log("loadedData:", data)
+            
+            // Handle both old format (array of items) and new format (object with items and signages)
+            let loadedItems = []
+            if (Array.isArray(data)) {
+                // Old format: array of items
+                loadedItems = data
+            } else if (data && typeof data === 'object' && data.items) {
+                // New format: object with items and signages
+                loadedItems = data.items
+            }
+            
             console.log("loadedItems length:", loadedItems?.length)
 
             setItems(loadedItems || [])
@@ -105,8 +116,9 @@ function ItemBrowser() {
             const itemSize = 96
             const spacing = 8
             const totalItemSize = itemSize + spacing
+            const sidebarWidth = 60
 
-            const cols = Math.floor((window.innerWidth - 40) / totalItemSize)
+            const cols = Math.floor((window.innerWidth - sidebarWidth - 40) / totalItemSize)
             const rows = Math.floor((window.innerHeight - 40) / totalItemSize)
             setGridSize({ cols, rows })
         }

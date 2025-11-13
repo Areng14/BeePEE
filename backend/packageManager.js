@@ -944,7 +944,10 @@ const reg_loadPackagePopup = () => {
         if (mainWindow) {
             mainWindow.webContents.send(
                 "package:loaded",
-                pkg.items.map((item) => item.toJSONWithExistence()),
+                {
+                    items: pkg.items.map((item) => item.toJSONWithExistence()),
+                    signages: pkg.signages.map((signage) => signage.toJSON()),
+                }
             )
         }
 
