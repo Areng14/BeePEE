@@ -59,9 +59,8 @@ class AutoUpdater {
         // Update error
         updater.on("error", (err) => {
             logger.error("Error in auto-updater:", err)
-            this.sendStatusToWindow("update-error", {
-                message: err.message || err.toString(),
-            })
+            const errorInfo = this.parseUpdateError(err)
+            this.sendStatusToWindow("update-error", errorInfo)
         })
 
         // Download progress
@@ -94,6 +93,111 @@ class AutoUpdater {
                 status,
                 data,
             })
+        }
+    }
+
+    parseUpdateError(err) {
+        const errorMessage = err.message || err.toString()
+        let userMessage = "An unexpected error occurred while checking for updates."
+        let troubleshooting = []
+        let errorType = "unknown"
+
+        // Network errors
+        if (
+            errorMessage.includes("ENOTFOUND") ||
+            errorMessage.includes("ETIMEDOUT") ||
+            errorMessage.includes("ECONNREFUSED") ||
+            errorMessage.includes("network")
+        ) {
+            errorType = "network"
+            userMessage =
+                "Unable to connect to the update server. Please check your internet connection."
+            troubleshooting = [
+                "Check your internet connection",
+                "Try again in a few moments",
+                "Check if a firewall is blocking the connection",
+                "Verify your network settings",
+            ]
+        }
+        // File system errors
+        else if (
+            errorMessage.includes("EACCES") ||
+            errorMessage.includes("EPERM") ||
+            errorMessage.includes("permission denied")
+        ) {
+            errorType = "permissions"
+            userMessage =
+                "Permission denied while trying to update. The app may need administrator privileges."
+            troubleshooting = [
+                "Try running the app as administrator",
+                "Check if the app folder is write-protected",
+                "Ensure antivirus isn't blocking the update",
+                "Close the app and try updating again",
+            ]
+        }
+        // Disk space errors
+        else if (
+            errorMessage.includes("ENOSPC") ||
+            errorMessage.includes("no space")
+        ) {
+            errorType = "disk_space"
+            userMessage =
+                "Not enough disk space to download the update."
+            troubleshooting = [
+                "Free up some disk space",
+                "Check available storage on your drive",
+                "Remove unnecessary files or apps",
+            ]
+        }
+        // Download/checksum errors
+        else if (
+            errorMessage.includes("sha512") ||
+            errorMessage.includes("checksum") ||
+            errorMessage.includes("corrupted")
+        ) {
+            errorType = "corrupted"
+            userMessage =
+                "The downloaded update file is corrupted or incomplete."
+            troubleshooting = [
+                "Try downloading the update again",
+                "Check your internet connection stability",
+                "Clear the update cache and retry",
+                "Download the update manually from the website",
+            ]
+        }
+        // Server/availability errors
+        else if (
+            errorMessage.includes("404") ||
+            errorMessage.includes("not found")
+        ) {
+            errorType = "not_found"
+            userMessage =
+                "Update not found on the server. This might be temporary."
+            troubleshooting = [
+                "The update may have been removed or moved",
+                "Try again later",
+                "Check the app website for manual updates",
+            ]
+        }
+        // Rate limiting
+        else if (
+            errorMessage.includes("429") ||
+            errorMessage.includes("rate limit")
+        ) {
+            errorType = "rate_limit"
+            userMessage =
+                "Too many update requests. Please wait before trying again."
+            troubleshooting = [
+                "Wait a few minutes before checking again",
+                "The server is limiting requests to prevent overload",
+            ]
+        }
+
+        return {
+            message: userMessage,
+            technicalDetails: errorMessage,
+            troubleshooting,
+            errorType,
         }
     }
 
@@ -150,10 +254,18 @@ class AutoUpdater {
         } catch (error) {
             logger.error("Failed to check for updates:", error)
             if (!silent) {
-                dialog.showErrorBox(
-                    "Update Check Failed",
-                    `Failed to check for updates: ${error.message}`
-                )
+                const errorInfo = this.parseUpdateError(error)
+                const troubleshootingText = errorInfo.troubleshooting.length
+                    ? `\n\nWhat to try:\n${errorInfo.troubleshooting.map((tip) => `• ${tip}`).join("\n")}`
+                    : ""
+
+                dialog.showMessageBox(this.mainWindow, {
+                    type: "error",
+                    title: "Update Check Failed",
+                    message: errorInfo.message,
+                    detail: `${troubleshootingText}\n\nTechnical details:\n${errorInfo.technicalDetails}`,
+                    buttons: ["OK"],
+                })
             }
         }
     }

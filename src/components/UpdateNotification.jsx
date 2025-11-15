@@ -6,14 +6,23 @@ import {
     LinearProgress,
     Box,
     Typography,
+    Collapse,
+    List,
+    ListItem,
+    ListItemText,
+    IconButton,
 } from "@mui/material"
 import DownloadIcon from "@mui/icons-material/Download"
 import UpdateIcon from "@mui/icons-material/Update"
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline"
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
+import ExpandLessIcon from "@mui/icons-material/ExpandLess"
 
 export default function UpdateNotification() {
     const [updateStatus, setUpdateStatus] = useState(null)
     const [open, setOpen] = useState(false)
     const [downloadProgress, setDownloadProgress] = useState(0)
+    const [showErrorDetails, setShowErrorDetails] = useState(false)
 
     useEffect(() => {
         // Listen for update status events
@@ -62,6 +71,27 @@ export default function UpdateNotification() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
     }
 
+    const formatSpeed = (bytesPerSecond) => {
+        if (!bytesPerSecond) return "0 B/s"
+        return formatBytes(bytesPerSecond) + "/s"
+    }
+
+    const estimateTimeRemaining = (transferred, total, bytesPerSecond) => {
+        if (!bytesPerSecond || bytesPerSecond === 0) return "Calculating..."
+        const remaining = total - transferred
+        const secondsRemaining = Math.ceil(remaining / bytesPerSecond)
+        
+        if (secondsRemaining < 60) {
+            return `${secondsRemaining} seconds`
+        } else if (secondsRemaining < 3600) {
+            const minutes = Math.ceil(secondsRemaining / 60)
+            return `${minutes} minute${minutes > 1 ? "s" : ""}`
+        } else {
+            const hours = Math.ceil(secondsRemaining / 3600)
+            return `${hours} hour${hours > 1 ? "s" : ""}`
+        }
+    }
+
     if (!updateStatus) return null
 
     // Render different alerts based on update status
@@ -79,7 +109,12 @@ export default function UpdateNotification() {
                         severity="info"
                         icon={<UpdateIcon />}
                     >
-                        Checking for updates...
+                        <Typography variant="body2">
+                            Checking for updates...
+                        </Typography>
+                        <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                            This will only take a moment
+                        </Typography>
                     </Alert>
                 </Snackbar>
             )
@@ -127,7 +162,12 @@ export default function UpdateNotification() {
                         severity="info"
                         icon={<DownloadIcon />}
                     >
-                        Starting download...
+                        <Typography variant="body2" fontWeight="bold">
+                            Starting download...
+                        </Typography>
+                        <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                            Download progress will appear shortly
+                        </Typography>
                     </Alert>
                 </Snackbar>
             )
@@ -142,7 +182,7 @@ export default function UpdateNotification() {
                         onClose={handleClose}
                         severity="info"
                         icon={<DownloadIcon />}
-                        sx={{ minWidth: 300 }}
+                        sx={{ minWidth: 350 }}
                     >
                         <Typography variant="body2" fontWeight="bold">
                             Downloading Update
@@ -152,13 +192,38 @@ export default function UpdateNotification() {
                                 variant="determinate"
                                 value={downloadProgress}
                             />
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    mt: 0.5,
+                                }}
+                            >
+                                <Typography variant="caption">
+                                    {downloadProgress}% -{" "}
+                                    {formatBytes(updateStatus.data.transferred)}{" "}
+                                    of {formatBytes(updateStatus.data.total)}
+                                </Typography>
+                                <Typography variant="caption">
+                                    {formatSpeed(
+                                        updateStatus.data.bytesPerSecond
+                                    )}
+                                </Typography>
+                            </Box>
                             <Typography
                                 variant="caption"
-                                sx={{ display: "block", mt: 0.5 }}
+                                sx={{
+                                    display: "block",
+                                    mt: 0.25,
+                                    opacity: 0.7,
+                                }}
                             >
-                                {downloadProgress}% -{" "}
-                                {formatBytes(updateStatus.data.transferred)} of{" "}
-                                {formatBytes(updateStatus.data.total)}
+                                Estimated time:{" "}
+                                {estimateTimeRemaining(
+                                    updateStatus.data.transferred,
+                                    updateStatus.data.total,
+                                    updateStatus.data.bytesPerSecond
+                                )}
                             </Typography>
                         </Box>
                     </Alert>
@@ -200,7 +265,7 @@ export default function UpdateNotification() {
             return (
                 <Snackbar
                     open={open}
-                    autoHideDuration={3000}
+                    autoHideDuration={4000}
                     onClose={handleClose}
                     anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                 >
@@ -209,7 +274,12 @@ export default function UpdateNotification() {
                         severity="success"
                         icon={<UpdateIcon />}
                     >
-                        You're running the latest version
+                        <Typography variant="body2" fontWeight="bold">
+                            You're up to date! 🎉
+                        </Typography>
+                        <Typography variant="caption" sx={{ opacity: 0.8 }}>
+                            No updates available at this time
+                        </Typography>
                     </Alert>
                 </Snackbar>
             )
@@ -218,17 +288,124 @@ export default function UpdateNotification() {
             return (
                 <Snackbar
                     open={open}
-                    autoHideDuration={6000}
+                    autoHideDuration={null}
                     onClose={handleClose}
                     anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                 >
-                    <Alert onClose={handleClose} severity="error">
-                        <Typography variant="body2" fontWeight="bold">
-                            Update Error
-                        </Typography>
-                        <Typography variant="caption">
-                            {updateStatus.data.message}
-                        </Typography>
+                    <Alert
+                        onClose={handleClose}
+                        severity="error"
+                        icon={<ErrorOutlineIcon />}
+                        sx={{ minWidth: 350, maxWidth: 500 }}
+                    >
+                        <Box>
+                            <Typography variant="body2" fontWeight="bold">
+                                Update Failed
+                            </Typography>
+                            <Typography
+                                variant="body2"
+                                sx={{ mt: 0.5, mb: 1 }}
+                            >
+                                {updateStatus.data.message}
+                            </Typography>
+
+                            {/* Troubleshooting tips */}
+                            {updateStatus.data.troubleshooting &&
+                                updateStatus.data.troubleshooting.length >
+                                    0 && (
+                                    <Box sx={{ mt: 1 }}>
+                                        <Typography
+                                            variant="caption"
+                                            fontWeight="bold"
+                                            sx={{ display: "block", mb: 0.5 }}
+                                        >
+                                            What to try:
+                                        </Typography>
+                                        <List
+                                            dense
+                                            sx={{
+                                                py: 0,
+                                                "& .MuiListItem-root": {
+                                                    py: 0.25,
+                                                    px: 0,
+                                                },
+                                            }}
+                                        >
+                                            {updateStatus.data.troubleshooting.map(
+                                                (tip, index) => (
+                                                    <ListItem key={index}>
+                                                        <ListItemText
+                                                            primary={`• ${tip}`}
+                                                            primaryTypographyProps={{
+                                                                variant:
+                                                                    "caption",
+                                                            }}
+                                                        />
+                                                    </ListItem>
+                                                )
+                                            )}
+                                        </List>
+                                    </Box>
+                                )}
+
+                            {/* Technical details toggle */}
+                            {updateStatus.data.technicalDetails && (
+                                <Box sx={{ mt: 1 }}>
+                                    <Button
+                                        size="small"
+                                        onClick={() =>
+                                            setShowErrorDetails(
+                                                !showErrorDetails
+                                            )
+                                        }
+                                        endIcon={
+                                            showErrorDetails ? (
+                                                <ExpandLessIcon />
+                                            ) : (
+                                                <ExpandMoreIcon />
+                                            )
+                                        }
+                                        sx={{
+                                            textTransform: "none",
+                                            p: 0,
+                                            minWidth: 0,
+                                        }}
+                                    >
+                                        <Typography variant="caption">
+                                            {showErrorDetails
+                                                ? "Hide"
+                                                : "Show"}{" "}
+                                            technical details
+                                        </Typography>
+                                    </Button>
+                                    <Collapse in={showErrorDetails}>
+                                        <Box
+                                            sx={{
+                                                mt: 1,
+                                                p: 1,
+                                                backgroundColor:
+                                                    "rgba(0, 0, 0, 0.1)",
+                                                borderRadius: 1,
+                                                wordBreak: "break-word",
+                                            }}
+                                        >
+                                            <Typography
+                                                variant="caption"
+                                                sx={{
+                                                    fontFamily: "monospace",
+                                                    fontSize: "0.7rem",
+                                                }}
+                                            >
+                                                {
+                                                    updateStatus.data
+                                                        .technicalDetails
+                                                }
+                                            </Typography>
+                                        </Box>
+                                    </Collapse>
+                                </Box>
+                            )}
+                        </Box>
                     </Alert>
                 </Snackbar>
             )
