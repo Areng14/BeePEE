@@ -1,7 +1,22 @@
 import { Box, Typography, Button, Stack, Paper } from "@mui/material"
 import { Add, FolderOpen, Unarchive } from "@mui/icons-material"
+import { useState, useEffect } from "react"
 
 function WelcomePage() {
+    const [appVersion, setAppVersion] = useState("")
+
+    useEffect(() => {
+        // Get app version from electron
+        const getVersion = async () => {
+            try {
+                const version = await window.electron.invoke("get-app-version")
+                setAppVersion(version)
+            } catch (error) {
+                console.error("Failed to get app version:", error)
+            }
+        }
+        getVersion()
+    }, [])
     const handleCreatePackage = async () => {
         try {
             // Check if there's a package already open
@@ -73,7 +88,7 @@ function WelcomePage() {
                     mb: 2,
                     fontSize: "1.25 rem",
                 }}>
-                BeeMOD Package Editor Enhanced
+                BEEmod Package Editor Enhanced {appVersion && `v${appVersion}`}
             </Typography>
 
             <Stack direction="row" spacing={2}>

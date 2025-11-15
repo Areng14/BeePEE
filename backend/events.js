@@ -14,7 +14,7 @@ const {
     createPackageCreationWindow,
     getCreatePackageWindow,
 } = require("./items/itemEditor")
-const { ipcMain, dialog, BrowserWindow } = require("electron")
+const { ipcMain, dialog, BrowserWindow, app } = require("electron")
 const fs = require("fs")
 const path = require("path")
 const { saveItem } = require("./saveItem") // Import the new saveItem function
@@ -848,6 +848,11 @@ function reg_events(mainWindow) {
             console.error("Error checking file existence:", error)
             return false
         }
+    })
+
+    // Get app version
+    ipcMain.handle("get-app-version", async () => {
+        return app.getVersion()
     })
 
     // Register item saving

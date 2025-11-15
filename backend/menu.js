@@ -389,23 +389,9 @@ function createMainMenu(mainWindow) {
                 },
             ],
         },
-        {
-            label: "View",
-            submenu: [
-                {
-                    label: "Toggle Developer Tools",
-                    accelerator: "F12",
-                    click: () => {
-                        const focusedWindow = BrowserWindow.getFocusedWindow()
-                        if (focusedWindow) {
-                            focusedWindow.webContents.toggleDevTools()
-                        }
-                    },
-                },
-            ],
-        },
     ]
 
+    // Only add developer tools in development mode
     if (isDev) {
         template.push({
             label: "Dev",
