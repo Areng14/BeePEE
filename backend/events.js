@@ -2266,6 +2266,10 @@ function reg_events(mainWindow) {
                 // Add to editoritems
                 const newIndex = item.addInstance(instanceName)
 
+                // Set the display name based on the filename (without .vmf extension)
+                const fileName = path.basename(instanceName, ".vmf")
+                item.setInstanceName(newIndex, fileName)
+
                 // Send updated item data to frontend
                 const updatedItem = item.toJSONWithExistence()
                 console.log(
@@ -2273,6 +2277,7 @@ function reg_events(mainWindow) {
                     {
                         id: updatedItem.id,
                         instances: updatedItem.instances,
+                        displayName: fileName,
                     },
                 )
                 mainWindow.webContents.send("item-updated", updatedItem)
@@ -2383,10 +2388,10 @@ function reg_events(mainWindow) {
                 throw new Error("Item not found")
             }
 
-            // Show file dialog to select VMF file
+            // Show file dialog to select VMF file(s) - support multiple selection
             const result = await dialog.showOpenDialog(mainWindow, {
-                title: "Select VMF Instance File",
-                properties: ["openFile"],
+                title: "Select VMF Instance File(s)",
+                properties: ["openFile", "multiSelections"],
                 filters: [
                     {
                         name: "VMF Files",
@@ -2403,31 +2408,59 @@ function reg_events(mainWindow) {
                 return { success: false, canceled: true }
             }
 
-            const selectedFilePath = result.filePaths[0]
-            const fileName = path.basename(selectedFilePath)
+            // Helper function to find unique filename
+            const getUniqueInstanceFileName = (originalFileName) => {
+                const existingInstances = Object.values(item.instances)
+                const existingPaths = existingInstances.map((inst) =>
+                    path.basename(inst.Name),
+                )
 
-            // Check if it's a VMF file
-            if (!fileName.toLowerCase().endsWith(".vmf")) {
-                throw new Error("Selected file must be a VMF file")
+                let fileName = originalFileName
+                let counter = 1
+
+                // Check if filename already exists, if so append number
+                while (existingPaths.includes(fileName)) {
+                    const nameWithoutExt = path.basename(
+                        originalFileName,
+                        ".vmf",
+                    )
+                    fileName = `${nameWithoutExt}_${counter}.vmf`
+                    counter++
+                }
+
+                return fileName
             }
 
-            // Calculate what the instance name would be (same logic as add-instance-file-dialog)
-            // Use new structure: instances/BEE2/bpee/ITEMID/instance.vmf
-            // Generate instance filename based on existing instance count
-            const existingInstances = Object.values(item.instances)
-            const instanceIndex = existingInstances.length
-            const instanceFileName =
-                instanceIndex === 0
-                    ? "instance.vmf"
-                    : `instance_${instanceIndex}.vmf`
-            const instanceName = `instances/BEE2/bpee/${item.id}/${instanceFileName}`
+            // Process all selected files
+            const results = result.filePaths.map((selectedFilePath) => {
+                const originalFileName = path.basename(selectedFilePath)
 
-            // Return file info without actually adding to backend
+                // Check if it's a VMF file
+                if (!originalFileName.toLowerCase().endsWith(".vmf")) {
+                    return {
+                        success: false,
+                        error: "Selected file must be a VMF file",
+                        filePath: selectedFilePath,
+                    }
+                }
+
+                // Use the original filename (or a unique variant if it already exists)
+                const instanceFileName =
+                    getUniqueInstanceFileName(originalFileName)
+                const instanceName = `instances/BEE2/bpee/${item.id}/${instanceFileName}`
+
+                return {
+                    success: true,
+                    filePath: selectedFilePath,
+                    instanceName: instanceName,
+                    fileName: originalFileName,
+                }
+            })
+
+            // Return all results
             return {
                 success: true,
-                filePath: selectedFilePath,
-                instanceName: instanceName,
-                fileName: fileName,
+                files: results,
             }
         } catch (error) {
             dialog.showErrorBox(
@@ -2438,7 +2471,7 @@ function reg_events(mainWindow) {
         }
     })
 
-    // Add instance with file dialog
+    // Add instance with file dialog (legacy - not used in current UI)
     ipcMain.handle("add-instance-file-dialog", async (event, { itemId }) => {
         try {
             // Find the item in any loaded package
@@ -2470,21 +2503,35 @@ function reg_events(mainWindow) {
             }
 
             const selectedFilePath = result.filePaths[0]
-            const fileName = path.basename(selectedFilePath)
+            const originalFileName = path.basename(selectedFilePath)
 
             // Check if it's a VMF file
-            if (!fileName.toLowerCase().endsWith(".vmf")) {
+            if (!originalFileName.toLowerCase().endsWith(".vmf")) {
                 throw new Error("Selected file must be a VMF file")
             }
 
-            // Use new structure: instances/BEE2/bpee/ITEMID/instance.vmf
-            // Generate instance filename based on existing instance count
-            const existingInstances = Object.values(item.instances)
-            const instanceIndex = existingInstances.length
-            const instanceFileName =
-                instanceIndex === 0
-                    ? "instance.vmf"
-                    : `instance_${instanceIndex}.vmf`
+            // Helper function to find unique filename
+            const getUniqueInstanceFileName = (fileName) => {
+                const existingInstances = Object.values(item.instances)
+                const existingPaths = existingInstances.map((inst) =>
+                    path.basename(inst.Name),
+                )
+
+                let uniqueFileName = fileName
+                let counter = 1
+
+                // Check if filename already exists, if so append number
+                while (existingPaths.includes(uniqueFileName)) {
+                    const nameWithoutExt = path.basename(fileName, ".vmf")
+                    uniqueFileName = `${nameWithoutExt}_${counter}.vmf`
+                    counter++
+                }
+
+                return uniqueFileName
+            }
+
+            // Use the original filename (or a unique variant if it already exists)
+            const instanceFileName = getUniqueInstanceFileName(originalFileName)
             const instanceName = `instances/BEE2/bpee/${item.id}/${instanceFileName}`
 
             // Copy the file to the package resources directory
@@ -2508,6 +2555,10 @@ function reg_events(mainWindow) {
             // Add to editoritems
             const newIndex = item.addInstance(instanceName)
 
+            // Set the display name based on the filename (without .vmf extension)
+            const displayName = path.basename(instanceName, ".vmf")
+            item.setInstanceName(newIndex, displayName)
+
             // Send updated item data to frontend
             const updatedItem = item.toJSONWithExistence()
             console.log(
@@ -2515,6 +2566,7 @@ function reg_events(mainWindow) {
                 {
                     id: updatedItem.id,
                     instances: updatedItem.instances,
+                    displayName: displayName,
                 },
             )
             mainWindow.webContents.send("item-updated", updatedItem)

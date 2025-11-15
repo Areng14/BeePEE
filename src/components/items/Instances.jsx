@@ -89,38 +89,50 @@ function Instances({
     }
 
     const handleAddInstanceWithFileDialog = async () => {
-        console.log("Instances: Selecting instance file for item:", item.id)
+        console.log("Instances: Selecting instance file(s) for item:", item.id)
         try {
             const result = await window.package.selectInstanceFile(item.id)
             console.log("Instances: File dialog result:", result)
-            if (result.success) {
-                // Generate a unique index for the new instance (use pending prefix to avoid conflicts)
-                const existingIndices = Object.keys(formData.instances || {})
-                    .filter((key) => !key.startsWith("pending_"))
-                    .map(Number)
-                const numericIndices = existingIndices.filter(
-                    (num) => !isNaN(num),
-                )
-                const maxIndex =
-                    numericIndices.length > 0 ? Math.max(...numericIndices) : -1
-                const newIndex = `pending_${Date.now()}` // Use timestamp to ensure uniqueness
+            if (result.success && result.files && result.files.length > 0) {
+                // Start with current instances
+                let updatedInstances = { ...formData.instances }
 
-                // Create new instance object with pending data
-                const newInstance = {
-                    Name: result.instanceName,
-                    _pending: true,
-                    _filePath: result.filePath, // Store the source file path for when we actually save
+                // Process each selected file
+                for (const fileResult of result.files) {
+                    if (fileResult.success) {
+                        // Generate a unique index for each new instance
+                        const newIndex = `pending_${Date.now()}_${Math.random()
+                            .toString(36)
+                            .substr(2, 9)}` // Use timestamp + random string to ensure uniqueness
+
+                        // Create new instance object with pending data
+                        const newInstance = {
+                            Name: fileResult.instanceName,
+                            _pending: true,
+                            _filePath: fileResult.filePath, // Store the source file path for when we actually save
+                        }
+
+                        // Add to instances collection
+                        updatedInstances[newIndex] = newInstance
+
+                        console.log(
+                            `Instances: Added pending instance: ${newInstance.Name} (will be saved on Save button)`,
+                        )
+
+                        // Small delay to ensure unique timestamps
+                        await new Promise((resolve) => setTimeout(resolve, 10))
+                    } else {
+                        console.error(
+                            "Instances: Failed to process file:",
+                            fileResult.error,
+                        )
+                    }
                 }
 
-                // Update formData with new pending instance
-                const updatedInstances = {
-                    ...formData.instances,
-                    [newIndex]: newInstance,
-                }
-
+                // Update formData with all new pending instances
                 onUpdateInstances(updatedInstances)
                 console.log(
-                    `Instances: Added pending instance: ${newInstance.Name} (will be saved on Save button)`,
+                    `Instances: Added ${result.files.length} pending instance(s)`,
                 )
             } else if (!result.canceled) {
                 console.error(
@@ -283,12 +295,12 @@ function Instances({
                     Instance Files ({instances.length})
                 </Typography>
                 <Box sx={{ display: "flex", gap: 1 }}>
-                    <Tooltip title="Select a VMF file to add as a new instance">
+                    <Tooltip title="Select one or more VMF files to add as new instances">
                         <Button
                             variant="contained"
                             startIcon={<AddIcon />}
                             onClick={handleAddInstanceWithFileDialog}>
-                            Add VMF Instance
+                            Add VMF Instance(s)
                         </Button>
                     </Tooltip>
                     {instances.some((instance) => {
@@ -380,8 +392,8 @@ function Instances({
                                         {/* Instance Name - Always Editable */}
                                         <Box
                                             sx={{
-                                                minWidth: "80px",
-                                                maxWidth: "120px",
+                                                minWidth: "120px",
+                                                maxWidth: "250px",
                                                 display: "flex",
                                                 alignItems: "center",
                                                 gap: 0.5,
@@ -410,8 +422,8 @@ function Instances({
                                                 }}
                                                 placeholder={`Instance ${instanceNumber}`}
                                                 sx={{
-                                                    minWidth: "60px",
-                                                    maxWidth: "100px",
+                                                    minWidth: "100px",
+                                                    maxWidth: "230px",
                                                     "& .MuiInputBase-input": {
                                                         fontSize: "0.875rem",
                                                         fontWeight: "medium",
