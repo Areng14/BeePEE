@@ -387,6 +387,22 @@ function createMainMenu(mainWindow) {
                         shell.openExternal("https://discord.gg/WPzDn4sZY3")
                     },
                 },
+                { type: "separator" },
+                {
+                    label: "Check for Updates...",
+                    click: () => {
+                        if (global.updaterInstance) {
+                            global.updaterInstance.checkForUpdates(false) // Non-silent check
+                        } else {
+                            dialog.showMessageBox({
+                                type: "error",
+                                title: "Error",
+                                message: "Update checker is not available.",
+                                buttons: ["OK"],
+                            })
+                        }
+                    },
+                },
             ],
         },
     ]

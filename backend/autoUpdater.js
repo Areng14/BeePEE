@@ -21,6 +21,10 @@ class AutoUpdater {
         this.autoUpdater.logger = logger
         this.autoUpdater.autoDownload = false // Don't auto-download, ask user first
         this.autoUpdater.autoInstallOnAppQuit = true
+        
+        // Log updater initialization
+        logger.info("Auto-updater: Initialized")
+        console.log("[Auto-updater] Initialized")
 
         // Set up event listeners
         this.setupEventListeners()
@@ -31,13 +35,17 @@ class AutoUpdater {
 
         // Checking for updates
         updater.on("checking-for-update", () => {
-            logger.info("Checking for updates...")
+            const msg = "Auto-updater: Checking for updates..."
+            logger.info(msg)
+            console.log(`[${msg}]`)
             this.sendStatusToWindow("checking-for-update")
         })
 
         // Update available
         updater.on("update-available", (info) => {
-            logger.info("Update available:", info.version)
+            const msg = `Auto-updater: Update available - v${info.version}`
+            logger.info(msg)
+            console.log(`[${msg}]`)
             this.sendStatusToWindow("update-available", {
                 version: info.version,
                 releaseDate: info.releaseDate,
@@ -50,7 +58,9 @@ class AutoUpdater {
 
         // Update not available
         updater.on("update-not-available", (info) => {
-            logger.info("Update not available. Current version is the latest.")
+            const msg = `Auto-updater: No updates available. Current version (${info.version}) is the latest.`
+            logger.info(msg)
+            console.log(`[${msg}]`)
             this.sendStatusToWindow("update-not-available", {
                 version: info.version,
             })
@@ -58,7 +68,10 @@ class AutoUpdater {
 
         // Update error
         updater.on("error", (err) => {
-            logger.error("Error in auto-updater:", err)
+            const msg = `Auto-updater: Error occurred - ${err.message || err}`
+            logger.error(msg)
+            logger.error("Auto-updater: Full error details:", err)
+            console.error(`[${msg}]`)
             const errorInfo = this.parseUpdateError(err)
             this.sendStatusToWindow("update-error", errorInfo)
         })
@@ -179,6 +192,21 @@ class AutoUpdater {
                 "Check the app website for manual updates",
             ]
         }
+        // GitHub release configuration errors
+        else if (
+            errorMessage.includes("406") ||
+            errorMessage.includes("Unable to find latest version on GitHub") ||
+            errorMessage.includes("please ensure a production release exists")
+        ) {
+            errorType = "no_release_assets"
+            userMessage =
+                "The update system is not properly configured. The latest release is missing required files."
+            troubleshooting = [
+                "The developer needs to publish releases using 'npm run publish'",
+                "Check the GitHub releases page manually for updates",
+                "The release may be missing the installer or update manifest files",
+            ]
+        }
         // Rate limiting
         else if (
             errorMessage.includes("429") ||
@@ -287,9 +315,14 @@ class AutoUpdater {
             return
         }
 
+        const msg = "Auto-updater: Scheduling startup update check in 5 seconds..."
+        logger.info(msg)
+        console.log(`[${msg}]`)
         // Check for updates 5 seconds after startup
         setTimeout(() => {
-            logger.info("Running startup update check...")
+            const checkMsg = "Auto-updater: Running startup update check..."
+            logger.info(checkMsg)
+            console.log(`[${checkMsg}]`)
             this.checkForUpdates(true) // Silent check
         }, 5000)
     }
@@ -303,8 +336,13 @@ class AutoUpdater {
 
         const CHECK_INTERVAL = 4 * 60 * 60 * 1000 // 4 hours in milliseconds
 
+        const msg = "Auto-updater: Starting periodic update checks (every 4 hours)"
+        logger.info(msg)
+        console.log(`[${msg}]`)
         this.updateCheckInterval = setInterval(() => {
-            logger.info("Running periodic update check...")
+            const checkMsg = "Auto-updater: Running periodic update check..."
+            logger.info(checkMsg)
+            console.log(`[${checkMsg}]`)
             this.checkForUpdates(true) // Silent check
         }, CHECK_INTERVAL)
     }
