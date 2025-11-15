@@ -13,6 +13,7 @@ const {
     getCreateItemWindow,
     createPackageCreationWindow,
     getCreatePackageWindow,
+    createSignageEditorWindow,
 } = require("./items/itemEditor")
 const { ipcMain, dialog, BrowserWindow } = require("electron")
 const fs = require("fs")
@@ -833,6 +834,79 @@ function reg_events(mainWindow) {
     ipcMain.handle("open-create-item-window", async () => {
         createItemCreationWindow(mainWindow)
         return { success: true }
+    })
+
+    // Register signage editor opening
+    ipcMain.handle("open-signage-editor", async () => {
+        createSignageEditorWindow(mainWindow)
+        return { success: true }
+    })
+
+    // Get signage presets
+    ipcMain.handle("get-signage-presets", async () => {
+        try {
+            const { app } = require("electron")
+            const publicPath = path.join(app.getAppPath(), "public", "signagePresets")
+            
+            // Check if directory exists
+            if (!fs.existsSync(publicPath)) {
+                console.log("Signage presets directory not found")
+                return []
+            }
+
+            // Read all files in the directory
+            const files = fs.readdirSync(publicPath)
+            
+            // Filter for image files
+            const imageExtensions = [".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp"]
+            const imageFiles = files.filter((file) => {
+                const ext = path.extname(file).toLowerCase()
+                return imageExtensions.includes(ext)
+            })
+
+            // Return preset data with beep:// URLs
+            return imageFiles.map((file) => ({
+                name: path.basename(file, path.extname(file)),
+                filename: file,
+                src: `beep://public/signagePresets/${file}`,
+            }))
+        } catch (error) {
+            console.error("Failed to load signage presets:", error)
+            return []
+        }
+    })
+
+    // Save signage
+    ipcMain.handle("save-signage", async (event, signageName, signageData) => {
+        try {
+            const currentPackageDir = getCurrentPackageDir()
+            if (!currentPackageDir) {
+                throw new Error("No package is currently loaded")
+            }
+
+            // Create signages directory if it doesn't exist
+            const signagesDir = path.join(currentPackageDir, "signages")
+            if (!fs.existsSync(signagesDir)) {
+                fs.mkdirSync(signagesDir, { recursive: true })
+            }
+
+            // Sanitize the signage name for use as filename
+            const sanitizedName = signageName.replace(/[^a-zA-Z0-9_-]/g, "_")
+            const signageFilePath = path.join(signagesDir, `${sanitizedName}.json`)
+
+            // Write the JSON file
+            fs.writeFileSync(
+                signageFilePath,
+                JSON.stringify(signageData, null, 2),
+                "utf8"
+            )
+
+            console.log(`Saved signage: ${signageFilePath}`)
+            return { success: true, path: signageFilePath }
+        } catch (error) {
+            console.error("Failed to save signage:", error)
+            throw error
+        }
     })
 
     // Register generic file dialog handler

@@ -2,6 +2,7 @@ const openEditors = new Map()
 let createItemWindow = null // Track the create item window
 let createPackageWindow = null // Track the create package window
 let packageInformationWindow = null // Track the package information window
+let signageEditorWindow = null // Track the signage editor window
 const { BrowserWindow, app } = require("electron")
 const path = require("path")
 const isDev = require("../utils/isDev.js")
@@ -197,6 +198,50 @@ function createPackageInformationWindow(mainWindow) {
     packageInformationWindow.setMenuBarVisibility(false)
 }
 
+function createSignageEditorWindow(mainWindow) {
+    // If window already exists, focus it
+    if (signageEditorWindow && !signageEditorWindow.isDestroyed()) {
+        signageEditorWindow.focus()
+        return
+    }
+
+    signageEditorWindow = new BrowserWindow({
+        width: 1024,
+        height: 768,
+        title: "BeePEE - Signage Editor",
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, "..", "preload.js"),
+        },
+        devTools: isDev,
+        skipTaskbar: false,
+        minimizable: true,
+        maximizable: true,
+        resizable: true,
+        autoHideMenuBar: true,
+    })
+
+    signageEditorWindow.on("closed", () => {
+        signageEditorWindow = null
+    })
+
+    if (isDev) {
+        signageEditorWindow.loadURL(`http://localhost:5173/?route=signage-editor`)
+    } else {
+        // Use app.getAppPath() for reliable path resolution in packaged app
+        const appPath = app.getAppPath()
+        signageEditorWindow.loadFile(
+            path.join(appPath, "dist", "index.html"),
+            {
+                query: { route: "signage-editor" },
+            },
+        )
+    }
+
+    signageEditorWindow.setMenuBarVisibility(false)
+}
+
 module.exports = {
     createItemEditor,
     sendItemUpdateToEditor,
@@ -207,4 +252,6 @@ module.exports = {
     getCreatePackageWindow: () => createPackageWindow,
     createPackageInformationWindow,
     getPackageInformationWindow: () => packageInformationWindow,
+    createSignageEditorWindow,
+    getSignageEditorWindow: () => signageEditorWindow,
 }

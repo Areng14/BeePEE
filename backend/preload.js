@@ -242,4 +242,11 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.removeAllListeners("update-status")
         ipcRenderer.on("update-status", (event, data) => callback(data))
     },
+
+    // ========================================
+    // SIGNAGE EDITOR FUNCTIONS
+    // ========================================
+    getSignagePresets: () => ipcRenderer.invoke("get-signage-presets"),
+    saveSignage: (signageName, signageData) =>
+        ipcRenderer.invoke("save-signage", signageName, signageData),
 })

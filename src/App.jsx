@@ -6,6 +6,7 @@ import CreateItemPage from "./pages/CreateItemPage"
 import CreatePackagePage from "./pages/CreatePackagePage"
 import PackageInformationPage from "./pages/PackageInformationPage"
 import WelcomePage from "./pages/WelcomePage"
+import SignageEditorPage from "./pages/SignageEditorPage"
 import LoadingPopup from "./components/LoadingPopup"
 import UpdateNotification from "./components/UpdateNotification"
 import { ItemProvider } from "./contexts/ItemContext"
@@ -19,6 +20,7 @@ function App() {
     const showCreateItem = routeParam === "create-item"
     const showCreatePackage = routeParam === "create-package"
     const showPackageInformation = routeParam === "package-information"
+    const showSignageEditor = routeParam === "signage-editor"
     const [packageLoaded, setPackageLoaded] = useState(false)
     const [loadingState, setLoadingState] = useState({
         open: false,
@@ -96,6 +98,9 @@ function App() {
             ) : showPackageInformation ? (
                 // Show PackageInformationPage directly for production windows
                 <PackageInformationPage />
+            ) : showSignageEditor ? (
+                // Show SignageEditorPage directly for production windows
+                <SignageEditorPage />
             ) : (
                 // Use normal routing for main window and development
                 <>
@@ -131,6 +136,10 @@ function App() {
                             <Route
                                 path="/package-information"
                                 element={<PackageInformationPage />}
+                            />
+                            <Route
+                                path="/signage-editor"
+                                element={<SignageEditorPage />}
                             />
                         </Routes>
                     </HashRouter>

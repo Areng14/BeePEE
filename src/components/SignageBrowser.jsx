@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { Box, Grid } from "@mui/material"
 import SignageIcon from "./SignageIcon"
+import AddSignage from "./AddSignage"
 
 function SignageBrowser() {
     const [signages, setSignages] = useState([])
@@ -99,8 +100,13 @@ function SignageBrowser() {
                     </Grid>
                 ))}
 
+                {/* Add button - first placeholder */}
+                <Grid size="auto">
+                    <AddSignage />
+                </Grid>
+
                 {/* Placeholder cells */}
-                {Array.from({ length: totalPlaceholders }).map((_, index) => (
+                {Array.from({ length: totalPlaceholders - 1 }).map((_, index) => (
                     <Grid key={`empty-${index}`} size="auto">
                         <Box
                             sx={{
