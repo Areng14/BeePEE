@@ -27,7 +27,7 @@
                 "provider": "github",
                 "owner": "Areng14",
                 "repo": "BeePEE",
-                "releaseType": "prerelease"
+                "releaseType": "release"
             }
         ],
         "files": [
