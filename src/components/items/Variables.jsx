@@ -154,7 +154,7 @@ function SortableVariableItem({ variable, onUpdateValue, onDelete }) {
                                     onChange={(e) =>
                                         onUpdateValue(
                                             variable.id,
-                                            e.checked ? "1" : "0",
+                                            e.target.checked ? "1" : "0",
                                         )
                                     }
                                     size="small"
