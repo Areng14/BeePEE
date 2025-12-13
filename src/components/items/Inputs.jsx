@@ -2517,7 +2517,8 @@ function Inputs({ item, formData, onUpdateInputs, onUpdateOutputs }) {
     const handleAddConfig = (configData) => {
         try {
             const isInput = tabValue === 0
-            const defaultName = isInput ? "Input" : "Output"
+            // Both inputs and outputs use "BEE2" as the key name
+            const defaultName = "BEE2"
 
             // Generate a unique name if default already exists
             let uniqueName = defaultName
