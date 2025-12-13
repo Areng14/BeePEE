@@ -27,9 +27,9 @@ release
 # BEEPEE stuff
 packages
 backend/__tests__/package
-backend/libs/vmf2obj/jre
+backend/libs/VMF2OBJ/jre-windows
 backend/libs/areng_cartoonify/_internal
-backend/libs/areng_vmfmerge/_internal
+backend/libs/areng_vmfMerge/_internal
 backend/libs/areng_obj23ds/_internal
 
 # Other
