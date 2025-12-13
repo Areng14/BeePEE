@@ -1681,10 +1681,10 @@ class Item {
                         block.variable,
                         block.value,
                     )
-                    const ifValue = convertBooleanValue(
-                        modifiedIfValue,
-                        block.variable,
-                    )
+                    // Only convert to boolean for boolean variables, use raw value for enums
+                    const ifValue = block.variable?.includes("cube_type")
+                        ? modifiedIfValue
+                        : convertBooleanValue(modifiedIfValue, block.variable)
                     const ifOperator = block.operator || "=="
                     const ifResult = {
                         instVar: `${block.variable || ""} ${ifOperator} ${ifValue}`,
@@ -1705,10 +1705,10 @@ class Item {
                         block.variable,
                         block.value,
                     )
-                    const ifElseValue = convertBooleanValue(
-                        modifiedIfElseValue,
-                        block.variable,
-                    )
+                    // Only convert to boolean for boolean variables, use raw value for enums
+                    const ifElseValue = block.variable?.includes("cube_type")
+                        ? modifiedIfElseValue
+                        : convertBooleanValue(modifiedIfElseValue, block.variable)
                     const ifElseOperator = block.operator || "=="
                     const ifElseResult = {
                         instVar: `${block.variable || ""} ${ifElseOperator} ${ifElseValue}`,
