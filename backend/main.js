@@ -334,7 +334,32 @@ app.whenReady().then(async () => {
 
     logger.info("🔧 Registered beep:// protocol for secure file access")
 
-    createWindow()
+    const window = createWindow()
+
+    // Check for version change and show changelog if needed
+    const { getLastSeenVersion, setLastSeenVersion } = require("./utils/settings.js")
+    const { createChangelogWindow } = require("./items/itemEditor.js")
+    const packageJson = require("../package.json")
+    const currentVersion = packageJson.version
+    const lastSeenVersion = getLastSeenVersion()
+
+    // Show changelog only once after update (not on first install)
+    if (lastSeenVersion && lastSeenVersion !== currentVersion) {
+        logger.info(`Version changed from ${lastSeenVersion} to ${currentVersion}, showing changelog`)
+        // Wait for window to be ready before showing changelog
+        window.webContents.once("did-finish-load", () => {
+            setTimeout(() => {
+                createChangelogWindow(window)
+                setLastSeenVersion(currentVersion)
+            }, 1000) // Small delay to ensure main window is fully loaded
+        })
+    } else if (!lastSeenVersion) {
+        // First run - just set the version without showing changelog
+        logger.info(`First run detected, setting version to ${currentVersion}`)
+        setLastSeenVersion(currentVersion)
+    } else {
+        logger.info(`Version unchanged: ${currentVersion}`)
+    }
 
     // Configure VMF2OBJ resource paths on startup
     try {
@@ -405,7 +430,8 @@ app.whenReady().then(async () => {
                             logger.debug(`    ✅ Added VPK: ${fullPath}`)
                         } else {
                             // For custom content (BEE2, mods), we allow directories with materials/models
-                            // These are typically clean and won't cause VMF2OBJ crashes
+                            // Note: VMF2OBJ crashes on files without extensions - ensure your
+                            // custom content folders don't contain extension-less files
                             const materialsPath = path.join(fullPath, "materials")
                             const modelsPath = path.join(fullPath, "models")
                             const hasMaterials = fs.existsSync(materialsPath)

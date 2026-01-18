@@ -2,7 +2,7 @@
     "name": "beepee",
     "main": "backend/main.js",
     "private": true,
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "BEEmod Package Editor",
     "author": "Areng",
     "repository": {
@@ -34,7 +34,8 @@
             "dist/**/*",
             "backend/**/*",
             "node_modules/**/*",
-            "package.json"
+            "package.json",
+            "changelog.json"
         ],
         "directories": {
             "buildResources": "build",
@@ -161,6 +162,7 @@
         "@react-three/drei": "^10.6.1",
         "@react-three/fiber": "^9.3.0",
         "7zip-bin": "^5.2.0",
+        "adm-zip": "^0.5.16",
         "electron-updater": "^6.6.2",
         "node-7z": "^3.0.0",
         "p-limit": "^7.2.0",
