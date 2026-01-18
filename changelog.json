@@ -1,0 +1,50 @@
+{
+    "versions": [
+        {
+            "version": "1.0.2",
+            "date": "2025-12-13",
+            "changes": {
+                "added": [
+                    "Changelog window"
+                ],
+                "fixed": [
+                    "BeePEE uses cube type standard 1 instead of 0",
+                    "Missing runtimes (PYTHON, JAVA)",
+                    "Boolean varibles defaults can now be changed",
+                    "BeePEE generates incorrect input blocks"
+                ]
+            }
+        },
+        {
+            "version": "1.0.1",
+            "date": "2025-11-15",
+            "changes": {
+                "fixed": [
+                    "Fixed a bug where if you add multiple instances it will duplicated and be wrong",
+                    "Fixed a bug where electron auto-updater's messages is too long and is shortened"
+                ]
+            }
+        },
+        {
+            "version": "1.0.0",
+            "date": "2025-11-08",
+            "changes": {
+                "added": [
+                    "Beemod package importing / exporting",
+                    "BeePEE package importing / exporting",
+                    "Item browser",
+                    "Item creation",
+                    "Item editor",
+                    "Basic information editor",
+                    "Instances editor",
+                    "Input / Output editor",
+                    "Variables editor",
+                    "Basic VBSP editor",
+                    "Item editor model generation",
+                    "Item editor model picker",
+                    "Associates .bee_pack and .bpee with BeePEE"
+                ]
+            }
+        }
+    ]
+}

@@ -2,6 +2,7 @@ const openEditors = new Map()
 let createItemWindow = null // Track the create item window
 let createPackageWindow = null // Track the create package window
 let packageInformationWindow = null // Track the package information window
+let changelogWindow = null // Track the changelog window
 const { BrowserWindow, app } = require("electron")
 const path = require("path")
 const isDev = require("../utils/isDev.js")
@@ -197,6 +198,47 @@ function createPackageInformationWindow(mainWindow) {
     packageInformationWindow.setMenuBarVisibility(false)
 }
 
+function createChangelogWindow(mainWindow) {
+    // If window already exists, focus it
+    if (changelogWindow && !changelogWindow.isDestroyed()) {
+        changelogWindow.focus()
+        return
+    }
+
+    changelogWindow = new BrowserWindow({
+        width: 800,
+        height: 700,
+        title: "BeePEE - What's New",
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, "..", "preload.js"),
+        },
+        devTools: isDev,
+        skipTaskbar: false,
+        minimizable: true,
+        maximizable: true,
+        resizable: true,
+        autoHideMenuBar: true,
+    })
+
+    changelogWindow.on("closed", () => {
+        changelogWindow = null
+    })
+
+    if (isDev) {
+        changelogWindow.loadURL(`http://localhost:5173/?route=changelog`)
+    } else {
+        // Use app.getAppPath() for reliable path resolution in packaged app
+        const appPath = app.getAppPath()
+        changelogWindow.loadFile(path.join(appPath, "dist", "index.html"), {
+            query: { route: "changelog" },
+        })
+    }
+
+    changelogWindow.setMenuBarVisibility(false)
+}
+
 module.exports = {
     createItemEditor,
     sendItemUpdateToEditor,
@@ -207,4 +249,6 @@ module.exports = {
     getCreatePackageWindow: () => createPackageWindow,
     createPackageInformationWindow,
     getPackageInformationWindow: () => packageInformationWindow,
+    createChangelogWindow,
+    getChangelogWindow: () => changelogWindow,
 }
