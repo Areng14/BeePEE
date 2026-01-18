@@ -14,6 +14,7 @@ const fs = require("fs")
 const {
     createPackageCreationWindow,
     createPackageInformationWindow,
+    createChangelogWindow,
 } = require("./items/itemEditor")
 const isDev = require("./utils/isDev.js")
 const { ensurePackagesDir } = require("./utils/packagesDir")
@@ -388,6 +389,12 @@ function createMainMenu(mainWindow) {
                     },
                 },
                 { type: "separator" },
+                {
+                    label: "What's New...",
+                    click: () => {
+                        createChangelogWindow(mainWindow)
+                    },
+                },
                 {
                     label: "Check for Updates...",
                     click: () => {

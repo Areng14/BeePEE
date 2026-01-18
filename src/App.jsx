@@ -5,6 +5,7 @@ import ItemEditor from "./components/ItemEditor"
 import CreateItemPage from "./pages/CreateItemPage"
 import CreatePackagePage from "./pages/CreatePackagePage"
 import PackageInformationPage from "./pages/PackageInformationPage"
+import ChangelogPage from "./pages/ChangelogPage"
 import WelcomePage from "./pages/WelcomePage"
 import LoadingPopup from "./components/LoadingPopup"
 import UpdateNotification from "./components/UpdateNotification"
@@ -19,6 +20,7 @@ function App() {
     const showCreateItem = routeParam === "create-item"
     const showCreatePackage = routeParam === "create-package"
     const showPackageInformation = routeParam === "package-information"
+    const showChangelog = routeParam === "changelog"
     const [packageLoaded, setPackageLoaded] = useState(false)
     const [loadingState, setLoadingState] = useState({
         open: false,
@@ -95,6 +97,9 @@ function App() {
             ) : showPackageInformation ? (
                 // Show PackageInformationPage directly for production windows
                 <PackageInformationPage />
+            ) : showChangelog ? (
+                // Show ChangelogPage directly for production windows
+                <ChangelogPage />
             ) : (
                 // Use normal routing for main window and development
                 <>
@@ -130,6 +135,10 @@ function App() {
                             <Route
                                 path="/package-information"
                                 element={<PackageInformationPage />}
+                            />
+                            <Route
+                                path="/changelog"
+                                element={<ChangelogPage />}
                             />
                         </Routes>
                     </HashRouter>

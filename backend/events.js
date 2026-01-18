@@ -13,6 +13,7 @@ const {
     getCreateItemWindow,
     createPackageCreationWindow,
     getCreatePackageWindow,
+    createChangelogWindow,
 } = require("./items/itemEditor")
 const { ipcMain, dialog, BrowserWindow, app } = require("electron")
 const fs = require("fs")
@@ -4911,6 +4912,32 @@ function reg_events(mainWindow) {
         } catch (error) {
             console.error("Failed to show message box:", error)
             return { success: false, error: error.message }
+        }
+    })
+
+    // Open changelog window
+    ipcMain.handle("open-changelog-window", async () => {
+        try {
+            createChangelogWindow(mainWindow)
+            return { success: true }
+        } catch (error) {
+            console.error("Failed to open changelog window:", error)
+            throw error
+        }
+    })
+
+    // Load changelog data
+    ipcMain.handle("load-changelog", async () => {
+        try {
+            const changelogPath = path.join(app.getAppPath(), "changelog.json")
+            if (!fs.existsSync(changelogPath)) {
+                throw new Error("Changelog file not found")
+            }
+            const changelogData = JSON.parse(fs.readFileSync(changelogPath, "utf-8"))
+            return changelogData
+        } catch (error) {
+            console.error("Failed to load changelog:", error)
+            throw error
         }
     })
 }
