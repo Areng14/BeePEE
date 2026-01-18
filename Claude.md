@@ -630,3 +630,79 @@ Graceful degradation:
 - **3DS (.3ds)** - Simplified collision geometry for physics interaction in Puzzle Editor
 - Portal 2's Puzzle Editor uses 3DS for selection bounds and collision detection
 - This matches the standard BEE2 item format structure
+
+---
+
+## VMF2OBJ Tool
+
+### Overview
+
+VMF2OBJ converts Source engine VMF files into OBJ files with materials. It handles brushes, displacements, entities, and models.
+
+**Location:** `backend/libs/VMF2OBJ/VMF2OBJ.jar`
+
+**Bundled JRE:** `backend/libs/VMF2OBJ/jre/` (auto-downloaded if missing from Eclipse Adoptium)
+
+### Command Line Interface
+
+```bash
+java -jar VMF2OBJ.jar [VMF_FILE] [args...]
+
+Options:
+  -h, --help                  Show help message
+  -o, --output <arg>          Output file name (defaults to VMF filename)
+  -q, --quiet                 Suppress warnings
+  -r, --resourcePaths <arg>   Semi-colon separated list of VPK files and folders
+  -t, --tools                 Ignore tool brushes
+```
+
+### Resource Paths (-r flag)
+
+The `-r` flag accepts a semi-colon separated list of:
+- **VPK files** (e.g., `pak01_dir.vpk`)
+- **Folders** containing `materials/` and/or `models/` subdirectories
+
+**IMPORTANT:** When using folders, point to the PARENT folder that contains `materials/` or `models/`, NOT to those folders directly:
+
+```
+custom-content/        <-- SELECT THIS
+├── materials/         <-- NOT this
+│   └── models/
+│       └── props/
+└── models/            <-- NOT this
+    └── props/
+```
+
+### Known Bug: Files Without Extensions
+
+**Problem:** VMF2OBJ crashes with `StringIndexOutOfBoundsException: Range [0, -1)` when scanning directories that contain files without extensions.
+
+**Cause:** The `addExtraFiles` method at line 308 tries to extract file extensions using `lastIndexOf('.')`. If a file has no extension, this returns -1, causing `substring(0, -1)` to fail.
+
+**Workaround:** Only pass VPK files to the `-r` flag, or ensure resource folders don't contain extension-less files.
+
+### Supported Features
+
+- ✅ Brushes
+- ✅ Displacements
+- ✅ Materials & Textures
+- ✅ Bump Maps
+- ✅ Transparency
+- ✅ Brush Entities
+- ✅ prop_* Entities (geometry, normals, materials)
+
+### Unsupported Features
+
+- ❌ prop_* skins (texture/QC mismatch issues)
+- ❌ Displacement blend materials (would require texture generation or per-vertex materials)
+- ❌ infodecal (projection logic unknown)
+- ❌ info_overlay (complex multi-face projection)
+
+### JRE Auto-Download
+
+If the bundled JRE is not found, BeePEE automatically downloads Eclipse Temurin JRE 17 (~45MB) from:
+```
+https://api.adoptium.net/v3/binary/latest/17/ga/windows/x64/jre/hotspot/normal/eclipse
+```
+
+The download includes progress reporting and extracts to the correct location automatically.

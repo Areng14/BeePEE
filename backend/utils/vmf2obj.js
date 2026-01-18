@@ -1,8 +1,217 @@
 const fs = require("fs")
 const path = require("path")
+const https = require("https")
 const { app } = require("electron")
 const { findPortal2Resources } = require("../data")
 const { convertTexturesForModel } = require("./tgaConverter")
+
+// JRE download configuration
+const JRE_VERSION = "17"
+const JRE_DOWNLOAD_URL = `https://api.adoptium.net/v3/binary/latest/${JRE_VERSION}/ga/windows/x64/jre/hotspot/normal/eclipse`
+
+/**
+ * Get the directory where the JRE should be installed
+ */
+function getJreDir() {
+    const isDev = !app.isPackaged
+    return isDev
+        ? path.join(__dirname, "..", "libs", "VMF2OBJ", "jre")
+        : path.join(process.resourcesPath, "extraResources", "VMF2OBJ", "jre")
+}
+
+/**
+ * Download a file with redirect support
+ */
+function downloadFile(url, destPath, onProgress) {
+    return new Promise((resolve, reject) => {
+        const file = fs.createWriteStream(destPath)
+
+        const request = (currentUrl) => {
+            https
+                .get(currentUrl, (response) => {
+                    // Handle redirects
+                    if (
+                        response.statusCode >= 300 &&
+                        response.statusCode < 400 &&
+                        response.headers.location
+                    ) {
+                        console.log(`Redirecting to: ${response.headers.location}`)
+                        request(response.headers.location)
+                        return
+                    }
+
+                    if (response.statusCode !== 200) {
+                        reject(
+                            new Error(
+                                `Failed to download: HTTP ${response.statusCode}`,
+                            ),
+                        )
+                        return
+                    }
+
+                    const totalSize = parseInt(
+                        response.headers["content-length"],
+                        10,
+                    )
+                    let downloadedSize = 0
+
+                    response.on("data", (chunk) => {
+                        downloadedSize += chunk.length
+                        if (onProgress && totalSize) {
+                            onProgress(downloadedSize, totalSize)
+                        }
+                    })
+
+                    response.pipe(file)
+
+                    file.on("finish", () => {
+                        file.close()
+                        resolve()
+                    })
+                })
+                .on("error", (err) => {
+                    fs.unlink(destPath, () => {})
+                    reject(err)
+                })
+        }
+
+        request(url)
+    })
+}
+
+/**
+ * Extract a zip file to a directory
+ */
+async function extractZip(zipPath, destDir) {
+    const AdmZip = require("adm-zip")
+    const zip = new AdmZip(zipPath)
+    const entries = zip.getEntries()
+
+    // Find the root folder name in the zip (e.g., "jdk-17.0.9+9-jre")
+    let rootFolder = null
+    for (const entry of entries) {
+        if (entry.isDirectory && entry.entryName.split("/").length === 2) {
+            rootFolder = entry.entryName.replace("/", "")
+            break
+        }
+    }
+
+    if (!rootFolder) {
+        // Just extract as-is
+        zip.extractAllTo(destDir, true)
+        return
+    }
+
+    // Extract to temp location, then move contents
+    const tempDir = path.join(path.dirname(destDir), "jre_temp_extract")
+    if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true })
+    }
+
+    zip.extractAllTo(tempDir, true)
+
+    // Move contents from rootFolder to destDir
+    const extractedRoot = path.join(tempDir, rootFolder)
+    if (fs.existsSync(extractedRoot)) {
+        // Ensure destDir exists
+        if (!fs.existsSync(destDir)) {
+            fs.mkdirSync(destDir, { recursive: true })
+        }
+
+        // Copy all contents
+        const copyRecursive = (src, dest) => {
+            const stat = fs.statSync(src)
+            if (stat.isDirectory()) {
+                if (!fs.existsSync(dest)) {
+                    fs.mkdirSync(dest, { recursive: true })
+                }
+                for (const child of fs.readdirSync(src)) {
+                    copyRecursive(path.join(src, child), path.join(dest, child))
+                }
+            } else {
+                fs.copyFileSync(src, dest)
+            }
+        }
+
+        copyRecursive(extractedRoot, destDir)
+    }
+
+    // Cleanup temp
+    fs.rmSync(tempDir, { recursive: true, force: true })
+}
+
+/**
+ * Download and install the JRE if not present
+ * @param {function} onProgress - Callback for progress updates (downloaded, total, status)
+ * @returns {Promise<string>} Path to java.exe
+ */
+async function ensureJreInstalled(onProgress) {
+    const jreDir = getJreDir()
+    const javaExe = path.join(jreDir, "bin", "java.exe")
+
+    // Already installed
+    if (fs.existsSync(javaExe)) {
+        return javaExe
+    }
+
+    console.log("Bundled JRE not found, downloading...")
+    if (onProgress) onProgress(0, 0, "Preparing to download JRE...")
+
+    // Ensure parent directory exists
+    const parentDir = path.dirname(jreDir)
+    if (!fs.existsSync(parentDir)) {
+        fs.mkdirSync(parentDir, { recursive: true })
+    }
+
+    const zipPath = path.join(parentDir, "jre_download.zip")
+
+    try {
+        // Download
+        if (onProgress) onProgress(0, 0, "Downloading JRE...")
+        console.log(`Downloading JRE from ${JRE_DOWNLOAD_URL}`)
+
+        await downloadFile(zipPath, zipPath, (downloaded, total) => {
+            if (onProgress) {
+                const percent = Math.round((downloaded / total) * 100)
+                const mb = (downloaded / 1024 / 1024).toFixed(1)
+                const totalMb = (total / 1024 / 1024).toFixed(1)
+                onProgress(
+                    downloaded,
+                    total,
+                    `Downloading JRE: ${mb}MB / ${totalMb}MB (${percent}%)`,
+                )
+            }
+        })
+
+        // Extract
+        if (onProgress) onProgress(0, 0, "Extracting JRE...")
+        console.log(`Extracting JRE to ${jreDir}`)
+
+        await extractZip(zipPath, jreDir)
+
+        // Cleanup zip
+        fs.unlinkSync(zipPath)
+
+        // Verify
+        if (!fs.existsSync(javaExe)) {
+            throw new Error("JRE extraction failed - java.exe not found")
+        }
+
+        console.log("JRE installed successfully")
+        if (onProgress) onProgress(100, 100, "JRE installed successfully")
+
+        return javaExe
+    } catch (error) {
+        // Cleanup on failure
+        try {
+            if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath)
+            if (fs.existsSync(jreDir))
+                fs.rmSync(jreDir, { recursive: true, force: true })
+        } catch {}
+
+        throw new Error(`Failed to download/install JRE: ${error.message}`)
+    }
+}
 
 // Extra resource search paths configurable at runtime (folders or VPKs)
 let extraResourcePaths = []
@@ -29,30 +238,8 @@ function uniquePaths(paths) {
 }
 
 function getJavaPath() {
-    const isDev = !app.isPackaged
-    const bundledJava = isDev
-        ? path.join(
-              __dirname,
-              "..",
-              "libs",
-              "VMF2OBJ",
-              "jre",
-              "bin",
-              "java.exe",
-          )
-        : path.join(
-              process.resourcesPath,
-              "extraResources",
-              "VMF2OBJ",
-              "jre",
-              "bin",
-              "java.exe",
-          )
-
-    if (fs.existsSync(bundledJava)) return bundledJava
-
-    // Fallback to system Java; rely on PATH
-    return "java"
+    const jreDir = getJreDir()
+    return path.join(jreDir, "bin", "java.exe")
 }
 
 function getJarPath() {
@@ -261,7 +448,8 @@ async function applySourceEngineRotation(objPath) {
 /**
  * Convert a VMF file to OBJ using the bundled VMF2OBJ tool
  * @param {string} vmfPath - Full path to the VMF file
- * @param {{outputDir?: string, timeoutMs?: number, resourcePaths?: string[], textureStyle?: 'cartoon' | 'raw', debug?: boolean, applySourceRotation?: boolean}} options
+ * @param {{outputDir?: string, timeoutMs?: number, resourcePaths?: string[], textureStyle?: 'cartoon' | 'raw', debug?: boolean, applySourceRotation?: boolean, onJreProgress?: function}} options
+ * @param {function} [options.onJreProgress] - Callback for JRE download progress (downloaded, total, status)
  * @returns {Promise<{objPath?: string, mtlPath?: string}>}
  */
 async function convertVmfToObj(vmfPath, options = {}) {
@@ -269,7 +457,9 @@ async function convertVmfToObj(vmfPath, options = {}) {
         throw new Error(`VMF file not found: ${vmfPath}`)
     }
 
-    const javaPath = getJavaPath()
+    // Ensure JRE is installed (downloads if missing)
+    const javaPath = await ensureJreInstalled(options.onJreProgress)
+
     const jarPath = getJarPath()
     if (!fs.existsSync(jarPath)) {
         throw new Error("VMF2OBJ tool not found")
@@ -524,4 +714,5 @@ module.exports = {
     convertVmfToObj,
     setExtraResourcePaths,
     getExtraResourcePaths,
+    ensureJreInstalled,
 }
