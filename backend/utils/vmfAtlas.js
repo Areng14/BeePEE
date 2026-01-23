@@ -1,7 +1,7 @@
 // VMF Atlas - Merge multiple VMF instances into a single grid layout
 const fs = require("fs")
 const path = require("path")
-const isDev = require("./isDev.js")
+const { isDev } = require("./isDev.js")
 
 /**
  * Get the path to the VMF merge executable

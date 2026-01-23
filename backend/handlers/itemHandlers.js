@@ -1,0 +1,553 @@
+/**
+ * Item CRUD handlers - create, edit, delete items
+ */
+
+const { dialog } = require("electron")
+const fs = require("fs")
+const path = require("path")
+const crypto = require("crypto")
+const {
+    packages,
+    loadPackage,
+    Package,
+    getCurrentPackageDir,
+} = require("../packageManager")
+const {
+    createItemEditor,
+    sendItemUpdateToEditor,
+    createItemCreationWindow,
+    getCreateItemWindow,
+} = require("../items/itemEditor")
+const { Item } = require("../models/items")
+const { vmfStatsCache } = require("../utils/vmfParser")
+
+function register(ipcMain, mainWindow) {
+    // Open item editor
+    // Note: Frontend passes item directly (not wrapped in object)
+    ipcMain.handle("open-item-editor", async (event, item) => {
+        try {
+            // Find the actual Item instance from the packages
+            const actualItem = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === item.id)
+            if (!actualItem) {
+                throw new Error(`Item not found: ${item.id}`)
+            }
+            createItemEditor(actualItem, mainWindow)
+            return { success: true }
+        } catch (error) {
+            console.error("Failed to open item editor:", error)
+            throw error
+        }
+    })
+
+    // Open create item window
+    ipcMain.handle("open-create-item-window", async () => {
+        try {
+            createItemCreationWindow(mainWindow)
+            return { success: true }
+        } catch (error) {
+            console.error("Failed to open item creation window:", error)
+            throw error
+        }
+    })
+
+    // Create item (full)
+    ipcMain.handle(
+        "create-item",
+        async (
+            event,
+            { name, description, author, iconPath, instances },
+        ) => {
+            try {
+                // Validate required fields
+                if (!name?.trim()) {
+                    throw new Error("Item name is required")
+                }
+                if (!author?.trim()) {
+                    throw new Error("Author name is required")
+                }
+                if (!instances || instances.length === 0) {
+                    throw new Error("At least one instance is required")
+                }
+
+                const currentPackageDir = getCurrentPackageDir()
+                if (!currentPackageDir) {
+                    throw new Error(
+                        "No package is currently loaded. Please create or open a package first.",
+                    )
+                }
+
+                const packagePath = currentPackageDir
+
+                // Generate a unique item ID
+                const sanitizedName = name
+                    .replace(/[^a-zA-Z0-9]/g, "")
+                    .toLowerCase()
+                const sanitizedAuthor = author
+                    .replace(/[^a-zA-Z0-9]/g, "")
+                    .toLowerCase()
+                const uuid = crypto
+                    .randomBytes(2)
+                    .toString("hex")
+                    .toUpperCase()
+
+                let itemId = `bpee_${sanitizedName}_${sanitizedAuthor}_${uuid}`
+
+                // Check for collisions and regenerate UUID if needed
+                const existingItems = packages.flatMap((p) => p.items)
+                let attempts = 0
+                while (
+                    existingItems.some((i) => i.id === itemId) &&
+                    attempts < 10
+                ) {
+                    const newUuid = crypto
+                        .randomBytes(2)
+                        .toString("hex")
+                        .toUpperCase()
+                    itemId = `bpee_${sanitizedName}_${sanitizedAuthor}_${newUuid}`
+                    attempts++
+                }
+
+                if (attempts >= 10) {
+                    throw new Error(
+                        "Failed to generate unique item ID after multiple attempts",
+                    )
+                }
+
+                // Create item folder
+                const itemFolder = `${sanitizedName}_${sanitizedAuthor}`
+                const itemFolderPath = path.join(
+                    packagePath,
+                    "items",
+                    itemFolder,
+                )
+                if (!fs.existsSync(itemFolderPath)) {
+                    fs.mkdirSync(itemFolderPath, { recursive: true })
+                }
+
+                // Create editoritems.json
+                const editoritems = {
+                    Item: {
+                        Type: "ITEM_CUBE",
+                        ItemClass: "BEE2",
+                        SubtypeProperty: null,
+                        Editor: {
+                            SubType: {
+                                Name: name,
+                                Palette: {
+                                    Tooltip: description || "",
+                                    Position: "0 0 0",
+                                },
+                            },
+                        },
+                        Exporting: {
+                            TargetName: itemId,
+                            Instances: {},
+                        },
+                    },
+                }
+
+                // Process instances
+                const instanceDir = path.join(
+                    packagePath,
+                    "resources",
+                    "instances",
+                    "bpee",
+                    itemId,
+                )
+                if (!fs.existsSync(instanceDir)) {
+                    fs.mkdirSync(instanceDir, { recursive: true })
+                }
+
+                for (let index = 0; index < instances.length; index++) {
+                    const instancePath = instances[index]
+
+                    // Copy instance file if it exists
+                    if (fs.existsSync(instancePath)) {
+                        const instanceFileName =
+                            index === 0
+                                ? "instance.vmf"
+                                : `instance_${index}.vmf`
+                        const targetPath = path.join(
+                            instanceDir,
+                            instanceFileName,
+                        )
+                        fs.copyFileSync(instancePath, targetPath)
+                    }
+
+                    // Add to editoritems - use relative path with BEE2 prefix
+                    const instanceFileName =
+                        index === 0 ? "instance.vmf" : `instance_${index}.vmf`
+                    const vmfStats = vmfStatsCache.getStats(
+                        path.join(instanceDir, instanceFileName),
+                    )
+
+                    editoritems.Item.Exporting.Instances[index.toString()] = {
+                        Name: `instances/BEE2/bpee/${itemId}/${instanceFileName}`,
+                        EntityCount: vmfStats.EntityCount || 0,
+                        BrushCount: vmfStats.BrushCount || 0,
+                        BrushSideCount: vmfStats.BrushSideCount || 0,
+                    }
+                }
+
+                // Write editoritems.json
+                fs.writeFileSync(
+                    path.join(itemFolderPath, "editoritems.json"),
+                    JSON.stringify(editoritems, null, 2),
+                )
+
+                // Create properties.json
+                const properties = {
+                    Properties: {
+                        Author: author,
+                    },
+                }
+                fs.writeFileSync(
+                    path.join(itemFolderPath, "properties.json"),
+                    JSON.stringify(properties, null, 2),
+                )
+
+                // Copy icon if provided
+                if (iconPath && fs.existsSync(iconPath)) {
+                    // Read package info to get ID
+                    const infoPath = path.join(packagePath, "info.json")
+                    const packageInfo = JSON.parse(
+                        fs.readFileSync(infoPath, "utf-8"),
+                    )
+                    const packageId =
+                        packageInfo.ID ||
+                        packageInfo.id ||
+                        path.basename(packagePath)
+
+                    const iconDir = path.join(
+                        packagePath,
+                        "resources",
+                        "BEE2",
+                        "items",
+                        packageId,
+                    )
+                    if (!fs.existsSync(iconDir)) {
+                        fs.mkdirSync(iconDir, { recursive: true })
+                    }
+                    const iconExtension = path.extname(iconPath)
+                    const iconFileName = `${sanitizedName}${iconExtension}`
+                    const targetIconPath = path.join(iconDir, iconFileName)
+                    fs.copyFileSync(iconPath, targetIconPath)
+
+                    // Update properties.json with icon path
+                    properties.Properties.Icon = {
+                        0: `${packageId}/${iconFileName}`,
+                    }
+                    fs.writeFileSync(
+                        path.join(itemFolderPath, "properties.json"),
+                        JSON.stringify(properties, null, 2),
+                    )
+                }
+
+                // Update package info.json
+                const infoPath = path.join(packagePath, "info.json")
+                const packageInfo = JSON.parse(
+                    fs.readFileSync(infoPath, "utf-8"),
+                )
+
+                // Ensure Item array exists
+                if (!packageInfo.Item) {
+                    packageInfo.Item = []
+                } else if (!Array.isArray(packageInfo.Item)) {
+                    packageInfo.Item = [packageInfo.Item]
+                }
+
+                // Add new item entry
+                packageInfo.Item.push({
+                    ID: itemId,
+                    Version: {
+                        Styles: {
+                            BEE2_CLEAN: itemFolder,
+                        },
+                    },
+                })
+
+                fs.writeFileSync(
+                    infoPath,
+                    JSON.stringify(packageInfo, null, 2),
+                )
+
+                // Create item instance and add to package
+                const itemJSON = {
+                    ID: itemId,
+                    Version: {
+                        Styles: {
+                            BEE2_CLEAN: itemFolder,
+                        },
+                    },
+                }
+
+                const newItem = new Item({ packagePath, itemJSON })
+                const pkg = packages.find((p) => p.packagePath === packagePath)
+                if (pkg) {
+                    pkg.items.push(newItem)
+                }
+
+                // Send package loaded event to refresh UI
+                mainWindow.webContents.send(
+                    "package:loaded",
+                    packages
+                        .flatMap((p) => p.items)
+                        .map((i) => i.toJSONWithExistence()),
+                )
+
+                // Close the creation window
+                const createWindow = getCreateItemWindow()
+                if (createWindow && !createWindow.isDestroyed()) {
+                    createWindow.close()
+                }
+
+                return { success: true, itemId }
+            } catch (error) {
+                console.error("Failed to create item:", error)
+                dialog.showErrorBox(
+                    "Failed to Create Item",
+                    error.message || "An unknown error occurred",
+                )
+                return { success: false, error: error.message }
+            }
+        },
+    )
+
+    // Create item (simplified)
+    ipcMain.handle(
+        "create-item-simple",
+        async (event, { name, description, author }) => {
+            try {
+                if (!name?.trim()) {
+                    throw new Error("Item name is required")
+                }
+
+                const currentPackageDir = getCurrentPackageDir()
+                if (!currentPackageDir) {
+                    throw new Error("No package is currently loaded")
+                }
+
+                const packagePath = currentPackageDir
+                const sanitizedName = name
+                    .replace(/[^a-zA-Z0-9]/g, "")
+                    .toLowerCase()
+                const sanitizedAuthor = (author || "unknown")
+                    .replace(/[^a-zA-Z0-9]/g, "")
+                    .toLowerCase()
+                const uuid = crypto
+                    .randomBytes(2)
+                    .toString("hex")
+                    .toUpperCase()
+
+                const itemId = `bpee_${sanitizedName}_${sanitizedAuthor}_${uuid}`
+                const itemFolder = `${sanitizedName}_${sanitizedAuthor}`
+                const itemFolderPath = path.join(
+                    packagePath,
+                    "items",
+                    itemFolder,
+                )
+
+                fs.mkdirSync(itemFolderPath, { recursive: true })
+
+                // Create minimal editoritems.json
+                const editoritems = {
+                    Item: {
+                        Type: "ITEM_CUBE",
+                        ItemClass: "BEE2",
+                        Editor: {
+                            SubType: {
+                                Name: name,
+                                Palette: {
+                                    Tooltip: description || "",
+                                },
+                            },
+                        },
+                        Exporting: {
+                            TargetName: itemId,
+                            Instances: {},
+                        },
+                    },
+                }
+
+                fs.writeFileSync(
+                    path.join(itemFolderPath, "editoritems.json"),
+                    JSON.stringify(editoritems, null, 2),
+                )
+
+                // Create properties.json
+                const properties = {
+                    Properties: {
+                        Author: author || "Unknown",
+                    },
+                }
+                fs.writeFileSync(
+                    path.join(itemFolderPath, "properties.json"),
+                    JSON.stringify(properties, null, 2),
+                )
+
+                // Update package info.json
+                const infoPath = path.join(packagePath, "info.json")
+                const packageInfo = JSON.parse(
+                    fs.readFileSync(infoPath, "utf-8"),
+                )
+
+                if (!packageInfo.Item) {
+                    packageInfo.Item = []
+                } else if (!Array.isArray(packageInfo.Item)) {
+                    packageInfo.Item = [packageInfo.Item]
+                }
+
+                packageInfo.Item.push({
+                    ID: itemId,
+                    Version: {
+                        Styles: {
+                            BEE2_CLEAN: itemFolder,
+                        },
+                    },
+                })
+
+                fs.writeFileSync(
+                    infoPath,
+                    JSON.stringify(packageInfo, null, 2),
+                )
+
+                // Create item instance
+                const itemJSON = {
+                    ID: itemId,
+                    Version: {
+                        Styles: {
+                            BEE2_CLEAN: itemFolder,
+                        },
+                    },
+                }
+
+                const newItem = new Item({ packagePath, itemJSON })
+                const pkg = packages.find((p) => p.packagePath === packagePath)
+                if (pkg) {
+                    pkg.items.push(newItem)
+                }
+
+                // Send update
+                mainWindow.webContents.send(
+                    "package:loaded",
+                    packages
+                        .flatMap((p) => p.items)
+                        .map((i) => i.toJSONWithExistence()),
+                )
+
+                return { success: true, itemId }
+            } catch (error) {
+                console.error("Failed to create item:", error)
+                return { success: false, error: error.message }
+            }
+        },
+    )
+
+    // Delete item
+    ipcMain.handle("delete-item", async (event, { itemId }) => {
+        try {
+            // Find the item
+            let targetItem = null
+            let targetPackage = null
+
+            for (const pkg of packages) {
+                const item = pkg.items.find((i) => i.id === itemId)
+                if (item) {
+                    targetItem = item
+                    targetPackage = pkg
+                    break
+                }
+            }
+
+            if (!targetItem) {
+                throw new Error("Item not found")
+            }
+
+            const packagePath = targetItem.packagePath
+
+            // Delete item folder
+            if (
+                targetItem.fullItemPath &&
+                fs.existsSync(targetItem.fullItemPath)
+            ) {
+                fs.rmSync(targetItem.fullItemPath, {
+                    recursive: true,
+                    force: true,
+                })
+            }
+
+            // Delete instance files
+            const instanceDir = path.join(
+                packagePath,
+                "resources",
+                "instances",
+                "bpee",
+                itemId,
+            )
+            if (fs.existsSync(instanceDir)) {
+                fs.rmSync(instanceDir, { recursive: true, force: true })
+            }
+
+            // Delete icon files
+            if (targetItem.icon && fs.existsSync(targetItem.icon)) {
+                fs.unlinkSync(targetItem.icon)
+            }
+
+            // Also delete palette icon if it exists
+            const paletteIconDir = path.join(
+                packagePath,
+                "resources",
+                "materials",
+                "models",
+                "props_map_editor",
+                "palette",
+                "bpee",
+                "item",
+            )
+            if (fs.existsSync(paletteIconDir)) {
+                fs.rmSync(paletteIconDir, { recursive: true, force: true })
+            }
+
+            // Update package info.json
+            const infoPath = path.join(packagePath, "info.json")
+            const packageInfo = JSON.parse(fs.readFileSync(infoPath, "utf-8"))
+
+            if (packageInfo.Item) {
+                if (Array.isArray(packageInfo.Item)) {
+                    packageInfo.Item = packageInfo.Item.filter(
+                        (item) => item.ID !== itemId,
+                    )
+                } else if (packageInfo.Item.ID === itemId) {
+                    delete packageInfo.Item
+                }
+            }
+
+            fs.writeFileSync(infoPath, JSON.stringify(packageInfo, null, 2))
+
+            // Remove from in-memory package
+            if (targetPackage) {
+                targetPackage.items = targetPackage.items.filter(
+                    (i) => i.id !== itemId,
+                )
+            }
+
+            // Send update
+            mainWindow.webContents.send(
+                "package:loaded",
+                packages
+                    .flatMap((p) => p.items)
+                    .map((i) => i.toJSONWithExistence()),
+            )
+
+            return { success: true }
+        } catch (error) {
+            console.error("Failed to delete item:", error)
+            dialog.showErrorBox("Failed to Delete Item", error.message)
+            return { success: false, error: error.message }
+        }
+    })
+}
+
+module.exports = { register }

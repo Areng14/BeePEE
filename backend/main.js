@@ -7,7 +7,7 @@ const { WindowTitleManager } = require("./windowTitleManager.js")
 const { setMainWindow, clearPackagesDirectory } = require("./packageManager.js")
 const { logger, initializeLogger } = require("./utils/logger.js")
 const { ensurePackagesDir, getPackagesDir } = require("./utils/packagesDir.js")
-const isDev = require("./utils/isDev.js")
+const { isDev } = require("./utils/isDev.js")
 const { AutoUpdater } = require("./autoUpdater.js")
 
 // Store reference to main window for file association handling

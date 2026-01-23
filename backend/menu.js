@@ -16,7 +16,7 @@ const {
     createPackageInformationWindow,
     createChangelogWindow,
 } = require("./items/itemEditor")
-const isDev = require("./utils/isDev.js")
+const { isDev } = require("./utils/isDev.js")
 const { ensurePackagesDir } = require("./utils/packagesDir")
 
 // Track last saved .bpee path in memory

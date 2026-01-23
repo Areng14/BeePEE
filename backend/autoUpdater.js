@@ -1,6 +1,6 @@
 const { dialog } = require("electron")
 const { logger } = require("./utils/logger")
-const isDev = require("./utils/isDev")
+const { isDev } = require("./utils/isDev")
 
 // Lazy-load autoUpdater to avoid accessing app before it's ready
 let _autoUpdater = null

@@ -9,7 +9,16 @@
       "Bash(cat:*)",
       "Read(//c/Program Files \\(x86\\)/Steam/steamapps/common/Portal 2/Hammer/**)",
       "Bash(findstr:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd JRE auto-download and fix VMF2OBJ resource path handling\n\n- Auto-download Eclipse Temurin JRE 17 if bundled JRE is missing\n- Add adm-zip dependency for zip extraction\n- Filter resource paths to only include VPK files and folders with materials/models\n- Document VMF2OBJ known bug with extension-less files in CLAUDE.md\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nAdd JRE auto-download and fix VMF2OBJ resource path handling\n\n- Auto-download Eclipse Temurin JRE 17 if bundled JRE is missing\n- Add adm-zip dependency for zip extraction\n- Filter resource paths to only include VPK files and folders with materials/models\n- Document VMF2OBJ known bug with extension-less files in CLAUDE.md\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(npm audit:*)",
+      "Bash(wc:*)",
+      "Bash(node -e:*)",
+      "Bash(npx electron .)",
+      "Bash(npx electron:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(.node_modules.binelectron test-electron.js)",
+      "Bash(./node_modules/.bin/electron:*)",
+      "Bash(\"c:\\\\Users\\\\ADMIN\\\\Dropbox\\\\My PC \\(DESKTOP-FBEPBG2\\)\\\\Documents\\\\projects\\\\BeePEE\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\" --version)"
     ],
     "deny": [],
     "ask": [],

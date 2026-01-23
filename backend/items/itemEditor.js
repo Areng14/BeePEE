@@ -5,7 +5,7 @@ let packageInformationWindow = null // Track the package information window
 let changelogWindow = null // Track the changelog window
 const { BrowserWindow, app } = require("electron")
 const path = require("path")
-const isDev = require("../utils/isDev.js")
+const { isDev } = require("../utils/isDev.js")
 
 function createItemEditor(item, mainWindow) {
     if (openEditors.has(item.id)) {
