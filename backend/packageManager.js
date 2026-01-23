@@ -13,7 +13,8 @@ const { getPackagesDir, ensurePackagesDir } = require("./utils/packagesDir")
 
 // Fix 7zip-bin path for packaged app
 // When app is packaged, use extraResources directory
-if (app.isPackaged) {
+// Use try-catch to handle case where app isn't ready yet (during module loading)
+if (app && app.isPackaged) {
     const resourcesPath = process.resourcesPath
     const platform = process.platform
     const arch = process.arch
@@ -77,6 +78,42 @@ function sendProgressUpdate(progress, message, error = null) {
             message,
             error,
         })
+    }
+}
+
+// Helper function to remove directory with retry logic (handles Windows/Dropbox file locking)
+async function removeDirectoryWithRetry(dirPath, maxRetries = 5, delayMs = 1000) {
+    const retryableCodes = ['ENOTEMPTY', 'EBUSY', 'EPERM', 'EACCES', 'ENOENT']
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            if (!fs.existsSync(dirPath)) {
+                return true // Already gone
+            }
+            fs.rmSync(dirPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+            return true
+        } catch (error) {
+            if (retryableCodes.includes(error.code)) {
+                if (attempt < maxRetries) {
+                    console.log(`Directory removal attempt ${attempt}/${maxRetries} failed (${error.code}), retrying in ${delayMs}ms...`)
+                    await new Promise(resolve => setTimeout(resolve, delayMs))
+                    delayMs = Math.min(delayMs * 1.5, 5000) // Exponential backoff, max 5s
+                } else {
+                    console.error(`Failed to remove directory after ${maxRetries} attempts:`, error.message)
+                    // Last resort: try renaming the directory to a temp name
+                    try {
+                        const tempPath = dirPath + '_old_' + Date.now()
+                        fs.renameSync(dirPath, tempPath)
+                        console.log(`Renamed problematic directory to: ${tempPath}`)
+                        return true
+                    } catch (renameError) {
+                        console.error('Rename fallback also failed:', renameError.message)
+                        throw error
+                    }
+                }
+            } else {
+                throw error
+            }
+        }
     }
 }
 
@@ -675,7 +712,7 @@ const unloadPackage = async (packageName, remove = false) => {
             const pkg = packages[index]
             // Delete the extracted files if remove is true
             if (pkg.packageDir && fs.existsSync(pkg.packageDir)) {
-                fs.rmSync(pkg.packageDir, { recursive: true, force: true })
+                await removeDirectoryWithRetry(pkg.packageDir)
             }
         }
         return packages.splice(index, 1)[0]
@@ -689,6 +726,7 @@ const extractPackage = async (pathToPackage, packageDir) => {
     const stream = extractFull(pathToPackage, packageDir, {
         $bin: path7za,
         recursive: true,
+        overwrite: 'a', // Overwrite all existing files without prompt
     })
 
     // Log extraction progress
@@ -746,7 +784,7 @@ const importPackage = async (pathToPackage) => {
             // Packages directory should already be initialized at app startup
             ensurePackagesDir()
 
-            // Extract package - wipe existing directory first
+            // Try to wipe existing directory first, but don't fail if locked
             if (fs.existsSync(tempPkg.packageDir)) {
                 const stat = fs.statSync(tempPkg.packageDir)
                 if (stat.isDirectory()) {
@@ -754,10 +792,18 @@ const importPackage = async (pathToPackage) => {
                         "Removing existing package directory:",
                         tempPkg.packageDir,
                     )
-                    fs.rmSync(tempPkg.packageDir, { recursive: true, force: true })
-                    console.log(
-                        "Wiped existing package directory before import extraction",
-                    )
+                    try {
+                        await removeDirectoryWithRetry(tempPkg.packageDir)
+                        console.log(
+                            "Wiped existing package directory before import extraction",
+                        )
+                    } catch (deleteError) {
+                        console.warn(
+                            "Could not delete existing directory (files may be locked):",
+                            deleteError.message,
+                        )
+                        console.log("Will extract over existing directory instead...")
+                    }
                 } else {
                     // If it's a file, remove it
                     fs.unlinkSync(tempPkg.packageDir)
@@ -862,12 +908,21 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
                     sendProgressUpdate(10, "Preparing package directory...")
                 }
 
-                // Always extract fresh - wipe existing directory first
+                // Try to wipe existing directory first, but don't fail if it can't be deleted
+                // (Dropbox/antivirus may lock files - 7zip can still overwrite)
                 if (fs.existsSync(packageDir)) {
-                    fs.rmSync(packageDir, { recursive: true, force: true })
-                    console.log(
-                        "Wiped existing package directory before extraction",
-                    )
+                    try {
+                        await removeDirectoryWithRetry(packageDir)
+                        console.log(
+                            "Wiped existing package directory before extraction",
+                        )
+                    } catch (deleteError) {
+                        console.warn(
+                            "Could not delete existing directory (files may be locked by Dropbox/antivirus):",
+                            deleteError.message,
+                        )
+                        console.log("Will extract over existing directory instead...")
+                    }
                 }
                 fs.mkdirSync(packageDir, { recursive: true })
 

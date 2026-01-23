@@ -1,7 +1,7 @@
 const { app } = require("electron")
 const path = require("path")
 const fs = require("fs")
-const isDev = require("./isDev.js")
+const { isDev } = require("./isDev.js")
 
 /**
  * Gets the packages directory path.

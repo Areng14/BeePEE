@@ -4,7 +4,7 @@ const path = require("path")
 const { exec } = require("child_process")
 const { promisify } = require("util")
 const { app } = require("electron")
-const isDev = require("./isDev.js")
+const { isDev } = require("./isDev.js")
 
 const execAsync = promisify(exec)
 

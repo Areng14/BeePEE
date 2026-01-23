@@ -7,7 +7,7 @@ const { app } = require("electron")
 const sharp = require("sharp")
 const { findPortal2Resources } = require("../data")
 const { convertImageToVTF } = require("./vtfConverter")
-const isDev = require("./isDev.js")
+const { isDev } = require("./isDev.js")
 
 const execAsync = promisify(exec)
 

@@ -1,0 +1,90 @@
+/**
+ * Basic application handlers - file dialogs, app info, package status
+ */
+
+const { dialog, app } = require("electron")
+const fs = require("fs")
+const { packages, loadPackage, getCurrentPackageDir } = require("../packageManager")
+
+function register(ipcMain, mainWindow) {
+    // Show open dialog
+    ipcMain.handle("show-open-dialog", async (event, options) => {
+        return dialog.showOpenDialog(mainWindow, options)
+    })
+
+    // Check if file exists
+    // Note: Frontend may pass filePath directly or wrapped in object
+    ipcMain.handle("check-file-exists", async (event, arg) => {
+        try {
+            // Support both formats: direct filePath string or { filePath } object
+            const filePath = typeof arg === 'string' ? arg : arg?.filePath
+            return fs.existsSync(filePath)
+        } catch (error) {
+            console.error("Error checking file existence:", error)
+            return false
+        }
+    })
+
+    // Get app version
+    ipcMain.handle("get-app-version", () => {
+        return app.getVersion()
+    })
+
+    // Set unsaved changes indicator
+    // Note: Frontend passes hasChanges directly (not wrapped in object)
+    ipcMain.handle("set-unsaved-changes", async (event, hasChanges) => {
+        if (global.titleManager) {
+            global.titleManager.setUnsavedChanges(hasChanges)
+        }
+        return { success: true }
+    })
+
+    // Reload package from disk
+    ipcMain.handle("reload-package", async () => {
+        try {
+            const currentPackageDir = getCurrentPackageDir()
+            if (!currentPackageDir) {
+                return { success: false, error: "No package loaded" }
+            }
+
+            const infoPath = require("path").join(currentPackageDir, "info.json")
+            const pkg = await loadPackage(infoPath)
+
+            // Send updated items to main window
+            mainWindow.webContents.send(
+                "package:loaded",
+                pkg.items.map((item) => item.toJSONWithExistence()),
+            )
+
+            return { success: true }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Check if package is loaded
+    // Note: Returns boolean for compatibility with old code
+    ipcMain.handle("check-package-loaded", async () => {
+        const currentPackageDir = getCurrentPackageDir()
+        return !!currentPackageDir
+    })
+
+    // Get current items
+    // Note: Returns array directly for compatibility with old code
+    ipcMain.handle("get-current-items", async () => {
+        try {
+            if (packages.length === 0) {
+                return []
+            }
+            const currentPackage = packages[0]
+            return currentPackage.items.map((item) =>
+                item.toJSONWithExistence(),
+            )
+        } catch (error) {
+            console.error("Failed to get current items:", error)
+            return []
+        }
+    })
+}
+
+module.exports = { register }
