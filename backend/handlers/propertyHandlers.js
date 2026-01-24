@@ -146,6 +146,10 @@ function register(ipcMain, mainWindow) {
             if (!item) throw new Error("Item not found")
 
             const allEntities = {}
+            const validationIssues = {
+                unnamedEntities: [],
+                invalidNames: [],
+            }
 
             // Get entities from all valid instances only
             for (const [instanceIndex, instanceData] of Object.entries(
@@ -160,10 +164,62 @@ function register(ipcMain, mainWindow) {
                 if (instance) {
                     const entities = instance.getAllEntities()
                     Object.assign(allEntities, entities)
+
+                    // Get validation issues for this instance
+                    const issues = instance.getEntityValidationIssues()
+                    // Add instance index to each issue for context
+                    issues.unnamedEntities.forEach((e) => {
+                        e.instanceIndex = instanceIndex
+                        validationIssues.unnamedEntities.push(e)
+                    })
+                    issues.invalidNames.forEach((e) => {
+                        e.instanceIndex = instanceIndex
+                        validationIssues.invalidNames.push(e)
+                    })
                 }
             }
 
-            return { success: true, entities: allEntities }
+            return {
+                success: true,
+                entities: allEntities,
+                validationIssues,
+            }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Fix entity names with spaces in VMF files
+    ipcMain.handle("fix-entity-names", async (event, { itemId }) => {
+        try {
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+
+            let totalFixed = 0
+
+            // Fix entity names in all valid instances
+            for (const [instanceIndex, instanceData] of Object.entries(
+                item.instances,
+            )) {
+                if (!item.instanceExists(instanceIndex)) {
+                    continue
+                }
+
+                const instance = item.getInstance(instanceIndex)
+                if (instance) {
+                    const result = instance.fixEntityNames()
+                    if (result.modified) {
+                        totalFixed++
+                    }
+                }
+            }
+
+            return {
+                success: true,
+                fixedInstances: totalFixed,
+            }
         } catch (error) {
             return { success: false, error: error.message }
         }

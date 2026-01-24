@@ -7,6 +7,7 @@ import CreatePackagePage from "./pages/CreatePackagePage"
 import PackageInformationPage from "./pages/PackageInformationPage"
 import ChangelogPage from "./pages/ChangelogPage"
 import WelcomePage from "./pages/WelcomePage"
+import ModelPreviewPage from "./pages/ModelPreviewPage"
 import LoadingPopup from "./components/LoadingPopup"
 import UpdateNotification from "./components/UpdateNotification"
 import { ItemProvider } from "./contexts/ItemContext"
@@ -21,6 +22,7 @@ function App() {
     const showCreatePackage = routeParam === "create-package"
     const showPackageInformation = routeParam === "package-information"
     const showChangelog = routeParam === "changelog"
+    const showModelPreview = routeParam === "model-preview"
     const [packageLoaded, setPackageLoaded] = useState(false)
     const [loadingState, setLoadingState] = useState({
         open: false,
@@ -100,6 +102,9 @@ function App() {
             ) : showChangelog ? (
                 // Show ChangelogPage directly for production windows
                 <ChangelogPage />
+            ) : showModelPreview ? (
+                // Show ModelPreviewPage directly for production windows
+                <ModelPreviewPage />
             ) : (
                 // Use normal routing for main window and development
                 <>
@@ -139,6 +144,10 @@ function App() {
                             <Route
                                 path="/changelog"
                                 element={<ChangelogPage />}
+                            />
+                            <Route
+                                path="/model-preview"
+                                element={<ModelPreviewPage />}
                             />
                         </Routes>
                     </HashRouter>

@@ -16,6 +16,7 @@ import {
     Tabs,
     Tab,
     Alert,
+    AlertTitle,
     Accordion,
     AccordionSummary,
     AccordionDetails,
@@ -25,6 +26,7 @@ import {
     Divider,
     Card,
     CardContent,
+    CircularProgress,
 } from "@mui/material"
 import {
     Edit,
@@ -35,6 +37,8 @@ import {
     ExpandMore,
     EditNote,
     GroupWork,
+    Build,
+    Warning,
 } from "@mui/icons-material"
 import { useState, useEffect } from "react"
 
@@ -678,6 +682,7 @@ function InputOutputConfigDialog({
                             Portal 2 FGD not detected. Entity selector is available, but input/output names must be entered manually.
                         </Alert>
                     )}
+
                     {isInput && (
                         <>
                             <TextField
@@ -2505,6 +2510,12 @@ function Inputs({ item, formData, onUpdateInputs, onUpdateOutputs }) {
     })
     const [deleteItem, setDeleteItem] = useState({ name: "", type: "" })
     const [error, setError] = useState("")
+    const [validationIssues, setValidationIssues] = useState({
+        unnamedEntities: [],
+        invalidNames: [],
+    })
+    const [fixingNames, setFixingNames] = useState(false)
+    const [loadingValidation, setLoadingValidation] = useState(false)
 
     // Use formData instead of loading from backend
     useEffect(() => {
@@ -2513,6 +2524,44 @@ function Inputs({ item, formData, onUpdateInputs, onUpdateOutputs }) {
             setOutputs(formData.outputs || {})
         }
     }, [formData])
+
+    // Load validation issues when component mounts or item changes
+    useEffect(() => {
+        if (item?.id) {
+            loadValidationIssues()
+        }
+    }, [item?.id, JSON.stringify(item?.instances)])
+
+    const loadValidationIssues = async () => {
+        setLoadingValidation(true)
+        try {
+            const result = await window.package.getItemEntities(item.id)
+            if (result.success && result.validationIssues) {
+                setValidationIssues(result.validationIssues)
+            }
+        } catch (error) {
+            console.error("Failed to load validation issues:", error)
+        } finally {
+            setLoadingValidation(false)
+        }
+    }
+
+    const handleFixEntityNames = async () => {
+        setFixingNames(true)
+        try {
+            const result = await window.package.fixEntityNames(item.id)
+            if (result.success) {
+                // Reload validation issues to refresh
+                await loadValidationIssues()
+            } else {
+                setError(`Failed to fix entity names: ${result.error}`)
+            }
+        } catch (error) {
+            setError(`Failed to fix entity names: ${error.message}`)
+        } finally {
+            setFixingNames(false)
+        }
+    }
 
     const handleAddConfig = (configData) => {
         try {
@@ -2742,6 +2791,65 @@ function Inputs({ item, formData, onUpdateInputs, onUpdateOutputs }) {
                     <Tab label="Output" />
                 </Tooltip>
             </Tabs>
+
+            {/* Validation warnings for entity issues */}
+            {(validationIssues.unnamedEntities.length > 0 || validationIssues.invalidNames.length > 0) && (
+                <Stack spacing={2} sx={{ mb: 2 }}>
+                    {validationIssues.unnamedEntities.length > 0 && (
+                        <Alert severity="warning" icon={<Warning />}>
+                            <AlertTitle>Unnamed Entities Detected</AlertTitle>
+                            <Typography variant="body2" sx={{ mb: 1 }}>
+                                {validationIssues.unnamedEntities.length} entit{validationIssues.unnamedEntities.length === 1 ? 'y' : 'ies'} in your instance{validationIssues.unnamedEntities.length > 1 ? 's' : ''} do not have a targetname.
+                                These entities cannot be used for inputs/outputs.
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}>
+                                {validationIssues.unnamedEntities.map((e, i) => (
+                                    <span key={i}>
+                                        {e.classname} (instance {e.instanceIndex})
+                                        {i < validationIssues.unnamedEntities.length - 1 ? ', ' : ''}
+                                    </span>
+                                ))}
+                            </Typography>
+                            <Typography variant="body2" sx={{ mt: 1 }}>
+                                Open your instance VMF in Hammer and add a targetname to these entities.
+                            </Typography>
+                        </Alert>
+                    )}
+
+                    {validationIssues.invalidNames.length > 0 && (
+                        <Alert
+                            severity="error"
+                            icon={<Warning />}
+                            action={
+                                <Button
+                                    color="inherit"
+                                    size="small"
+                                    startIcon={fixingNames ? <CircularProgress size={16} color="inherit" /> : <Build />}
+                                    onClick={handleFixEntityNames}
+                                    disabled={fixingNames}
+                                >
+                                    {fixingNames ? "Fixing..." : "Fix All"}
+                                </Button>
+                            }
+                        >
+                            <AlertTitle>Invalid Entity Names</AlertTitle>
+                            <Typography variant="body2" sx={{ mb: 1 }}>
+                                {validationIssues.invalidNames.length} entit{validationIssues.invalidNames.length === 1 ? 'y' : 'ies'} ha{validationIssues.invalidNames.length === 1 ? 's' : 've'} spaces in their targetname, which is invalid.
+                            </Typography>
+                            <Box sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}>
+                                {validationIssues.invalidNames.map((e, i) => (
+                                    <Typography key={i} variant="body2" sx={{ fontFamily: "monospace", fontSize: "0.75rem" }}>
+                                        "{e.name}" → "{e.fixedName}"
+                                    </Typography>
+                                ))}
+                            </Box>
+                            <Typography variant="body2" sx={{ mt: 1 }}>
+                                Click "Fix All" to automatically replace spaces with underscores in the VMF files.
+                            </Typography>
+                        </Alert>
+                    )}
+                </Stack>
+            )}
 
             <Box sx={{ display: tabValue === 0 ? "block" : "none" }}>
                 <Stack spacing={2}>

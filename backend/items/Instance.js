@@ -126,6 +126,103 @@ class Instance {
             return {}
         }
     }
+
+    // Get validation issues for entities in this instance
+    getEntityValidationIssues() {
+        try {
+            let vmfContent = fs.readFileSync(this.path, "utf-8")
+            vmfContent = this.cleanVmfContent(vmfContent)
+            const vmfData = vdf.parse(vmfContent)
+
+            const issues = {
+                unnamedEntities: [], // Entities with classname but no targetname
+                invalidNames: [], // Entities with spaces or other invalid chars in name
+            }
+
+            // Recursive function to find all entities and check for issues
+            const findEntitiesRecursive = (obj) => {
+                if (typeof obj !== "object" || obj === null) return
+
+                // Check if this object is an entity (has classname)
+                if (obj.classname) {
+                    // Check for unnamed entity
+                    if (!obj.targetname || obj.targetname.trim() === "") {
+                        issues.unnamedEntities.push({
+                            classname: obj.classname,
+                            id: obj.id || "unknown",
+                        })
+                    } else {
+                        // Check for spaces in name
+                        if (obj.targetname.includes(" ")) {
+                            issues.invalidNames.push({
+                                name: obj.targetname,
+                                classname: obj.classname,
+                                id: obj.id || "unknown",
+                                fixedName: obj.targetname.replace(/ /g, "_"),
+                                issue: "space",
+                            })
+                        }
+                    }
+                    return
+                }
+
+                // Recursively search all properties
+                for (const [key, value] of Object.entries(obj)) {
+                    if (typeof value === "object" && value !== null) {
+                        findEntitiesRecursive(value)
+                    }
+                }
+            }
+
+            findEntitiesRecursive(vmfData)
+
+            return issues
+        } catch (error) {
+            console.error(
+                `Failed to get validation issues for ${this.path}:`,
+                error.message,
+            )
+            return { unnamedEntities: [], invalidNames: [] }
+        }
+    }
+
+    // Fix entity names with spaces by replacing them with underscores
+    fixEntityNames() {
+        try {
+            let vmfContent = fs.readFileSync(this.path, "utf-8")
+            let modified = false
+
+            // Find and fix targetnames with spaces using regex
+            // Match "targetname" "value with spaces"
+            const targetNameRegex = /("targetname"\s*")([^"]*\s[^"]*)(")/g
+            vmfContent = vmfContent.replace(
+                targetNameRegex,
+                (match, prefix, name, suffix) => {
+                    const fixedName = name.replace(/ /g, "_")
+                    if (fixedName !== name) {
+                        modified = true
+                        console.log(
+                            `Fixed entity name: "${name}" -> "${fixedName}"`,
+                        )
+                    }
+                    return prefix + fixedName + suffix
+                },
+            )
+
+            if (modified) {
+                fs.writeFileSync(this.path, vmfContent, "utf-8")
+                return { success: true, modified: true }
+            }
+
+            return { success: true, modified: false }
+        } catch (error) {
+            console.error(
+                `Failed to fix entity names in ${this.path}:`,
+                error.message,
+            )
+            return { success: false, error: error.message }
+        }
+    }
 }
 
 module.exports = { Instance }

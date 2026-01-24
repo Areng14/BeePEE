@@ -338,9 +338,12 @@ async function mergeVMFsIntoGrid(vmfFiles, outputPath, options = {}) {
  * @param {Array} gridLayout - Grid layout info from mergeVMFsIntoGrid
  * @param {string} outputDir - Directory to save individual OBJs
  * @param {number} cellSize - Size of each grid cell (should match the cellSize from merge)
- * @returns {Promise<Array<{name: string, objPath: string}>>}
+ * @param {Object} options - Additional options
+ * @param {string} options.namePrefix - Prefix for output files (e.g., "itemname" -> "itemname_0.obj")
+ * @returns {Promise<Array<{name: string, objPath: string, index: number}>>}
  */
-async function splitOBJByGrid(objPath, gridLayout, outputDir, cellSize = 256) {
+async function splitOBJByGrid(objPath, gridLayout, outputDir, cellSize = 256, options = {}) {
+    const { namePrefix = null } = options
     console.log(
         `✂️  Splitting combined OBJ into ${gridLayout.length} individual models...`,
     )
@@ -643,7 +646,9 @@ async function splitOBJByGrid(objPath, gridLayout, outputDir, cellSize = 256) {
 
     for (let cellIdx = 0; cellIdx < gridLayout.length; cellIdx++) {
         const cell = gridLayout[cellIdx]
-        console.log(`  ✂️  Extracting ${cell.name}...`)
+        // Use namePrefix_index format if provided, otherwise use cell.name
+        const outputName = namePrefix ? `${namePrefix}_${cellIdx}` : cell.name
+        console.log(`  ✂️  Extracting ${outputName} (from ${cell.name})...`)
 
         // Find all vertices in this cluster
         const cellVertexIndices = []
@@ -673,7 +678,7 @@ async function splitOBJByGrid(objPath, gridLayout, outputDir, cellSize = 256) {
 
         // Build new OBJ content
         const objLines = []
-        const splitMtlName = `${cell.name}.mtl`
+        const splitMtlName = `${outputName}.mtl`
         objLines.push(`mtllib ${splitMtlName}`)
         objLines.push("")
 
@@ -731,12 +736,12 @@ async function splitOBJByGrid(objPath, gridLayout, outputDir, cellSize = 256) {
         }
 
         // Write OBJ file
-        const outputPath = path.join(outputDir, `${cell.name}.obj`)
+        const outputPath = path.join(outputDir, `${outputName}.obj`)
         fs.writeFileSync(outputPath, objLines.join("\n"), "utf-8")
         console.log(`    ✅ Saved: ${outputPath}`)
 
         // Create MTL file for this split model (copy from combined MTL)
-        const splitMtlPath = path.join(outputDir, `${cell.name}.mtl`)
+        const splitMtlPath = path.join(outputDir, `${outputName}.mtl`)
         if (mtlLib) {
             const combinedMtlFile = mtlLib.replace("mtllib ", "").trim()
             const combinedMtlPath = path.join(
@@ -746,7 +751,7 @@ async function splitOBJByGrid(objPath, gridLayout, outputDir, cellSize = 256) {
 
             if (fs.existsSync(combinedMtlPath)) {
                 fs.copyFileSync(combinedMtlPath, splitMtlPath)
-                console.log(`    ✅ Copied MTL: ${cell.name}.mtl`)
+                console.log(`    ✅ Copied MTL: ${outputName}.mtl`)
             } else {
                 console.warn(
                     `    ⚠️  Combined MTL not found: ${combinedMtlPath}`,
@@ -755,8 +760,11 @@ async function splitOBJByGrid(objPath, gridLayout, outputDir, cellSize = 256) {
         }
 
         results.push({
-            name: cell.name,
+            name: outputName,
+            originalName: cell.name,
             objPath: outputPath,
+            mtlPath: splitMtlPath,
+            index: cellIdx,
         })
     }
 

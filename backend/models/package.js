@@ -59,7 +59,7 @@ class Package {
 
             // Set importedVersion for items that don't have it (for imported packages)
             try {
-                const packageJson = require("../package.json")
+                const packageJson = require("../../package.json")
                 const appVersion = packageJson.version
                 if (appVersion) {
                     for (const item of this.items) {

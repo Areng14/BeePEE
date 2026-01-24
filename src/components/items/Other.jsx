@@ -14,6 +14,8 @@ import {
     Autocomplete,
     Collapse,
     Divider,
+    Checkbox,
+    FormControlLabel,
 } from "@mui/material"
 import {
     Preview,
@@ -41,6 +43,7 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
     const [vbspVariables, setVbspVariables] = useState([])
     const [portal2Status, setPortal2Status] = useState(null)
     const [objFileExists, setObjFileExists] = useState(false)
+    const [skipCartoonify, setSkipCartoonify] = useState(false)
 
     // Check Portal 2 installation status on mount
     useEffect(() => {
@@ -153,38 +156,37 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
         }
     }, [formData?.modelName, objFileExists])
 
-    // Check if OBJ file exists for preview
+    // Check if OBJ files exist for preview using listModelSegments
     useEffect(() => {
         const checkObjExists = async () => {
-            const objPath = getObjPath()
-            if (!objPath) {
+            if (!item?.id) {
                 setObjFileExists(false)
                 return
             }
 
             try {
-                // Check if directory exists and contains OBJ files
-                const exists = await window.electron.invoke('check-file-exists', objPath)
-                setObjFileExists(exists)
+                // Use listModelSegments to check if any OBJ files exist
+                const result = await window.package?.listModelSegments?.(item.id)
+                setObjFileExists(result?.success && result.segments?.length > 0)
             } catch (error) {
-                console.error('Failed to check OBJ file existence:', error)
+                console.error('Failed to check model segments:', error)
                 setObjFileExists(false)
             }
         }
 
         checkObjExists()
-    }, [item?.packagePath, item?.id, isConverting, formData?.modelName])
+    }, [item?.id, isConverting, formData?.modelName])
 
     // Get the expected OBJ file path for the model
-    // After multi-model generation, files are named after instance names (e.g., half_glass_0.obj)
-    // Just return the .bpee/tempmdl directory - backend will find the first OBJ file
+    // Models are stored persistently in .bpee/{itemName}/models/
     const getObjPath = () => {
         if (!item?.id || !item?.packagePath) return null
 
-        const tempDir = `${item.packagePath}/.bpee/tempmdl`
+        const itemName = item.id.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase()
+        const modelsDir = `${item.packagePath}/.bpee/${itemName}/models`
 
-        // Return directory path - backend will find first OBJ file
-        return tempDir
+        // Return directory path - backend will find OBJ files
+        return modelsDir
     }
 
     // Get the expected MTL file path for the model
@@ -217,7 +219,7 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
             const result = await window.package.convertInstanceToObj(
                 item.id,
                 selectedInstanceKey, // This is now a variable name, not an instance key
-                { textureStyle: "cartoon", isVariable: true },
+                { textureStyle: skipCartoonify ? "raw" : "cartoon", isVariable: true },
             )
             if (result?.success) {
                 console.log("VMF2OBJ conversion completed successfully")
@@ -272,46 +274,33 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
     }
 
     const handlePreview = async () => {
-        if (!selectedInstanceKey) return
+        if (!selectedInstanceKey || !item?.id) return
 
-        const objPath = getObjPath()
-        const mtlPath = getMtlPath()
+        // Get list of available model segments
+        const segmentsResult = await window.package?.listModelSegments?.(item.id)
 
-        if (!objPath) {
+        if (!segmentsResult?.success || !segmentsResult.segments?.length) {
             await window.electron.showMessageBox({
                 type: 'warning',
-                title: 'Model Not Found',
-                message: 'No OBJ path found. Please generate the model first.',
+                title: 'No Models Found',
+                message: 'No model files found. Please click "Make Model" first to generate the 3D model.',
                 buttons: ['OK']
             })
             return
         }
 
-        // Check if the OBJ file exists
-        try {
-            const stats = await window.package?.getFileStats?.(objPath)
-            if (!stats) {
-                await window.electron.showMessageBox({
-                    type: 'warning',
-                    title: 'Model File Not Found',
-                    message: 'Model file not found. Please click "Make Model" first to generate the 3D model.',
-                    buttons: ['OK']
-                })
-                return
-            }
-        } catch (e) {
-            await window.electron.showMessageBox({
-                type: 'warning',
-                title: 'Model File Not Found',
-                message: 'Model file not found. Please click "Make Model" first to generate the 3D model.',
-                buttons: ['OK']
-            })
-            return
-        }
-
+        const segments = segmentsResult.segments
+        const firstSegment = segments[0]
         const title = `${getInstanceDisplayName() || "Instance"} — ${item?.name || "Model"}`
+
         try {
-            await window.package?.showModelPreview?.(objPath, mtlPath, title)
+            // Pass first segment's path and all segments for dropdown switching
+            await window.package?.showModelPreview?.(
+                firstSegment.path,
+                firstSegment.mtlPath,
+                title,
+                segments
+            )
         } catch (e) {
             console.error("Failed to open model preview:", e)
         }
@@ -436,7 +425,7 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                             <Typography
                                 variant="caption"
                                 color="text.secondary"
-                                sx={{ mb: 1, display: "block" }}>
+                                sx={{ mb: 2, display: "block" }}>
                                 Generates models based on your conditions config. Example:{" "}
                                 <Box component="span" sx={{ fontWeight: 500 }}>
                                     Start Enabled
@@ -475,10 +464,26 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                                 </Select>
                             </FormControl>
                         </Box>
-                        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                        <Stack direction="row" spacing={1} sx={{ mt: 1.5 }} alignItems="center" justifyContent="space-between">
+                            <FormControlLabel
+                                control={
+                                    <Checkbox
+                                        checked={skipCartoonify}
+                                        onChange={(e) => setSkipCartoonify(e.target.checked)}
+                                        size="small"
+                                        sx={{ py: 0, pl: 0.5 }}
+                                    />
+                                }
+                                label={
+                                    <Typography variant="body2" color="text.secondary">
+                                        Use original textures
+                                    </Typography>
+                                }
+                                sx={{ m: 0, ml: -0.5 }}
+                            />
                             {/* If custom bpee/ model exists with OBJ files, Preview becomes primary (large) button */}
                             {formData.modelName && formData.modelName.startsWith('bpee/') && objFileExists ? (
-                                <>
+                                <Stack direction="row" spacing={1}>
                                     <Tooltip
                                         title={
                                             vbspVariables.length === 0
@@ -489,7 +494,7 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                                                     ? "Generate model first"
                                                     : ""
                                         }>
-                                        <span style={{ flexGrow: 1 }}>
+                                        <span>
                                             <Button
                                                 variant="contained"
                                                 onClick={handlePreview}
@@ -499,8 +504,7 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                                                     vbspVariables.length === 0 ||
                                                     !objFileExists
                                                 }
-                                                startIcon={<Preview />}
-                                                fullWidth>
+                                                startIcon={<Preview />}>
                                                 Preview
                                             </Button>
                                         </span>
@@ -524,13 +528,13 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                                                     vbspVariables.length === 0
                                                 }
                                                 sx={{ flexShrink: 0 }}>
-                                                {isConverting ? conversionProgress : "Regenerate"}
+                                                {isConverting ? "Generating..." : "Regenerate"}
                                             </Button>
                                         </span>
                                     </Tooltip>
-                                </>
+                                </Stack>
                             ) : (
-                                <>
+                                <Stack direction="row" spacing={1}>
                                     <Tooltip
                                         title={
                                             vbspVariables.length === 0
@@ -551,8 +555,7 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                                                     vbspVariables.length === 0 ||
                                                     !objFileExists
                                                 }
-                                                startIcon={<Preview />}
-                                                sx={{ flexShrink: 0 }}>
+                                                startIcon={<Preview />}>
                                                 Preview
                                             </Button>
                                         </span>
@@ -565,7 +568,7 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                                                   ? "Portal 2 required"
                                                   : ""
                                         }>
-                                        <span style={{ flexGrow: 1 }}>
+                                        <span>
                                             <Button
                                                 variant="contained"
                                                 onClick={handleMakeModel}
@@ -575,7 +578,6 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                                                     !portal2Status?.features?.modelGeneration ||
                                                     vbspVariables.length === 0
                                                 }
-                                                fullWidth
                                                 startIcon={
                                                     isConverting ? (
                                                         <CircularProgress
@@ -584,22 +586,17 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
                                                         />
                                                     ) : null
                                                 }>
-                                                {isConverting
-                                                    ? conversionProgress || "Converting..."
-                                                    : "Make Model"}
+                                                {isConverting ? "Generating..." : "Make Model"}
                                             </Button>
                                         </span>
                                     </Tooltip>
-                                </>
+                                </Stack>
                             )}
                         </Stack>
                     </Box>
                     <Alert severity="warning" sx={{ mb: 2 , mt: 1}}>
-                        Always view the model after generation. 
+                        Always view the model after generation.
                         Model generation from VMFs are not always accurate.
-                    </Alert>
-                    <Alert severity="warning" sx={{ mb: 2 , mt: 1}}>
-                        You will not be able to preview after you hit save.
                     </Alert>
                 </Collapse>
             </Stack>

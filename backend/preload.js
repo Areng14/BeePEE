@@ -187,8 +187,10 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.invoke("get-file-stats", { filePath }),
     showItemInFolder: (filePath) =>
         ipcRenderer.invoke("show-item-in-folder", { filePath }),
-    showModelPreview: (objPath, mtlPath, title) =>
-        ipcRenderer.invoke("show-model-preview", { objPath, mtlPath, title }),
+    showModelPreview: (objPath, mtlPath, title, segments = null) =>
+        ipcRenderer.invoke("show-model-preview", { objPath, mtlPath, title, segments }),
+    listModelSegments: (itemId) =>
+        ipcRenderer.invoke("list-model-segments", { itemId }),
 
     // ========================================
     // PORTAL 2 DETECTION
@@ -200,6 +202,8 @@ contextBridge.exposeInMainWorld("package", {
     // ========================================
     getItemEntities: (itemId) =>
         ipcRenderer.invoke("get-item-entities", { itemId }),
+    fixEntityNames: (itemId) =>
+        ipcRenderer.invoke("fix-entity-names", { itemId }),
     getValidInstances: (itemId) =>
         ipcRenderer.invoke("get-valid-instances", { itemId }),
     getFgdData: () => ipcRenderer.invoke("get-fgd-data"),
@@ -230,6 +234,14 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.on("package-loading-progress", (event, data) =>
             callback(data),
         ),
+
+    // ========================================
+    // MODEL PREVIEW DATA
+    // ========================================
+    onModelPreviewData: (callback) => {
+        ipcRenderer.removeAllListeners("model-preview-data")
+        ipcRenderer.on("model-preview-data", (event, data) => callback(data))
+    },
 
     // ========================================
     // AUTO-UPDATER FUNCTIONS
