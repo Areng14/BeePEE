@@ -18,7 +18,14 @@
       "Bash(npm uninstall:*)",
       "Bash(.node_modules.binelectron test-electron.js)",
       "Bash(./node_modules/.bin/electron:*)",
-      "Bash(\"c:\\\\Users\\\\ADMIN\\\\Dropbox\\\\My PC \\(DESKTOP-FBEPBG2\\)\\\\Documents\\\\projects\\\\BeePEE\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\" --version)"
+      "Bash(\"c:\\\\Users\\\\ADMIN\\\\Dropbox\\\\My PC \\(DESKTOP-FBEPBG2\\)\\\\Documents\\\\projects\\\\BeePEE\\\\node_modules\\\\electron\\\\dist\\\\electron.exe\" --version)",
+      "Bash(powershell -Command \"[System.IO.File]::ReadAllText\\(''c:\\\\Users\\\\ADMIN\\\\Dropbox\\\\My PC \\(DESKTOP-FBEPBG2\\)\\\\Documents\\\\projects\\\\BeePEE\\\\backend\\\\handlers\\\\shared.js''\\) | Select-String -Pattern ''\\\\\\\\[^\\\\\\\\nr]'' -AllMatches | ForEach-Object { $_Matches.Value } | Select-Object -First 20\")",
+      "Bash(powershell -Command:*)",
+      "Bash(node -c:*)",
+      "Bash(node:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nMove model preview to React component and fix file handle issues\n\n- Migrate 900+ line inline model preview template from shared.js to \n  proper React component \\(ModelPreviewPage.jsx\\) using React Three Fiber\n- Add route handling in App.jsx for model-preview window\n- Add createModelPreviewWindow\\(\\) and closeAllModelPreviewWindows\\(\\) in \n  itemEditor.js following existing window patterns\n- Fix EPERM file handle issues:\n  - Replace net.fetch with fs.promises.readFile in beep:// protocol\n  - Add session.clearCache\\(\\) before closing preview windows\n  - Add clearAllWindowCaches\\(\\) in packageManager before directory deletion\n  - Implement rename-then-delete strategy for locked directories\n  - Add cleanupDeletedDirectories\\(\\) on app startup\n- Add mkdirWithRetry\\(\\) helper with exponential backoff for EPERM/EBUSY\n- Fix grid rendering in model preview using THREE.GridHelper\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": [],
