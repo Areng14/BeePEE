@@ -1,10 +1,10 @@
-const { app, BrowserWindow, ipcMain, protocol, net } = require("electron")
+const { app, BrowserWindow, ipcMain, protocol } = require("electron")
 const path = require("path")
 const { createMainMenu } = require("./menu.js")
 const fs = require("fs")
 const { reg_events } = require("./events.js")
 const { WindowTitleManager } = require("./windowTitleManager.js")
-const { setMainWindow, clearPackagesDirectory } = require("./packageManager.js")
+const { setMainWindow, clearPackagesDirectory, cleanupDeletedDirectories } = require("./packageManager.js")
 const { logger, initializeLogger } = require("./utils/logger.js")
 const { ensurePackagesDir, getPackagesDir } = require("./utils/packagesDir.js")
 const { isDev } = require("./utils/isDev.js")
@@ -142,6 +142,9 @@ app.whenReady().then(async () => {
     // Initialize logger
     initializeLogger()
 
+    // Clean up any leftover renamed directories from previous sessions
+    cleanupDeletedDirectories()
+
     // Check for required Python bin folders
     const missingBins = checkArengBinFolders()
     if (missingBins.length > 0) {
@@ -266,33 +269,9 @@ app.whenReady().then(async () => {
                 })
             }
 
-            // Construct proper file:// URL for net.fetch
-            let fileUrl
-            if (process.platform === "win32") {
-                // Windows: file:///C:/path/to/file
-                fileUrl = `file:///${filePath.replace(/\\/g, "/")}`
-            } else {
-                // Unix-like: file:///path/to/file
-                fileUrl = `file://${filePath}`
-            }
+            logger.debug(`Serving file: ${filePath}`)
 
-            logger.debug(`Serving file: ${filePath} via ${fileUrl}`)
-
-            // Fetch the file
-            const response = await net.fetch(fileUrl)
-
-            // Check if the fetch was successful
-            if (!response.ok) {
-                logger.error(
-                    `Failed to fetch file: ${fileUrl}, status: ${response.status}`,
-                )
-                return new Response(
-                    "Internal Server Error: Failed to read file",
-                    { status: 500 },
-                )
-            }
-
-            // Get file extension and set appropriate MIME type if not already set
+            // Get file extension and set appropriate MIME type
             const ext = path.extname(filePath).toLowerCase()
             const mimeTypes = {
                 ".obj": "text/plain",
@@ -311,21 +290,17 @@ app.whenReady().then(async () => {
                 ".html": "text/html",
             }
 
-            // Clone response to add/modify headers if needed
-            const contentType = response.headers.get("content-type")
-            if (!contentType && mimeTypes[ext]) {
-                const buffer = await response.arrayBuffer()
-                return new Response(buffer, {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers: {
-                        ...Object.fromEntries(response.headers.entries()),
-                        "content-type": mimeTypes[ext],
-                    },
-                })
-            }
+            // Read file directly using fs.readFile instead of net.fetch
+            // This ensures file handles are released immediately after reading
+            const fileBuffer = await fs.promises.readFile(filePath)
 
-            return response
+            return new Response(fileBuffer, {
+                status: 200,
+                headers: {
+                    "content-type": mimeTypes[ext] || "application/octet-stream",
+                    "content-length": fileBuffer.length.toString(),
+                },
+            })
         } catch (error) {
             logger.error("Beep protocol handler error:", error)
             return new Response("Internal Server Error", { status: 500 })
@@ -503,12 +478,18 @@ process.on("unhandledRejection", (reason, promise) => {
     }
 })
 
-// Clean up packages directory when app exits
-app.on("before-quit", async () => {
+// Clean up packages directory when app exits (only in production)
+app.on("before-quit", () => {
     try {
-        logger.info("Cleaning up packages directory...")
-        await clearPackagesDirectory()
-        logger.info("Packages directory cleaned up successfully")
+        // Only clean up packages in production - in dev mode the packages folder
+        // is inside the project and we don't want to delete user's work
+        if (!isDev) {
+            logger.info("Cleaning up packages directory...")
+            clearPackagesDirectory()
+            logger.info("Packages directory cleaned up successfully")
+        } else {
+            logger.info("Skipping packages cleanup in development mode")
+        }
     } catch (error) {
         logger.error("Failed to clean up packages directory:", error.message)
     } finally {

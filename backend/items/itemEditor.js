@@ -1,4 +1,5 @@
 const openEditors = new Map()
+const openModelPreviewWindows = new Map() // Track model preview windows
 let createItemWindow = null // Track the create item window
 let createPackageWindow = null // Track the create package window
 let packageInformationWindow = null // Track the package information window
@@ -239,6 +240,195 @@ function createChangelogWindow(mainWindow) {
     changelogWindow.setMenuBarVisibility(false)
 }
 
+/**
+ * Create a 3D model preview window
+ * @param {object} modelData - Object containing objUrl, mtlUrl, title, and optional segments
+ */
+function createModelPreviewWindow(modelData) {
+    const { objPath, title = "Model Preview" } = modelData
+    const windowKey = objPath || `preview-${Date.now()}`
+
+    // If window already exists for this model, focus it
+    if (openModelPreviewWindows.has(windowKey)) {
+        const existingWindow = openModelPreviewWindows.get(windowKey)
+        if (!existingWindow.isDestroyed()) {
+            existingWindow.focus()
+            return existingWindow
+        }
+        openModelPreviewWindows.delete(windowKey)
+    }
+
+    const previewWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        title,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, "..", "preload.js"),
+            webSecurity: false, // Required for loading local files via beep://
+        },
+        devTools: isDev,
+        skipTaskbar: false,
+        minimizable: true,
+        maximizable: true,
+        resizable: true,
+        autoHideMenuBar: true,
+    })
+
+    openModelPreviewWindows.set(windowKey, previewWindow)
+
+    previewWindow.on("closed", () => {
+        openModelPreviewWindows.delete(windowKey)
+    })
+
+    // Also clean up when window is about to close
+    previewWindow.on("close", () => {
+        try {
+            if (previewWindow.webContents && !previewWindow.webContents.isDestroyed()) {
+                previewWindow.webContents.session.clearStorageData({
+                    storages: ["cachestorage", "filesystem", "indexdb", "localstorage", "shadercache", "websql", "serviceworkers"],
+                })
+            }
+        } catch (e) {
+            // Ignore cleanup errors
+        }
+    })
+
+    if (isDev) {
+        previewWindow.loadURL(`http://localhost:5173/?route=model-preview`)
+    } else {
+        const appPath = app.getAppPath()
+        previewWindow.loadFile(path.join(appPath, "dist", "index.html"), {
+            query: { route: "model-preview" },
+        })
+    }
+
+    previewWindow.setMenuBarVisibility(false)
+
+    // Send model data after the window has finished loading
+    previewWindow.webContents.once("did-finish-load", () => {
+        setTimeout(() => {
+            previewWindow.webContents.send("model-preview-data", modelData)
+        }, 100)
+    })
+
+    return previewWindow
+}
+
+/**
+ * Close all model preview windows to release file handles
+ */
+async function closeAllModelPreviewWindows() {
+    const closePromises = []
+    for (const [key, window] of openModelPreviewWindows) {
+        if (window && !window.isDestroyed()) {
+            // Clear all session caches before closing
+            try {
+                const session = window.webContents.session
+                await session.clearCache()
+                await session.clearStorageData({
+                    storages: ["appcache", "cookies", "filesystem", "indexdb", "localstorage", "shadercache", "websql", "serviceworkers", "cachestorage"],
+                })
+            } catch (e) {
+                // Ignore cleanup errors
+            }
+
+            closePromises.push(
+                new Promise((resolve) => {
+                    window.once("closed", resolve)
+                    window.close()
+                })
+            )
+        } else {
+            openModelPreviewWindows.delete(key)
+        }
+    }
+
+    if (closePromises.length > 0) {
+        await Promise.all(closePromises)
+        // Give more time for file handles to be released after cache clear
+        await new Promise((resolve) => setTimeout(resolve, 500))
+
+        // Force garbage collection if available
+        if (global.gc) {
+            global.gc()
+            await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+    }
+}
+
+/**
+ * Close all item editor windows to release file handles
+ */
+async function closeAllEditorWindows() {
+    const closePromises = []
+    for (const [key, window] of openEditors) {
+        if (window && !window.isDestroyed()) {
+            // Clear all session caches before closing
+            try {
+                const session = window.webContents.session
+                await session.clearCache()
+                await session.clearStorageData({
+                    storages: ["appcache", "cookies", "filesystem", "indexdb", "localstorage", "shadercache", "websql", "serviceworkers", "cachestorage"],
+                })
+            } catch (e) {
+                // Ignore cleanup errors
+            }
+
+            closePromises.push(
+                new Promise((resolve) => {
+                    window.once("closed", resolve)
+                    window.close()
+                })
+            )
+        } else {
+            openEditors.delete(key)
+        }
+    }
+
+    if (closePromises.length > 0) {
+        console.log(`Closing ${closePromises.length} editor window(s)...`)
+        await Promise.all(closePromises)
+        // Give time for file handles to be released
+        await new Promise((resolve) => setTimeout(resolve, 300))
+
+        // Force garbage collection if available
+        if (global.gc) {
+            global.gc()
+            await new Promise((resolve) => setTimeout(resolve, 100))
+        }
+    }
+}
+
+/**
+ * Close all windows (editors, model previews, etc.) to release all file handles
+ */
+async function closeAllWindows() {
+    console.log('Closing all BeePEE windows to release file handles...')
+    await closeAllEditorWindows()
+    await closeAllModelPreviewWindows()
+
+    // Also close create item and create package windows if open
+    if (createItemWindow && !createItemWindow.isDestroyed()) {
+        createItemWindow.close()
+    }
+    if (createPackageWindow && !createPackageWindow.isDestroyed()) {
+        createPackageWindow.close()
+    }
+
+    // Give extra time for all handles to be released
+    await new Promise((resolve) => setTimeout(resolve, 500))
+
+    // Force garbage collection
+    if (global.gc) {
+        global.gc()
+        await new Promise((resolve) => setTimeout(resolve, 200))
+    }
+
+    console.log('All BeePEE windows closed')
+}
+
 module.exports = {
     createItemEditor,
     sendItemUpdateToEditor,
@@ -251,4 +441,9 @@ module.exports = {
     getPackageInformationWindow: () => packageInformationWindow,
     createChangelogWindow,
     getChangelogWindow: () => changelogWindow,
+    createModelPreviewWindow,
+    closeAllModelPreviewWindows,
+    closeAllEditorWindows,
+    closeAllWindows,
+    openModelPreviewWindows,
 }

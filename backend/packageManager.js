@@ -81,40 +81,174 @@ function sendProgressUpdate(progress, message, error = null) {
     }
 }
 
-// Helper function to remove directory with retry logic (handles Windows/Dropbox file locking)
-async function removeDirectoryWithRetry(dirPath, maxRetries = 5, delayMs = 1000) {
-    const retryableCodes = ['ENOTEMPTY', 'EBUSY', 'EPERM', 'EACCES', 'ENOENT']
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+// Helper function to forcefully remove directory using multiple strategies
+async function removeDirectoryWithRetry(dirPath, maxRetries = 5) {
+    // Clear all window caches first to release any file handles
+    await clearAllWindowCaches()
+
+    // Helper to wait
+    const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms))
+
+    // Helper to make files writable recursively (Windows read-only attribute can cause issues)
+    const makeWritable = (dir) => {
+        try {
+            const items = fs.readdirSync(dir)
+            for (const item of items) {
+                const fullPath = path.join(dir, item)
+                try {
+                    const stat = fs.statSync(fullPath)
+                    if (stat.isDirectory()) {
+                        makeWritable(fullPath)
+                    }
+                    // Remove read-only attribute
+                    fs.chmodSync(fullPath, 0o666)
+                } catch (e) {
+                    // Ignore errors for individual files
+                }
+            }
+            fs.chmodSync(dir, 0o777)
+        } catch (e) {
+            // Ignore errors
+        }
+    }
+
+    // Strategy 1: Try standard rmSync with retries and exponential backoff
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             if (!fs.existsSync(dirPath)) {
                 return true // Already gone
             }
+
+            // Make files writable before attempting deletion
+            if (attempt > 0) {
+                makeWritable(dirPath)
+            }
+
             fs.rmSync(dirPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+            console.log(`Successfully removed directory on attempt ${attempt + 1}`)
             return true
         } catch (error) {
-            if (retryableCodes.includes(error.code)) {
-                if (attempt < maxRetries) {
-                    console.log(`Directory removal attempt ${attempt}/${maxRetries} failed (${error.code}), retrying in ${delayMs}ms...`)
-                    await new Promise(resolve => setTimeout(resolve, delayMs))
-                    delayMs = Math.min(delayMs * 1.5, 5000) // Exponential backoff, max 5s
-                } else {
-                    console.error(`Failed to remove directory after ${maxRetries} attempts:`, error.message)
-                    // Last resort: try renaming the directory to a temp name
-                    try {
-                        const tempPath = dirPath + '_old_' + Date.now()
-                        fs.renameSync(dirPath, tempPath)
-                        console.log(`Renamed problematic directory to: ${tempPath}`)
-                        return true
-                    } catch (renameError) {
-                        console.error('Rename fallback also failed:', renameError.message)
-                        throw error
-                    }
+            console.warn(`rmSync attempt ${attempt + 1}/${maxRetries} failed (${error.code}): ${dirPath}`)
+
+            if (attempt < maxRetries - 1) {
+                // Exponential backoff: 200ms, 400ms, 800ms, 1600ms
+                const delay = 200 * Math.pow(2, attempt)
+                console.log(`Waiting ${delay}ms before retry...`)
+                await sleep(delay)
+
+                // Force garbage collection if available
+                if (global.gc) {
+                    global.gc()
                 }
-            } else {
-                throw error
             }
         }
     }
+
+    // Strategy 2: Try Windows-specific rd command (sometimes works when Node.js can't)
+    if (process.platform === 'win32') {
+        console.log('Trying Windows rd command...')
+        try {
+            const { execSync } = require('child_process')
+            // Use cmd /c rd /s /q which is Windows' native recursive delete
+            execSync(`cmd /c rd /s /q "${dirPath}"`, { stdio: 'pipe', timeout: 30000 })
+
+            if (!fs.existsSync(dirPath)) {
+                console.log('Windows rd command succeeded')
+                return true
+            }
+        } catch (cmdError) {
+            console.warn(`Windows rd command failed: ${cmdError.message}`)
+        }
+    }
+
+    // Strategy 3: Rename-then-delete (last resort)
+    console.log('Trying rename-then-delete strategy...')
+    const renamedPath = `${dirPath}_deleted_${Date.now()}`
+    try {
+        fs.renameSync(dirPath, renamedPath)
+        console.log(`Renamed locked directory to: ${renamedPath}`)
+
+        // Now try to delete the renamed directory in background
+        setImmediate(async () => {
+            await sleep(500) // Give some time for handles to release
+            try {
+                fs.rmSync(renamedPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+                console.log(`Successfully deleted renamed directory`)
+            } catch (deleteError) {
+                console.warn(`Will clean up renamed directory on next startup: ${renamedPath}`)
+            }
+        })
+        return true
+    } catch (renameError) {
+        // If rename fails too, just let the extraction proceed and overwrite
+        console.warn(`Rename also failed (${renameError.code}), extraction will overwrite existing files`)
+        return false
+    }
+}
+
+// Clean up any leftover renamed directories from previous sessions
+function cleanupDeletedDirectories() {
+    const packagesDir = getPackagesDir()
+    if (!fs.existsSync(packagesDir)) return
+
+    try {
+        const entries = fs.readdirSync(packagesDir, { withFileTypes: true })
+        for (const entry of entries) {
+            if (entry.isDirectory() && entry.name.includes("_deleted_")) {
+                const fullPath = path.join(packagesDir, entry.name)
+                try {
+                    fs.rmSync(fullPath, { recursive: true, force: true })
+                    console.log(`Cleaned up leftover directory: ${fullPath}`)
+                } catch (e) {
+                    // Ignore, will try again next time
+                }
+            }
+        }
+    } catch (e) {
+        // Ignore errors during cleanup
+    }
+}
+
+/**
+ * Clear all window caches to release file handles
+ * This should be called before any directory deletion operations
+ */
+async function clearAllWindowCaches() {
+    const { BrowserWindow } = require("electron")
+
+    // Clear main window cache
+    if (mainWindow && !mainWindow.isDestroyed()) {
+        try {
+            const session = mainWindow.webContents.session
+            await session.clearCache()
+            await session.clearStorageData({
+                storages: ["appcache", "cookies", "filesystem", "indexdb", "localstorage", "shadercache", "websql", "serviceworkers", "cachestorage"],
+            })
+        } catch (e) {
+            console.warn("Could not clear main window cache:", e.message)
+        }
+    }
+
+    // Clear all other window caches
+    const allWindows = BrowserWindow.getAllWindows()
+    for (const win of allWindows) {
+        if (win && !win.isDestroyed() && win !== mainWindow) {
+            try {
+                const session = win.webContents.session
+                await session.clearCache()
+            } catch (e) {
+                // Ignore errors for other windows
+            }
+        }
+    }
+
+    // Force garbage collection if available
+    if (global.gc) {
+        global.gc()
+    }
+
+    // Give time for handles to be released
+    await new Promise(resolve => setTimeout(resolve, 300))
 }
 
 var packages = []
@@ -423,11 +557,30 @@ function convertVdfToJson(filePath) {
 
 // Helper function to recursively process VDF files
 function processVdfFiles(directory) {
-    const files = fs.readdirSync(directory)
+    let files
+    try {
+        files = fs.readdirSync(directory)
+    } catch (error) {
+        // Skip directories we can't read (locked by another process, permission denied, etc.)
+        console.warn(`Skipping unreadable directory: ${directory} (${error.code || error.message})`)
+        return
+    }
 
     for (const file of files) {
+        // Skip .bpee directory - it's BeePEE's internal storage (case-insensitive check)
+        if (file.toLowerCase() === ".bpee") {
+            continue
+        }
+
         const fullPath = path.join(directory, file)
-        const stat = fs.statSync(fullPath)
+        let stat
+        try {
+            stat = fs.statSync(fullPath)
+        } catch (error) {
+            // Skip files/directories we can't stat
+            console.warn(`Skipping inaccessible path: ${fullPath} (${error.code || error.message})`)
+            continue
+        }
 
         if (stat.isDirectory()) {
             // Recursively process subdirectories
@@ -494,11 +647,28 @@ function processVdfFiles(directory) {
 
 // Helper function to recursively process JSON files back to VDF for export
 function processJsonFilesToVdf(directory) {
-    const files = fs.readdirSync(directory)
+    let files
+    try {
+        files = fs.readdirSync(directory)
+    } catch (error) {
+        console.warn(`Skipping unreadable directory: ${directory} (${error.code || error.message})`)
+        return
+    }
 
     for (const file of files) {
+        // Skip .bpee directory
+        if (file.toLowerCase() === ".bpee") {
+            continue
+        }
+
         const fullPath = path.join(directory, file)
-        const stat = fs.statSync(fullPath)
+        let stat
+        try {
+            stat = fs.statSync(fullPath)
+        } catch (error) {
+            console.warn(`Skipping inaccessible path: ${fullPath} (${error.code || error.message})`)
+            continue
+        }
 
         if (stat.isDirectory()) {
             // Recursively process subdirectories
@@ -568,11 +738,28 @@ const updateVMFStatsForPackage = async (packageDir) => {
             // Find all editoritems.json files in the package
             const findEditorItemsFiles = (dir) => {
                 const files = []
-                const items = fs.readdirSync(dir)
+                let items
+                try {
+                    items = fs.readdirSync(dir)
+                } catch (error) {
+                    console.warn(`Skipping unreadable directory: ${dir} (${error.code || error.message})`)
+                    return files
+                }
 
                 for (const item of items) {
+                    // Skip .bpee directory
+                    if (item.toLowerCase() === ".bpee") {
+                        continue
+                    }
+
                     const fullPath = path.join(dir, item)
-                    const stat = fs.statSync(fullPath)
+                    let stat
+                    try {
+                        stat = fs.statSync(fullPath)
+                    } catch (error) {
+                        console.warn(`Skipping inaccessible path: ${fullPath} (${error.code || error.message})`)
+                        continue
+                    }
 
                     if (stat.isDirectory()) {
                         files.push(...findEditorItemsFiles(fullPath))
@@ -759,6 +946,15 @@ const importPackage = async (pathToPackage) => {
     return timeOperation("Import package", async () => {
         let tempPkg = null
         try {
+            // Close all editor/preview windows to release file handles
+            try {
+                const { closeAllWindows } = require("./items/itemEditor")
+                await closeAllWindows()
+            } catch (e) {
+                console.warn("Could not close windows before import:", e.message)
+                // Ignore if itemEditor module not available yet
+            }
+
             console.log("Importing package from:", pathToPackage)
 
             // Validate that the file exists and is an archive
@@ -863,6 +1059,14 @@ const importPackage = async (pathToPackage) => {
 const loadPackage = async (pathToPackage, skipProgressReset = false) => {
     return timeOperation("Load package", async () => {
         try {
+            // Close all editor/preview windows to release file handles before loading
+            try {
+                const { closeAllWindows } = require("./items/itemEditor")
+                await closeAllWindows()
+            } catch (e) {
+                // Ignore if itemEditor module not available yet
+            }
+
             if (!skipProgressReset) {
                 sendProgressUpdate(0, "Starting package load...")
             }
@@ -909,7 +1113,7 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
                 }
 
                 // Try to wipe existing directory first, but don't fail if it can't be deleted
-                // (Dropbox/antivirus may lock files - 7zip can still overwrite)
+                // (antivirus may lock files - 7zip can still overwrite)
                 if (fs.existsSync(packageDir)) {
                     try {
                         await removeDirectoryWithRetry(packageDir)
@@ -918,7 +1122,7 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
                         )
                     } catch (deleteError) {
                         console.warn(
-                            "Could not delete existing directory (files may be locked by Dropbox/antivirus):",
+                            "Could not delete existing directory (files may be locked):",
                             deleteError.message,
                         )
                         console.log("Will extract over existing directory instead...")
@@ -1200,21 +1404,36 @@ async function exportPackageAsBeePack(packageDir, outputBeePackPath) {
  * Clears all contents of the packages directory at the project root.
  * @returns {Promise<void>} Resolves when done, rejects on error.
  */
-async function clearPackagesDirectory() {
+function clearPackagesDirectory() {
     const packagesDir = getPackagesDir()
-    if (fs.existsSync(packagesDir)) {
-        const entries = fs.readdirSync(packagesDir)
-        for (const entry of entries) {
-            const entryPath = path.join(packagesDir, entry)
-            // Check if it's a directory before trying to remove it
+    console.log(`Clearing packages directory: ${packagesDir}`)
+
+    if (!fs.existsSync(packagesDir)) {
+        console.log("Packages directory does not exist, nothing to clean")
+        return
+    }
+
+    const entries = fs.readdirSync(packagesDir)
+    console.log(`Found ${entries.length} entries to clean up`)
+
+    for (const entry of entries) {
+        const entryPath = path.join(packagesDir, entry)
+        try {
             const stat = fs.statSync(entryPath)
             if (stat.isDirectory()) {
-                fs.rmSync(entryPath, { recursive: true, force: true })
+                console.log(`Removing directory: ${entry}`)
+                fs.rmSync(entryPath, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
             } else {
+                console.log(`Removing file: ${entry}`)
                 fs.unlinkSync(entryPath)
             }
+        } catch (error) {
+            console.error(`Failed to remove ${entry}: ${error.message}`)
+            // Continue with other entries even if one fails
         }
     }
+
+    console.log("Packages directory cleanup completed")
 }
 
 const closePackage = async () => {
@@ -1251,4 +1470,5 @@ module.exports = {
     setMainWindow,
     getCurrentPackageDir,
     convertJsonToVdf,
+    cleanupDeletedDirectories,
 }

@@ -29,5 +29,12 @@ export default defineConfig(({ command }) => {
         // Use absolute paths during dev so Vite's client assets load via HTTP,
         // but switch to relative paths for the packaged file:// protocol.
         base: isServe ? "/" : "./",
+        server: {
+            watch: {
+                // Ignore packages folder to prevent file locks on Windows
+                // This folder contains extracted BEE2 packages and is managed by Electron
+                ignored: ["**/packages/**", "**/node_modules/**"],
+            },
+        },
     }
 })

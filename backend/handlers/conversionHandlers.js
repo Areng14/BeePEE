@@ -9,6 +9,32 @@ const { packages } = require("../packageManager")
 const { convertVmfToObj } = require("../utils/vmf2obj")
 const { Instance } = require("../items/Instance")
 const { fixInstancePath } = require("./instanceHandlers")
+const { closeAllModelPreviewWindows } = require("../items/itemEditor")
+
+/**
+ * Helper to create directory with retry logic for EPERM errors
+ */
+async function mkdirWithRetry(dirPath, maxAttempts = 5) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+            if (!fs.existsSync(dirPath)) {
+                fs.mkdirSync(dirPath, { recursive: true })
+            }
+            return true
+        } catch (error) {
+            if (error.code === "EPERM" || error.code === "EBUSY") {
+                if (attempt < maxAttempts - 1) {
+                    console.warn(`mkdir attempt ${attempt + 1} failed (${error.code}), retrying in ${(attempt + 1) * 200}ms...`)
+                    await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 200))
+                } else {
+                    throw error
+                }
+            } else {
+                throw error
+            }
+        }
+    }
+}
 
 function register(ipcMain, mainWindow) {
     // VMF2OBJ conversion handler (direct)
@@ -43,6 +69,9 @@ function register(ipcMain, mainWindow) {
         "convert-instance-to-obj",
         async (event, { itemId, instanceKey, options = {} }) => {
             try {
+                // Close any open model preview windows to release file handles
+                await closeAllModelPreviewWindows()
+
                 const item = packages
                     .flatMap((p) => p.items)
                     .find((i) => i.id === itemId)
@@ -62,11 +91,11 @@ function register(ipcMain, mainWindow) {
                     instance.Name,
                 )
 
-                // Create temp directory
-                const tempDir = path.join(item.packagePath, "temp_models")
-                if (!fs.existsSync(tempDir)) {
-                    fs.mkdirSync(tempDir, { recursive: true })
-                }
+                // Create persistent models directory for this item
+                const itemName = item.id.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase()
+                const modelsDir = path.join(item.packagePath, ".bpee", itemName, "models")
+                await mkdirWithRetry(modelsDir)
+                const tempDir = modelsDir // Use persistent location
 
                 const result = await convertVmfToObj(vmfPath, {
                     outputDir: tempDir,
@@ -238,10 +267,12 @@ async function handleDefaultConversion(event, item, options) {
     }
 
     const vmfPath = Instance.getCleanPath(item.packagePath, firstInstance.Name)
-    const tempDir = path.join(item.packagePath, ".bpee", "tempmdl")
-    if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true })
-    }
+
+    // Create persistent models directory for this item
+    const itemName = item.id.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase()
+    const modelsDir = path.join(item.packagePath, ".bpee", itemName, "models")
+    await mkdirWithRetry(modelsDir)
+    const tempDir = modelsDir // Use persistent location
 
     const result = await convertVmfToObj(vmfPath, {
         outputDir: tempDir,
@@ -340,10 +371,11 @@ async function handleAtlasConversion(event, item, instanceKey, finalInstanceMap,
         message: `Preparing to merge ${uniqueInstances.length} instances into grid...`,
     })
 
-    const tempDir = path.join(item.packagePath, ".bpee", "tempmdl")
-    if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true })
-    }
+    // Create persistent models directory for this item
+    const itemName = item.id.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase()
+    const modelsDir = path.join(item.packagePath, ".bpee", itemName, "models")
+    await mkdirWithRetry(modelsDir)
+    const tempDir = modelsDir // Use persistent location
 
     const vmfFiles = []
     for (const instancePath of uniqueInstances) {
@@ -405,6 +437,7 @@ async function handleAtlasConversion(event, item, instanceKey, finalInstanceMap,
         atlasResult.gridLayout,
         tempDir,
         atlasResult.bounds.cellSize,
+        { namePrefix: itemName },
     )
 
     // Convert materials once (shared)
@@ -438,9 +471,10 @@ async function handleAtlasConversion(event, item, instanceKey, finalInstanceMap,
     })
 
     const conversionPromises = splitResults.map(async (split) => {
-        const instancePath = vmfFiles.find((v) => v.name === split.name)?.instancePath
+        // Use originalName to match with vmfFiles (before namePrefix was applied)
+        const instancePath = vmfFiles.find((v) => v.name === split.originalName)?.instancePath
         if (!instancePath) {
-            return { instancePath: split.name, error: "Instance path not found" }
+            return { instancePath: split.originalName || split.name, error: "Instance path not found" }
         }
 
         try {

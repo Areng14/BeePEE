@@ -10,13 +10,54 @@ const JRE_VERSION = "17"
 const JRE_DOWNLOAD_URL = `https://api.adoptium.net/v3/binary/latest/${JRE_VERSION}/ga/windows/x64/jre/hotspot/normal/eclipse`
 
 /**
+ * Helper to create directory with retry logic for EPERM errors
+ */
+async function mkdirWithRetry(dirPath, maxAttempts = 5) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+            if (!fs.existsSync(dirPath)) {
+                fs.mkdirSync(dirPath, { recursive: true })
+            }
+            return true
+        } catch (error) {
+            if (error.code === "EPERM" || error.code === "EBUSY") {
+                if (attempt < maxAttempts - 1) {
+                    console.warn(`mkdir attempt ${attempt + 1} failed (${error.code}), retrying in ${(attempt + 1) * 200}ms...`)
+                    await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 200))
+                } else {
+                    throw error
+                }
+            } else {
+                throw error
+            }
+        }
+    }
+}
+
+/**
  * Get the directory where the JRE should be installed
+ * Checks both "jre" and "jre-windows" folder names for compatibility
  */
 function getJreDir() {
     const isDev = !app.isPackaged
-    return isDev
-        ? path.join(__dirname, "..", "libs", "VMF2OBJ", "jre")
-        : path.join(process.resourcesPath, "extraResources", "VMF2OBJ", "jre")
+    const baseDir = isDev
+        ? path.join(__dirname, "..", "libs", "VMF2OBJ")
+        : path.join(process.resourcesPath, "extraResources", "VMF2OBJ")
+
+    // Check for both possible folder names
+    const jreDir = path.join(baseDir, "jre")
+    const jreWindowsDir = path.join(baseDir, "jre-windows")
+
+    // Prefer jre-windows if it exists with java.exe
+    if (fs.existsSync(path.join(jreWindowsDir, "bin", "java.exe"))) {
+        return jreWindowsDir
+    }
+    // Fall back to jre
+    if (fs.existsSync(path.join(jreDir, "bin", "java.exe"))) {
+        return jreDir
+    }
+    // Default to jre for download location
+    return jreDir
 }
 
 /**
@@ -470,7 +511,7 @@ async function convertVmfToObj(vmfPath, options = {}) {
 
     const baseName = path.basename(vmfPath, path.extname(vmfPath))
     const outputDir = options.outputDir || path.dirname(vmfPath)
-    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true })
+    await mkdirWithRetry(outputDir)
 
     // Expected outputs
     const objPath = path.join(outputDir, `${baseName}.obj`)
@@ -504,10 +545,21 @@ async function convertVmfToObj(vmfPath, options = {}) {
         } catch {}
     }
 
-    // Add the package's resources as a resource as they might have stuff packed in there also
-    const instancesDir = path.dirname(vmfPath)
-    const resourcesDir = path.dirname(instancesDir) // up from instances -> resources
-    if (path.basename(resourcesDir).toLowerCase() === "resources") {
+    // Add the package's resources folder as a resource path
+    // Walk up the directory tree from vmfPath to find the "resources" folder
+    let currentDir = path.dirname(vmfPath)
+    let resourcesDir = null
+    for (let i = 0; i < 10; i++) {
+        // Safety limit to avoid infinite loop
+        if (path.basename(currentDir).toLowerCase() === "resources") {
+            resourcesDir = currentDir
+            break
+        }
+        const parentDir = path.dirname(currentDir)
+        if (parentDir === currentDir) break // Reached root
+        currentDir = parentDir
+    }
+    if (resourcesDir && fs.existsSync(resourcesDir)) {
         resourcePaths.push(resourcesDir)
     }
 

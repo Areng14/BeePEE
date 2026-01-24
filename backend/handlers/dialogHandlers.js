@@ -6,9 +6,41 @@ const { dialog } = require("electron")
 const fs = require("fs")
 const path = require("path")
 const { packages } = require("../packageManager")
-const { sendItemUpdateToEditor } = require("../items/itemEditor")
+const { sendItemUpdateToEditor, createModelPreviewWindow } = require("../items/itemEditor")
 const { Item } = require("../models/items")
-const { createIconPreviewWindow, createModelPreviewWindow, loadOriginalItemJSON } = require("./shared")
+const { createIconPreviewWindow, loadOriginalItemJSON } = require("./shared")
+
+/**
+ * Convert a file path to a beep:// URL for secure protocol
+ */
+function toBeepUrl(p) {
+    if (!p) return null
+
+    try {
+        // Remove any existing protocol prefixes
+        let cleanPath = p
+            .replace(/^file:\/\/\//, "")
+            .replace(/^file:\/\//, "")
+            .replace(/^beep:\/\//, "")
+
+        // Handle Windows drive letters
+        if (process.platform === "win32") {
+            if (cleanPath.match(/^[a-z]\//)) {
+                cleanPath = cleanPath.charAt(0).toUpperCase() + ":" + cleanPath.slice(1)
+            } else if (cleanPath.match(/^[a-z]:\//)) {
+                cleanPath = cleanPath.charAt(0).toUpperCase() + cleanPath.slice(1)
+            }
+        }
+
+        // Normalize path and convert backslashes to forward slashes
+        const normalized = path.normalize(cleanPath).replace(/\\/g, "/")
+
+        return `beep://${normalized}`
+    } catch (error) {
+        console.error("Error creating beep URL from path:", p, error)
+        return null
+    }
+}
 
 function register(ipcMain, mainWindow) {
     // Register icon preview handler
@@ -30,10 +62,62 @@ function register(ipcMain, mainWindow) {
         },
     )
 
+    // List model segments for an item (persistent storage)
+    ipcMain.handle(
+        "list-model-segments",
+        async (event, { itemId }) => {
+            try {
+                const item = packages
+                    .flatMap((p) => p.items)
+                    .find((i) => i.id === itemId)
+                if (!item) {
+                    return { success: false, error: "Item not found", segments: [] }
+                }
+
+                const itemName = item.id.replace(/[^a-zA-Z0-9_-]/g, "_").toLowerCase()
+                let modelsDir = path.join(item.packagePath, ".bpee", itemName, "models")
+
+                // Fall back to old tempmdl location for backward compatibility
+                if (!fs.existsSync(modelsDir)) {
+                    const legacyDir = path.join(item.packagePath, ".bpee", "tempmdl")
+                    if (fs.existsSync(legacyDir)) {
+                        modelsDir = legacyDir
+                    } else {
+                        return { success: true, segments: [], modelsDir: null }
+                    }
+                }
+
+                const files = fs.readdirSync(modelsDir)
+                const objFiles = files
+                    .filter(f => f.endsWith('.obj') && !f.includes('_sourcecoords') && !f.includes('_combined'))
+                    .map(f => {
+                        // Parse segment index from filename: itemName_X.obj
+                        const match = f.match(/_(\d+)\.obj$/i)
+                        const index = match ? parseInt(match[1], 10) : 0
+                        const objPath = path.join(modelsDir, f)
+                        const mtlPath = path.join(modelsDir, f.replace('.obj', '.mtl'))
+                        return {
+                            name: f,
+                            path: objPath,
+                            mtlPath: fs.existsSync(mtlPath) ? mtlPath : null,
+                            index,
+                            label: `Segment ${index}`
+                        }
+                    })
+                    .sort((a, b) => a.index - b.index)
+
+                return { success: true, segments: objFiles, modelsDir }
+            } catch (error) {
+                console.error("Failed to list model segments:", error)
+                return { success: false, error: error.message, segments: [] }
+            }
+        },
+    )
+
     // Register model preview handler
     ipcMain.handle(
         "show-model-preview",
-        async (event, { objPath, mtlPath, title }) => {
+        async (event, { objPath, mtlPath, title, segments = null }) => {
             try {
                 if (!objPath || !fs.existsSync(objPath)) {
                     throw new Error("OBJ file not found")
@@ -65,7 +149,7 @@ function register(ipcMain, mainWindow) {
 
                     if (!objFile) {
                         throw new Error(
-                            "No OBJ files found in .bpee/tempmdl directory",
+                            "No OBJ files found in models directory",
                         )
                     }
 
@@ -75,7 +159,30 @@ function register(ipcMain, mainWindow) {
                     console.log(`Found OBJ file for preview: ${objFile}`)
                 }
 
-                createModelPreviewWindow(actualObjPath, actualMtlPath, title)
+                // Convert paths to beep:// URLs
+                const objUrl = toBeepUrl(actualObjPath)
+                const mtlUrl = actualMtlPath && fs.existsSync(actualMtlPath) ? toBeepUrl(actualMtlPath) : null
+
+                // Transform segments to include beep:// URLs
+                const segmentsWithUrls = segments ? segments.map(seg => ({
+                    ...seg,
+                    objUrl: toBeepUrl(seg.path),
+                    mtlUrl: seg.mtlPath ? toBeepUrl(seg.mtlPath) : null
+                })) : null
+
+                console.log("Creating model preview window with:")
+                console.log("  objUrl:", objUrl)
+                console.log("  mtlUrl:", mtlUrl)
+                console.log("  segments:", segmentsWithUrls?.length || 0)
+
+                // Create the preview window with model data
+                createModelPreviewWindow({
+                    objPath: actualObjPath,
+                    objUrl,
+                    mtlUrl,
+                    title: title || "Model Preview",
+                    segments: segmentsWithUrls,
+                })
                 return { success: true }
             } catch (error) {
                 console.error("Failed to show model preview:", error)

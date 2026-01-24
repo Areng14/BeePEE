@@ -12,6 +12,32 @@ const { isDev } = require("./isDev.js")
 const execAsync = promisify(exec)
 
 /**
+ * Helper to create directory with retry logic for EPERM errors
+ * Windows sometimes holds file handles briefly - retry with delays
+ */
+async function mkdirWithRetry(dirPath, maxAttempts = 5) {
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+            if (!fs.existsSync(dirPath)) {
+                fs.mkdirSync(dirPath, { recursive: true })
+            }
+            return true
+        } catch (error) {
+            if (error.code === "EPERM" || error.code === "EBUSY") {
+                if (attempt < maxAttempts - 1) {
+                    console.warn(`mkdir attempt ${attempt + 1} failed (${error.code}), retrying in ${(attempt + 1) * 200}ms...`)
+                    await new Promise(resolve => setTimeout(resolve, (attempt + 1) * 200))
+                } else {
+                    throw error
+                }
+            } else {
+                throw error
+            }
+        }
+    }
+}
+
+/**
  * Helper to get STUDIOMDL path
  */
 function getStudioMDLPath() {
@@ -275,10 +301,8 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
         throw new Error(`STUDIOMDL not found at: ${studiomdlPath}`)
     }
 
-    // Ensure output directory exists
-    if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true })
-    }
+    // Ensure output directory exists (with retry for EPERM errors)
+    await mkdirWithRetry(outputDir)
 
     const modelName =
         options.modelName || path.basename(objPath, path.extname(objPath))
@@ -330,9 +354,7 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
         `📁 Copying materials to Portal 2 for STUDIOMDL: ${gameMaterialsDir}`,
     )
 
-    if (!fs.existsSync(gameMaterialsDir)) {
-        fs.mkdirSync(gameMaterialsDir, { recursive: true })
-    }
+    await mkdirWithRetry(gameMaterialsDir)
 
     // Copy materials from package resources to Portal 2 (temporarily for compilation)
     const packageMaterialsDir = options.packageMaterialsDir
@@ -340,7 +362,14 @@ async function convertObjToMDL(objPath, outputDir, options = {}) {
         console.log(`📋 Copying materials from: ${packageMaterialsDir}`)
         // Copy all VTF/VMT files to Portal 2
         const copyDir = (src, dest) => {
-            if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true })
+            if (!fs.existsSync(dest)) {
+                try {
+                    fs.mkdirSync(dest, { recursive: true })
+                } catch (e) {
+                    // Ignore if already exists
+                    if (e.code !== "EEXIST") throw e
+                }
+            }
             const entries = fs.readdirSync(src, { withFileTypes: true })
             for (const entry of entries) {
                 const srcPath = path.join(src, entry.name)
@@ -484,9 +513,7 @@ async function convertMaterialsToPackage(
             return
         }
 
-        if (!fs.existsSync(flatDest)) {
-            fs.mkdirSync(flatDest, { recursive: true })
-        }
+        await mkdirWithRetry(flatDest)
 
         const entries = fs.readdirSync(src, { withFileTypes: true })
         for (const entry of entries) {
@@ -647,11 +674,9 @@ async function copyMDLToPackage(
         folderName,
     )
 
-    // Ensure target directory exists
-    if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true })
-        console.log(`Created directory: ${targetDir}`)
-    }
+    // Ensure target directory exists (with retry for EPERM errors)
+    await mkdirWithRetry(targetDir)
+    console.log(`Ensured directory exists: ${targetDir}`)
 
     // Materials are now converted BEFORE this function is called
     // (Legacy parameter materialsSourceDir is kept for backward compatibility but ignored)
@@ -1237,11 +1262,9 @@ async function convertObjTo3DS(
         throw new Error(`Trimesh converter not found at: ${converterExe}`)
     }
 
-    // Ensure output directory exists
+    // Ensure output directory exists (with retry for EPERM errors)
     const outputDir = path.dirname(outputPath)
-    if (!fs.existsSync(outputDir)) {
-        fs.mkdirSync(outputDir, { recursive: true })
-    }
+    await mkdirWithRetry(outputDir)
 
     console.log(`🔷 Converting OBJ to 3DS using Trimesh...`)
     console.log(`  Input: ${objPath}`)
@@ -1310,11 +1333,9 @@ async function copy3DSToPackage(
         folderName,
     )
 
-    // Ensure target directory exists
-    if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true })
-        console.log(`Created directory: ${targetDir}`)
-    }
+    // Ensure target directory exists (with retry for EPERM errors)
+    await mkdirWithRetry(targetDir)
+    console.log(`Ensured directory exists: ${targetDir}`)
 
     // Copy the 3DS file with the correct name
     const fileName = `${itemName}.3ds`
