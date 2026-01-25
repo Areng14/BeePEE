@@ -5,8 +5,8 @@ import * as THREE from "three"
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader"
 import { MTLLoader } from "three/examples/jsm/loaders/MTLLoader"
 
-// Simple grid component using THREE.GridHelper
-function SimpleGrid({ size = 20000, divisions = 200, color1 = 0x555555, color2 = 0x333333, position = [0, -64, 0] }) {
+// Simple grid component using THREE.GridHelper (128 units per cell)
+function SimpleGrid({ size = 20480, divisions = 160, color1 = 0x555555, color2 = 0x333333, position = [0, -64, 0] }) {
     const grid = useMemo(() => new THREE.GridHelper(size, divisions, color1, color2), [size, divisions, color1, color2])
     return <primitive object={grid} position={position} />
 }
