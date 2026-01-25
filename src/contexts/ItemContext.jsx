@@ -59,6 +59,8 @@ export const ItemProvider = ({ children }) => {
                     instances: updatedItem.instances,
                     instanceCount: Object.keys(updatedItem.instances || {})
                         .length,
+                    metadata: updatedItem.metadata,
+                    hasCustomModel: updatedItem.metadata?.hasCustomModel,
                 },
             )
             setItem(updatedItem)

@@ -19,6 +19,7 @@ import {
 } from "@mui/material"
 import {
     Preview,
+    Warning,
 } from "@mui/icons-material"
 import { useState, useEffect } from "react"
 
@@ -319,6 +320,13 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
             </Box>
 
             <Stack spacing={2} sx={{ height: "100%" }}>
+                {/* Warning for missing editor model - show if no model selected and no custom model generated */}
+                {!item?.metadata?.hasCustomModel && !formData.modelName && (
+                    <Alert severity="warning" icon={<Warning />}>
+                        Editor model is required - select a model or generate one below
+                    </Alert>
+                )}
+
                 {/* Model Chooser */}
                 <Box>
                     <Typography variant="subtitle1" sx={{ mb: 1 }}>

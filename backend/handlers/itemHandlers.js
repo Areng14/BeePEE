@@ -443,6 +443,12 @@ function register(ipcMain, mainWindow) {
                         .map((i) => i.toJSONWithExistence()),
                 )
 
+                // Close the create item window
+                const createWindow = getCreateItemWindow()
+                if (createWindow && !createWindow.isDestroyed()) {
+                    createWindow.close()
+                }
+
                 return { success: true, itemId, item: newItem.toJSONWithExistence() }
             } catch (error) {
                 console.error("Failed to create item:", error)
