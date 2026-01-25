@@ -284,9 +284,11 @@ function register(ipcMain, mainWindow) {
                 }
 
                 const newItem = new Item({ packagePath, itemJSON })
-                const pkg = packages.find((p) => p.packagePath === packagePath)
+                const pkg = packages.find((p) => p.packageDir === packagePath)
                 if (pkg) {
                     pkg.items.push(newItem)
+                } else {
+                    console.warn(`Package not found for path: ${packagePath}`)
                 }
 
                 // Send package loaded event to refresh UI
@@ -318,9 +320,11 @@ function register(ipcMain, mainWindow) {
     // Create item (simplified)
     ipcMain.handle(
         "create-item-simple",
-        async (event, { name, description, author }) => {
+        async (event, { name, itemId: providedItemId, description, author }) => {
             try {
-                if (!name?.trim()) {
+                // Support both 'name' and 'itemId' as the item identifier
+                const itemName = name || providedItemId
+                if (!itemName?.trim()) {
                     throw new Error("Item name is required")
                 }
 
@@ -330,7 +334,7 @@ function register(ipcMain, mainWindow) {
                 }
 
                 const packagePath = currentPackageDir
-                const sanitizedName = name
+                const sanitizedName = itemName
                     .replace(/[^a-zA-Z0-9]/g, "")
                     .toLowerCase()
                 const sanitizedAuthor = (author || "unknown")
@@ -358,7 +362,7 @@ function register(ipcMain, mainWindow) {
                         ItemClass: "BEE2",
                         Editor: {
                             SubType: {
-                                Name: name,
+                                Name: itemName,
                                 Palette: {
                                     Tooltip: description || "",
                                 },
@@ -424,9 +428,11 @@ function register(ipcMain, mainWindow) {
                 }
 
                 const newItem = new Item({ packagePath, itemJSON })
-                const pkg = packages.find((p) => p.packagePath === packagePath)
+                const pkg = packages.find((p) => p.packageDir === packagePath)
                 if (pkg) {
                     pkg.items.push(newItem)
+                } else {
+                    console.warn(`Package not found for path: ${packagePath}`)
                 }
 
                 // Send update
@@ -437,7 +443,7 @@ function register(ipcMain, mainWindow) {
                         .map((i) => i.toJSONWithExistence()),
                 )
 
-                return { success: true, itemId }
+                return { success: true, itemId, item: newItem.toJSONWithExistence() }
             } catch (error) {
                 console.error("Failed to create item:", error)
                 return { success: false, error: error.message }

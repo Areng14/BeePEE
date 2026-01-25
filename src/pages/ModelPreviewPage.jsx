@@ -5,10 +5,26 @@ import * as THREE from "three"
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader"
 import { MTLLoader } from "three/examples/jsm/loaders/MTLLoader"
 
-// Simple grid component using THREE.GridHelper (128 units per cell)
-function SimpleGrid({ size = 20480, divisions = 160, color1 = 0x555555, color2 = 0x333333, position = [0, -64, 0] }) {
-    const grid = useMemo(() => new THREE.GridHelper(size, divisions, color1, color2), [size, divisions, color1, color2])
-    return <primitive object={grid} position={position} />
+// Dual grid component: main grid at 128 units, lighter sub-grid at 64 units
+function SimpleGrid({ size = 20480, position = [0, -64, 0] }) {
+    // Main grid: 128 units per cell (size / 128 = divisions)
+    const mainGrid = useMemo(() => {
+        const grid = new THREE.GridHelper(size, size / 128, 0x555555, 0x555555)
+        return grid
+    }, [size])
+
+    // Sub-grid: 64 units per cell (lighter, finer lines)
+    const subGrid = useMemo(() => {
+        const grid = new THREE.GridHelper(size, size / 64, 0x333333, 0x333333)
+        return grid
+    }, [size])
+
+    return (
+        <group position={position}>
+            <primitive object={subGrid} />
+            <primitive object={mainGrid} />
+        </group>
+    )
 }
 
 // Custom OBJ model component that handles beep:// URLs
