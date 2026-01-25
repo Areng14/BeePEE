@@ -1,0 +1,162 @@
+{
+    "categories": [
+        {
+            "name": "Switches",
+            "description": "Switch statements for multi-value variables",
+            "prefabs": [
+                {
+                    "id": "switch_cube_type",
+                    "name": "Cube Type",
+                    "description": "Switch for all cube types (Standard, Companion, Reflection, Sphere, FrankenTurret)",
+                    "blocks": [
+                        {
+                            "type": "switchCase",
+                            "displayName": "Cube Type",
+                            "variable": "$cube_type",
+                            "cases": [
+                                {
+                                    "type": "case",
+                                    "displayName": "Standard",
+                                    "value": "0",
+                                    "thenBlocks": [
+                                        {
+                                            "type": "changeInstance",
+                                            "displayName": "Standard Cube",
+                                            "instanceName": ""
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "case",
+                                    "displayName": "Companion",
+                                    "value": "1",
+                                    "thenBlocks": [
+                                        {
+                                            "type": "changeInstance",
+                                            "displayName": "Companion Cube",
+                                            "instanceName": ""
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "case",
+                                    "displayName": "Reflection",
+                                    "value": "2",
+                                    "thenBlocks": [
+                                        {
+                                            "type": "changeInstance",
+                                            "displayName": "Reflection Cube",
+                                            "instanceName": ""
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "case",
+                                    "displayName": "Sphere",
+                                    "value": "3",
+                                    "thenBlocks": [
+                                        {
+                                            "type": "changeInstance",
+                                            "displayName": "Sphere Cube",
+                                            "instanceName": ""
+                                        }
+                                    ]
+                                },
+                                {
+                                    "type": "case",
+                                    "displayName": "FrankenTurret",
+                                    "value": "4",
+                                    "thenBlocks": [
+                                        {
+                                            "type": "changeInstance",
+                                            "displayName": "FrankenTurret",
+                                            "instanceName": ""
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "id": "switch_timer_delay",
+                    "name": "Timer Delay",
+                    "description": "Switch for timer delay values (0-3 seconds)",
+                    "blocks": [
+                        {
+                            "type": "switchCase",
+                            "displayName": "Timer Delay",
+                            "variable": "$timer_delay",
+                            "cases": [
+                                {
+                                    "type": "case",
+                                    "displayName": "0 seconds",
+                                    "value": "0",
+                                    "thenBlocks": []
+                                },
+                                {
+                                    "type": "case",
+                                    "displayName": "1 second",
+                                    "value": "1",
+                                    "thenBlocks": []
+                                },
+                                {
+                                    "type": "case",
+                                    "displayName": "2 seconds",
+                                    "value": "2",
+                                    "thenBlocks": []
+                                },
+                                {
+                                    "type": "case",
+                                    "displayName": "3 seconds",
+                                    "value": "3",
+                                    "thenBlocks": []
+                                },
+                                {
+                                    "type": "case",
+                                    "displayName": "Default",
+                                    "value": "",
+                                    "thenBlocks": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+        {
+            "name": "Booleans",
+            "description": "If/Else conditions for true/false values",
+            "prefabs": [
+                {
+                    "id": "bool_general",
+                    "name": "General If",
+                    "description": "Generic if/else condition - set your own variable",
+                    "blocks": [
+                        {
+                            "type": "ifElse",
+                            "displayName": "If Condition",
+                            "variable": "$variable",
+                            "operator": "==",
+                            "value": "1",
+                            "thenBlocks": [
+                                {
+                                    "type": "changeInstance",
+                                    "displayName": "True Instance",
+                                    "instanceName": ""
+                                }
+                            ],
+                            "elseBlocks": [
+                                {
+                                    "type": "changeInstance",
+                                    "displayName": "False Instance",
+                                    "instanceName": ""
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}

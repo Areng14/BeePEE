@@ -115,10 +115,36 @@ async function autopackInstance(instancePath, packageDir, itemName) {
         const searchDirs = getPortal2SearchDirs(portal2Dir)
         console.log(`Portal 2 search directories:`, searchDirs)
 
-        // Combine all assets into a single list
+        // Combine all assets into a single list with proper prefixes
         let allAssets = []
-        for (const assetType in assets) {
-            allAssets = allAssets.concat(assets[assetType])
+
+        // Add models (already have models/ prefix)
+        if (assets.MODEL) {
+            allAssets = allAssets.concat(assets.MODEL)
+        }
+
+        // Add materials with materials/ prefix if missing
+        if (assets.MATERIAL) {
+            const materials = assets.MATERIAL.map(mat =>
+                mat.startsWith("materials/") ? mat : `materials/${mat}`
+            )
+            allAssets = allAssets.concat(materials)
+        }
+
+        // Add sounds with sound/ prefix if missing
+        if (assets.SOUND) {
+            const sounds = assets.SOUND.map(snd =>
+                snd.startsWith("sound/") ? snd : `sound/${snd}`
+            )
+            allAssets = allAssets.concat(sounds)
+        }
+
+        // Add scripts with scripts/ prefix if missing
+        if (assets.SCRIPT) {
+            const scripts = assets.SCRIPT.map(scr =>
+                scr.startsWith("scripts/") ? scr : `scripts/${scr}`
+            )
+            allAssets = allAssets.concat(scripts)
         }
 
         // Find dependent materials for models using srctools

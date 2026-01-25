@@ -13,7 +13,7 @@ function getMissingFields(item, hasIconError) {
     }
 
     // Check author
-    if (!item.details?.Author?.trim()) {
+    if (!item.details?.Authors?.trim()) {
         missing.push("Author")
     }
 
@@ -22,8 +22,18 @@ function getMissingFields(item, hasIconError) {
         missing.push("Icon")
     }
 
-    // Check description
-    const hasDescription = item.details?.Description?.trim()
+    // Check description (can be string or object with desc_ keys)
+    const desc = item.details?.Description
+    let hasDescription = false
+    if (desc) {
+        if (typeof desc === "string") {
+            hasDescription = desc.trim() !== ""
+        } else if (typeof desc === "object") {
+            hasDescription = Object.keys(desc)
+                .filter((key) => key.startsWith("desc_"))
+                .some((key) => desc[key] && desc[key].trim() !== "")
+        }
+    }
     if (!hasDescription) {
         missing.push("Description")
     }

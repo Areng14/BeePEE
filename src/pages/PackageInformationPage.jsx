@@ -27,9 +27,9 @@ function PackageInformationPage() {
                 const result = await window.electron.invoke("get-package-info")
 
                 if (result.success) {
-                    setPackageId(result.info.ID || "")
-                    setName(result.info.Name || "")
-                    setDescription(result.info.Desc || "")
+                    setPackageId(result.info.id || "")
+                    setName(result.info.name || "")
+                    setDescription(result.info.description || "")
                 } else {
                     setError(
                         result.error || "Failed to load package information",

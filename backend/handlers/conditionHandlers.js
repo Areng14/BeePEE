@@ -3,6 +3,8 @@
  */
 
 const { dialog } = require("electron")
+const fs = require("fs")
+const path = require("path")
 const { packages } = require("../packageManager")
 const { sendItemUpdateToEditor } = require("../items/itemEditor")
 
@@ -55,6 +57,32 @@ function register(ipcMain, mainWindow) {
             return { success: true }
         } catch (error) {
             dialog.showErrorBox("Failed to Save Conditions", error.message)
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Load VBSP prefabs
+    ipcMain.handle("get-vbsp-prefabs", async () => {
+        try {
+            // Check both dev and packaged paths
+            const devPath = path.join(__dirname, "..", "prefabs", "vbsp_prefabs.json")
+            const packagedPath = path.join(process.resourcesPath || "", "prefabs", "vbsp_prefabs.json")
+
+            let prefabsPath = null
+            if (fs.existsSync(devPath)) {
+                prefabsPath = devPath
+            } else if (fs.existsSync(packagedPath)) {
+                prefabsPath = packagedPath
+            }
+
+            if (!prefabsPath) {
+                return { success: false, error: "Prefabs file not found" }
+            }
+
+            const prefabsData = JSON.parse(fs.readFileSync(prefabsPath, "utf-8"))
+            return { success: true, prefabs: prefabsData }
+        } catch (error) {
+            console.error("Failed to load VBSP prefabs:", error)
             return { success: false, error: error.message }
         }
     })

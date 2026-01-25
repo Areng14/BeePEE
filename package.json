@@ -2,7 +2,7 @@
     "name": "beepee",
     "main": "backend/main.js",
     "private": true,
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "BEEmod Package Editor",
     "author": "Areng",
     "repository": {
@@ -143,6 +143,10 @@
             {
                 "from": "backend/libs/areng_mdlDepend",
                 "to": "extraResources/areng_mdlDepend"
+            },
+            {
+                "from": "backend/prefabs",
+                "to": "prefabs"
             }
         ]
     },
