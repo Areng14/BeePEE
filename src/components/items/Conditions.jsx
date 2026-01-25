@@ -3425,9 +3425,77 @@ function Conditions({
     const [selectedCategory, setSelectedCategory] = useState("Logic")
     const [activeId, setActiveId] = useState(null)
 
+    // Prefab state
+    const [prefabDialogOpen, setPrefabDialogOpen] = useState(false)
+    const [prefabs, setPrefabs] = useState(null)
+    const [selectedPrefabCategory, setSelectedPrefabCategory] = useState(0)
+    const [loadingPrefabs, setLoadingPrefabs] = useState(false)
+
     // Generate unique ID for blocks
     const generateUniqueId = () => {
         return Date.now().toString(36) + Math.random().toString(36).substr(2)
+    }
+
+    // Load prefabs when dialog opens
+    const loadPrefabs = async () => {
+        if (prefabs) return // Already loaded
+        setLoadingPrefabs(true)
+        try {
+            const result = await window.package.getVbspPrefabs()
+            if (result.success) {
+                setPrefabs(result.prefabs)
+            } else {
+                console.error("Failed to load prefabs:", result.error)
+            }
+        } catch (error) {
+            console.error("Error loading prefabs:", error)
+        }
+        setLoadingPrefabs(false)
+    }
+
+    // Helper function to recursively clone prefab block with new IDs
+    const clonePrefabBlock = (block) => {
+        const newBlock = {
+            ...block,
+            id: `${block.type}_${generateUniqueId()}`,
+        }
+
+        // Clone cases array for switchCase
+        if (block.cases && Array.isArray(block.cases)) {
+            newBlock.cases = block.cases.map((caseBlock) =>
+                clonePrefabBlock(caseBlock),
+            )
+        }
+
+        // Clone thenBlocks
+        if (block.thenBlocks && Array.isArray(block.thenBlocks)) {
+            newBlock.thenBlocks = block.thenBlocks.map((childBlock) =>
+                clonePrefabBlock(childBlock),
+            )
+        }
+
+        // Clone elseBlocks
+        if (block.elseBlocks && Array.isArray(block.elseBlocks)) {
+            newBlock.elseBlocks = block.elseBlocks.map((childBlock) =>
+                clonePrefabBlock(childBlock),
+            )
+        }
+
+        return newBlock
+    }
+
+    // Apply a prefab - add its blocks to the current blocks
+    const applyPrefab = (prefab) => {
+        if (!prefab.blocks || prefab.blocks.length === 0) return
+
+        // Clone each block with new IDs
+        const newBlocks = prefab.blocks.map((block) => clonePrefabBlock(block))
+
+        // Add the new blocks to the existing blocks
+        const updatedBlocks = [...blocks, ...newBlocks]
+        setBlocks(updatedBlocks)
+        onUpdateConditions({ blocks: updatedBlocks })
+        setPrefabDialogOpen(false)
     }
 
     // Deep clone a block with new IDs
@@ -4774,6 +4842,15 @@ function Conditions({
                         onClick={() => setAddDialogOpen(true)}>
                         Add Block
                     </Button>
+                    <Button
+                        variant="outlined"
+                        startIcon={<FileCopy />}
+                        onClick={() => {
+                            loadPrefabs()
+                            setPrefabDialogOpen(true)
+                        }}>
+                        Add Prefab
+                    </Button>
                 </Box>
             </Box>
 
@@ -5159,6 +5236,131 @@ function Conditions({
                 <DialogActions sx={{ p: 3, pt: 1 }}>
                     <Button
                         onClick={() => setAddDialogOpen(false)}
+                        variant="outlined">
+                        Cancel
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Add Prefab Dialog */}
+            <Dialog
+                open={prefabDialogOpen}
+                onClose={() => setPrefabDialogOpen(false)}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                    sx: { borderRadius: 3 },
+                }}>
+                <DialogTitle sx={{ pb: 1 }} component="div">
+                    <Typography variant="h6" component="div" sx={{ fontWeight: 600 }}>
+                        Add Prefab
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                        Choose a pre-built condition template to add
+                    </Typography>
+                </DialogTitle>
+                <DialogContent>
+                    {loadingPrefabs ? (
+                        <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                            <Typography color="text.secondary">Loading prefabs...</Typography>
+                        </Box>
+                    ) : prefabs ? (
+                        <>
+                            <Box sx={{ mb: 3 }}>
+                                <Typography
+                                    variant="subtitle2"
+                                    gutterBottom
+                                    sx={{ mb: 2 }}>
+                                    Select Category
+                                </Typography>
+                                <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    sx={{ flexWrap: "wrap", gap: 1 }}>
+                                    {prefabs.categories.map((category, index) => (
+                                        <Chip
+                                            key={category.name}
+                                            label={category.name}
+                                            onClick={() => setSelectedPrefabCategory(index)}
+                                            color={selectedPrefabCategory === index ? "primary" : "default"}
+                                            variant={selectedPrefabCategory === index ? "filled" : "outlined"}
+                                            sx={{
+                                                borderRadius: 2,
+                                                backgroundColor:
+                                                    selectedPrefabCategory === index
+                                                        ? "#d2b019ff"
+                                                        : "#3a3a3a",
+                                                color:
+                                                    selectedPrefabCategory === index
+                                                        ? "#000"
+                                                        : "#c3c7c9ff",
+                                                "&:hover": {
+                                                    transform: "translateY(-1px)",
+                                                    boxShadow: 2,
+                                                    backgroundColor:
+                                                        selectedPrefabCategory === index
+                                                            ? "#e6c34d"
+                                                            : "#555",
+                                                },
+                                                transition: "all 0.2s ease-in-out",
+                                            }}
+                                        />
+                                    ))}
+                                </Stack>
+                            </Box>
+
+                            {prefabs.categories[selectedPrefabCategory] && (
+                                <>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                        {prefabs.categories[selectedPrefabCategory].description}
+                                    </Typography>
+                                    <List sx={{ pt: 0 }}>
+                                        {prefabs.categories[selectedPrefabCategory].prefabs.map((prefab) => (
+                                            <ListItem
+                                                key={prefab.id}
+                                                disablePadding
+                                                sx={{ mb: 1 }}>
+                                                <ListItemButton
+                                                    onClick={() => applyPrefab(prefab)}
+                                                    sx={{
+                                                        borderRadius: 2,
+                                                        border: "1px solid",
+                                                        borderColor: "#555",
+                                                        backgroundColor: "#2a2d30",
+                                                        "&:hover": {
+                                                            borderColor: "#d2b019ff",
+                                                            backgroundColor: "rgba(210, 176, 25, 0.1)",
+                                                        },
+                                                        transition: "all 0.2s ease-in-out",
+                                                    }}>
+                                                    <ListItemText
+                                                        primary={
+                                                            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                                                                {prefab.name}
+                                                            </Typography>
+                                                        }
+                                                        secondary={
+                                                            <Typography variant="body2" color="text.secondary">
+                                                                {prefab.description}
+                                                            </Typography>
+                                                        }
+                                                    />
+                                                </ListItemButton>
+                                            </ListItem>
+                                        ))}
+                                    </List>
+                                </>
+                            )}
+                        </>
+                    ) : (
+                        <Box sx={{ py: 4, textAlign: "center" }}>
+                            <Typography color="error">Failed to load prefabs</Typography>
+                        </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ p: 3, pt: 1 }}>
+                    <Button
+                        onClick={() => setPrefabDialogOpen(false)}
                         variant="outlined">
                         Cancel
                     </Button>

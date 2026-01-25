@@ -1,6 +1,22 @@
 {
     "versions": [
         {
+            "version": "1.0.3",
+            "date": "2026-1-25",
+            "changes": {
+                "added": [
+                    "Warning system if some fields are not filled",
+                    "VBSP Conditions prefabs (Booleans, Cube Type, Timer)"
+                ],
+                "fixed": [
+                    "Autopacking custom assets not working",
+                    "VMF2OBJ Crashing sometimes during model generation",
+                    "Generated models can be previewed even after editor restart",
+                    "Codebase changes (got rid of that 5k events.js)"
+                ]
+            }
+        },
+        {
             "version": "1.0.2",
             "date": "2025-12-13",
             "changes": {

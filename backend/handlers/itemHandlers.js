@@ -200,7 +200,7 @@ function register(ipcMain, mainWindow) {
                 // Create properties.json
                 const properties = {
                     Properties: {
-                        Author: author,
+                        Authors: author,
                     },
                 }
                 fs.writeFileSync(
@@ -383,7 +383,7 @@ function register(ipcMain, mainWindow) {
                 // Create properties.json
                 const properties = {
                     Properties: {
-                        Author: author || "Unknown",
+                        Authors: author || "Unknown",
                     },
                 }
                 fs.writeFileSync(

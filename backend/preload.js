@@ -169,6 +169,7 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.invoke("save-conditions", { itemId, conditions }),
     convertBlocksToVbsp: (blocks) =>
         ipcRenderer.invoke("convert-blocks-to-vbsp", { blocks }),
+    getVbspPrefabs: () => ipcRenderer.invoke("get-vbsp-prefabs"),
 
     // ========================================
     // VMF2OBJ CONVERSION
