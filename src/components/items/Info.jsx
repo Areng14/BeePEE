@@ -4,18 +4,20 @@ import {
     Box,
     Typography,
     IconButton,
-    InputAdornment,
+    Button,
     Divider,
     FormControl,
     InputLabel,
     Select,
     MenuItem,
+    Alert,
 } from "@mui/material"
 import {
     Visibility,
     Edit,
     FolderOpen,
     Image,
+    Warning,
 } from "@mui/icons-material"
 import ReactMarkdown from "react-markdown"
 import { useState, useEffect } from "react"
@@ -120,12 +122,27 @@ function Info({ item, formData, onUpdate }) {
             </Box>
 
             <Stack spacing={2} sx={{ height: "100%" }}>
+                {/* Warning alert for missing fields */}
+                {(() => {
+                    const missing = []
+                    if (!formData.name?.trim()) missing.push("Name")
+                    if (!formData.author?.trim()) missing.push("Author")
+                    if (!formData.stagedIconPath && !item?.icon) missing.push("Icon")
+                    if (!formData.description?.trim()) missing.push("Description")
+                    return missing.length > 0 ? (
+                        <Alert severity="warning" icon={<Warning />}>
+                            Missing required fields: {missing.join(", ")}
+                        </Alert>
+                    ) : null
+                })()}
+
                 <TextField
                     label="Name"
                     value={formData.name}
                     onChange={(e) => onUpdate("name", e.target.value)}
                     fullWidth
                     variant="outlined"
+                    error={!formData.name?.trim()}
                 />
 
                 <TextField
@@ -134,88 +151,78 @@ function Info({ item, formData, onUpdate }) {
                     onChange={(e) => onUpdate("author", e.target.value)}
                     fullWidth
                     variant="outlined"
+                    error={!formData.author?.trim()}
                 />
 
-                <TextField
-                    label="Icon"
-                    value={getRelativeIconPath()}
-                    fullWidth
-                    variant="outlined"
-                    InputProps={{
-                        readOnly: true,
-                        endAdornment: (
-                            <InputAdornment position="end">
-                                <IconButton
-                                    size="small"
-                                    onClick={async () => {
-                                        try {
-                                            const result =
-                                                await window.package.browseForIconFile()
-                                            if (result.success) {
-                                                console.log(
-                                                    "Icon staged successfully",
-                                                )
-                                                // Stage the icon change
-                                                onUpdate(
-                                                    "stagedIconPath",
-                                                    result.filePath,
-                                                )
-                                                onUpdate(
-                                                    "stagedIconName",
-                                                    result.fileName,
-                                                )
-                                                onUpdate(
-                                                    "iconChanged",
-                                                    true,
-                                                    "basicInfo",
-                                                )
-                                            } else if (!result.canceled) {
-                                                console.error(
-                                                    "Failed to browse for icon:",
-                                                    result.error,
-                                                )
-                                            }
-                                        } catch (error) {
-                                            console.error(
-                                                "Failed to browse for icon:",
-                                                error,
-                                            )
-                                        }
-                                    }}
-                                    title="Browse for Icon"
-                                    sx={{ mr: 0.5 }}>
-                                    <FolderOpen />
-                                </IconButton>
-                                <IconButton
-                                    size="small"
-                                    onClick={async () => {
-                                        const iconToShow =
-                                            formData.stagedIconPath ||
-                                            item?.icon
-                                        if (iconToShow) {
-                                            try {
-                                                await window.package.showIconPreview(
-                                                    iconToShow,
-                                                    item.name,
-                                                )
-                                            } catch (error) {
-                                                console.error(
-                                                    "Failed to show icon preview:",
-                                                    error,
-                                                )
-                                            }
-                                        }
-                                    }}
-                                    title="View Icon"
-                                    disabled={
-                                        !formData.stagedIconPath && !item?.icon
-                                    }>
-                                    <Image />
-                                </IconButton>
-                            </InputAdornment>
-                        ),
-                    }}
-                />
+                {/* Icon upload */}
+                {(iconSrc || formData.stagedIconPath || item?.icon) ? (
+                    <Box sx={{ display: "flex", gap: 1 }}>
+                        <Button
+                            variant="outlined"
+                            fullWidth
+                            startIcon={<FolderOpen />}
+                            onClick={async () => {
+                                try {
+                                    const result = await window.package.browseForIconFile()
+                                    if (result.success) {
+                                        onUpdate("stagedIconPath", result.filePath)
+                                        onUpdate("stagedIconName", result.fileName)
+                                        onUpdate("iconChanged", true, "basicInfo")
+                                    } else if (!result.canceled) {
+                                        console.error("Failed to browse for icon:", result.error)
+                                    }
+                                } catch (error) {
+                                    console.error("Failed to browse for icon:", error)
+                                }
+                            }}
+                            sx={{ py: 1.5 }}
+                        >
+                            Change Icon
+                        </Button>
+                        <Button
+                            variant="contained"
+                            fullWidth
+                            startIcon={<Visibility />}
+                            onClick={async () => {
+                                const iconToShow = formData.stagedIconPath || item?.icon
+                                if (iconToShow) {
+                                    try {
+                                        await window.package.showIconPreview(iconToShow, item.name)
+                                    } catch (error) {
+                                        console.error("Failed to show icon preview:", error)
+                                    }
+                                }
+                            }}
+                            sx={{ py: 1.5 }}
+                        >
+                            Preview
+                        </Button>
+                    </Box>
+                ) : (
+                    <Button
+                        variant="contained"
+                        fullWidth
+                        color="warning"
+                        startIcon={<FolderOpen />}
+                        onClick={async () => {
+                            try {
+                                const result = await window.package.browseForIconFile()
+                                if (result.success) {
+                                    onUpdate("stagedIconPath", result.filePath)
+                                    onUpdate("stagedIconName", result.fileName)
+                                    onUpdate("iconChanged", true, "basicInfo")
+                                } else if (!result.canceled) {
+                                    console.error("Failed to browse for icon:", result.error)
+                                }
+                            } catch (error) {
+                                console.error("Failed to browse for icon:", error)
+                            }
+                        }}
+                        sx={{ py: 1.5 }}
+                    >
+                        Upload Icon
+                    </Button>
+                )}
 
                 {/* Description with preview toggle */}
                 <Box sx={{ flex: 1, display: "flex", flexDirection: "column" }}>
@@ -263,6 +270,7 @@ function Info({ item, formData, onUpdate }) {
                             }
                             fullWidth
                             multiline
+                            error={!formData.description?.trim()}
                             placeholder="Enter description...   Markdown formatting is supported"
                             sx={{
                                 flex: 1,

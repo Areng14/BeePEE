@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useState, useMemo } from "react"
 import {
     Box,
     Tabs,
@@ -32,6 +32,7 @@ import {
     DataObject,
     Rule,
     Delete,
+    Warning,
 } from "@mui/icons-material"
 import Info from "./items/Info"
 import Inputs from "./items/Inputs"
@@ -321,6 +322,30 @@ function ItemEditor() {
             window.package?.setUnsavedChanges?.(true)
         }
     }
+
+    // Compute missing required fields for warning badges
+    const missingFieldsWarnings = useMemo(() => {
+        const warnings = {
+            info: [], // Tab 0 - Name, Author, Description, Icon
+            instances: [], // Tab 1 - At least one instance
+            other: [], // Tab 5 - Editor Model
+        }
+
+        // Check Info tab fields
+        if (!formData.name?.trim()) warnings.info.push("Name")
+        if (!formData.author?.trim()) warnings.info.push("Author")
+        if (!formData.description?.trim()) warnings.info.push("Description")
+        if (!item?.icon && !formData.stagedIconPath) warnings.info.push("Icon")
+
+        // Check Instances - need at least one
+        const instanceCount = formData.instances ? Object.keys(formData.instances).length : 0
+        if (instanceCount === 0) warnings.instances.push("Instance")
+
+        // Check Editor Model - warn if no model selected AND no custom model generated
+        if (!item?.metadata?.hasCustomModel && !formData.modelName) warnings.other.push("Editor Model")
+
+        return warnings
+    }, [formData.name, formData.author, formData.description, formData.stagedIconPath, formData.instances, formData.modelName, item?.icon, item?.metadata?.hasCustomModel])
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue)
@@ -894,29 +919,63 @@ function ItemEditor() {
                         },
                     }}>
                     <Tooltip
-                        title="Info - Edit name, author, description"
+                        title={
+                            missingFieldsWarnings.info.length > 0
+                                ? `Info - Missing: ${missingFieldsWarnings.info.join(", ")}`
+                                : "Info - Edit name, author, description"
+                        }
                         placement="right">
                         <Tab
                             icon={
                                 <Badge
                                     color="primary"
                                     variant="dot"
-                                    invisible={!formData._modified.basicInfo}>
-                                    <InfoIcon />
+                                    invisible={!formData._modified.basicInfo || missingFieldsWarnings.info.length > 0}>
+                                    <Box sx={{ position: "relative" }}>
+                                        <InfoIcon />
+                                        {missingFieldsWarnings.info.length > 0 && (
+                                            <Warning
+                                                sx={{
+                                                    position: "absolute",
+                                                    top: -6,
+                                                    right: -6,
+                                                    fontSize: 14,
+                                                    color: "#f57c00",
+                                                }}
+                                            />
+                                        )}
+                                    </Box>
                                 </Badge>
                             }
                         />
                     </Tooltip>
                     <Tooltip
-                        title="Instances - Manage item's VMF instances"
+                        title={
+                            missingFieldsWarnings.instances.length > 0
+                                ? `Instances - Missing: ${missingFieldsWarnings.instances.join(", ")}`
+                                : "Instances - Manage item's VMF instances"
+                        }
                         placement="right">
                         <Tab
                             icon={
                                 <Badge
                                     color="primary"
                                     variant="dot"
-                                    invisible={!formData._modified.instances}>
-                                    <ViewInAr />
+                                    invisible={!formData._modified.instances || missingFieldsWarnings.instances.length > 0}>
+                                    <Box sx={{ position: "relative" }}>
+                                        <ViewInAr />
+                                        {missingFieldsWarnings.instances.length > 0 && (
+                                            <Warning
+                                                sx={{
+                                                    position: "absolute",
+                                                    top: -6,
+                                                    right: -6,
+                                                    fontSize: 14,
+                                                    color: "#f57c00",
+                                                }}
+                                            />
+                                        )}
+                                    </Box>
                                 </Badge>
                             }
                         />
@@ -967,15 +1026,32 @@ function ItemEditor() {
                         />
                     </Tooltip>
                     <Tooltip
-                        title="Other - Model chooser and generator"
+                        title={
+                            missingFieldsWarnings.other.length > 0
+                                ? `Other - Missing: ${missingFieldsWarnings.other.join(", ")}`
+                                : "Other - Model chooser and generator"
+                        }
                         placement="right">
                         <Tab
                             icon={
                                 <Badge
                                     color="primary"
                                     variant="dot"
-                                    invisible={!formData._modified.other}>
-                                    <Construction />
+                                    invisible={!formData._modified.other || missingFieldsWarnings.other.length > 0}>
+                                    <Box sx={{ position: "relative" }}>
+                                        <Construction />
+                                        {missingFieldsWarnings.other.length > 0 && (
+                                            <Warning
+                                                sx={{
+                                                    position: "absolute",
+                                                    top: -6,
+                                                    right: -6,
+                                                    fontSize: 14,
+                                                    color: "#f57c00",
+                                                }}
+                                            />
+                                        )}
+                                    </Box>
                                 </Badge>
                             }
                         />

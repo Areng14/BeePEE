@@ -2295,6 +2295,7 @@ class Item {
             packagePath: this.packagePath,
             instances: this.instances, // Regular instances without existence check
             metadata: this.metadata,
+            modelName: this.getModelName(), // Include model name for warnings
         }
     }
 
@@ -2312,6 +2313,7 @@ class Item {
             packagePath: this.packagePath,
             instances: this.getInstancesWithStatus(), // Include existence status
             metadata: this.metadata,
+            modelName: this.getModelName(), // Include model name for warnings
         }
     }
 }

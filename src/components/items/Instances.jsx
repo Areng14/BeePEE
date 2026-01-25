@@ -15,6 +15,7 @@ import {
     Chip,
     Divider,
     TextField,
+    Alert,
 } from "@mui/material"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
@@ -26,6 +27,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore"
 import ExpandLessIcon from "@mui/icons-material/ExpandLess"
 import InfoIcon from "@mui/icons-material/Info"
 import LabelIcon from "@mui/icons-material/Label"
+import WarningIcon from "@mui/icons-material/Warning"
 import { useState, useEffect } from "react"
 import ViewInAr from "@mui/icons-material/ViewInAr"
 
@@ -324,6 +326,12 @@ function Instances({
                         )}
                 </Box>
             </Box>
+
+            {instances.length === 0 && (
+                <Alert severity="warning" icon={<WarningIcon />} sx={{ mb: 2 }}>
+                    At least one instance is required
+                </Alert>
+            )}
 
             {instances.length > 0 ? (
                 <Stack spacing={2}>
