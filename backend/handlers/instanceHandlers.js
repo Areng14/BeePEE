@@ -10,7 +10,57 @@ const { packages } = require("../packageManager")
 const { sendItemUpdateToEditor } = require("../items/itemEditor")
 const { Instance } = require("../items/Instance")
 const { vmfStatsCache } = require("../utils/vmfParser")
-const { getHammerPath, getHammerAvailability } = require("../data")
+const { getHammerPath, getHammerAvailability, findPortal2Dir } = require("../data")
+const { extractAssetsFromVMF, getPortal2SearchDirs, assetExistsInPortal2 } = require("../utils/vmfAssetExtractor")
+const { execFile } = require("child_process")
+const { promisify } = require("util")
+const execFileAsync = promisify(execFile)
+
+/**
+ * Get MDL material dependencies using find_mdl_deps.exe
+ * @param {string} mdlPath - Path to the MDL file (e.g., "models/props/cube.mdl")
+ * @param {string} portal2Dir - Path to Portal 2 directory
+ * @returns {Promise<Object>} Object with materials array or error
+ */
+async function getMdlDependencies(mdlPath, portal2Dir) {
+    try {
+        // Find the executable - check both dev and packaged paths
+        const devPath = path.join(__dirname, "..", "libs", "areng_mdlDepend", "find_mdl_deps.exe")
+        const packagedPath = path.join(process.resourcesPath || "", "extraResources", "areng_mdlDepend", "find_mdl_deps.exe")
+
+        let exePath = null
+        if (fs.existsSync(devPath)) {
+            exePath = devPath
+        } else if (fs.existsSync(packagedPath)) {
+            exePath = packagedPath
+        }
+
+        if (!exePath) {
+            console.log("find_mdl_deps.exe not found, skipping MDL dependency check")
+            return { success: false, error: "find_mdl_deps.exe not found", materials: [] }
+        }
+
+        // Game directory is the portal2 subfolder
+        const gameDir = path.join(portal2Dir, "portal2")
+
+        // Run the executable
+        const { stdout, stderr } = await execFileAsync(exePath, [mdlPath, gameDir], {
+            timeout: 30000, // 30 second timeout
+            maxBuffer: 10 * 1024 * 1024 // 10MB buffer
+        })
+
+        if (stderr) {
+            console.warn("find_mdl_deps.exe stderr:", stderr)
+        }
+
+        // Parse JSON output
+        const result = JSON.parse(stdout)
+        return result
+    } catch (error) {
+        console.warn(`Failed to get MDL dependencies for ${mdlPath}:`, error.message)
+        return { success: false, error: error.message, materials: [] }
+    }
+}
 
 /**
  * Helper function to fix instance paths by removing BEE2/ prefix
@@ -637,6 +687,123 @@ function register(ipcMain, mainWindow) {
             }
         },
     )
+
+    // Check if VMF uses external assets (not in base Portal 2)
+    ipcMain.handle("check-vmf-external-assets", async (event, { vmfPath }) => {
+        try {
+            if (!fs.existsSync(vmfPath)) {
+                return { success: false, error: "VMF file not found" }
+            }
+
+            // Get Portal 2 directory
+            const portal2Dir = await findPortal2Dir()
+            if (!portal2Dir) {
+                return {
+                    success: false,
+                    error: "Could not find Portal 2 installation",
+                    assets: { external: [], found: [] }
+                }
+            }
+
+            // Get search directories from gameinfo.txt
+            const searchDirs = getPortal2SearchDirs(portal2Dir)
+
+            // Extract assets from the VMF
+            const assets = extractAssetsFromVMF(vmfPath)
+
+            const externalAssets = []
+            const foundAssets = []
+
+            // Track materials we've already checked (to avoid duplicates from MDL dependencies)
+            const checkedMaterials = new Set()
+
+            // Check models and their material dependencies
+            for (const model of assets.MODEL) {
+                const modelPath = model.startsWith("models/") ? model : `models/${model}`
+                if (assetExistsInPortal2(modelPath, portal2Dir, searchDirs)) {
+                    foundAssets.push({ type: "MODEL", path: model })
+                } else {
+                    externalAssets.push({ type: "MODEL", path: model })
+                }
+
+                // Get MDL material dependencies using srctools
+                const mdlDeps = await getMdlDependencies(modelPath, portal2Dir)
+                if (mdlDeps.success && mdlDeps.materials) {
+                    for (const matPath of mdlDeps.materials) {
+                        // Skip if already checked
+                        const matKey = matPath.toLowerCase()
+                        if (checkedMaterials.has(matKey)) continue
+                        checkedMaterials.add(matKey)
+
+                        // Check if material exists in Portal 2
+                        if (assetExistsInPortal2(matPath, portal2Dir, searchDirs)) {
+                            foundAssets.push({ type: "MATERIAL", path: matPath, source: "mdl" })
+                        } else {
+                            externalAssets.push({ type: "MATERIAL", path: matPath, source: "mdl" })
+                        }
+                    }
+                }
+            }
+
+            // Check materials (from VMF brushes and entities)
+            for (const material of assets.MATERIAL) {
+                // Skip tool textures and common materials
+                if (material.startsWith("tools/") || material.startsWith("dev/")) {
+                    continue // Already filtered in extractor, but double-check
+                }
+
+                const materialPath = material.startsWith("materials/") ? material : `materials/${material}`
+
+                // Skip if already checked from MDL dependencies
+                const matKey = materialPath.toLowerCase()
+                if (checkedMaterials.has(matKey)) continue
+                checkedMaterials.add(matKey)
+
+                if (assetExistsInPortal2(materialPath, portal2Dir, searchDirs)) {
+                    foundAssets.push({ type: "MATERIAL", path: material })
+                } else {
+                    externalAssets.push({ type: "MATERIAL", path: material })
+                }
+            }
+
+            // Check sounds
+            for (const sound of assets.SOUND) {
+                const soundPath = sound.startsWith("sound/") ? sound : `sound/${sound}`
+                if (assetExistsInPortal2(soundPath, portal2Dir, searchDirs)) {
+                    foundAssets.push({ type: "SOUND", path: sound })
+                } else {
+                    externalAssets.push({ type: "SOUND", path: sound })
+                }
+            }
+
+            // Check scripts
+            for (const script of assets.SCRIPT) {
+                const scriptPath = script.startsWith("scripts/") ? script : `scripts/${script}`
+                if (assetExistsInPortal2(scriptPath, portal2Dir, searchDirs)) {
+                    foundAssets.push({ type: "SCRIPT", path: script })
+                } else {
+                    externalAssets.push({ type: "SCRIPT", path: script })
+                }
+            }
+
+            return {
+                success: true,
+                hasExternalAssets: externalAssets.length > 0,
+                assets: {
+                    external: externalAssets,
+                    found: foundAssets
+                },
+                summary: {
+                    totalAssets: externalAssets.length + foundAssets.length,
+                    externalCount: externalAssets.length,
+                    foundCount: foundAssets.length
+                }
+            }
+        } catch (error) {
+            console.error("Error checking VMF external assets:", error)
+            return { success: false, error: error.message }
+        }
+    })
 }
 
 module.exports = { register, fixInstancePath, fixItemInstances }

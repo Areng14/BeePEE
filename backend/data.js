@@ -461,6 +461,7 @@ function getHammerAvailability() {
 }
 
 module.exports = {
+    findPortal2Dir,
     findPortal2Resources,
     getHammerPath,
     getHammerAvailability,

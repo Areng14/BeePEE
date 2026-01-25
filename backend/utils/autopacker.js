@@ -1,13 +1,84 @@
 const fs = require("fs")
 const path = require("path")
+const { execFile } = require("child_process")
+const { promisify } = require("util")
+const execFileAsync = promisify(execFile)
 const {
     extractAssetsFromVMF,
-    findDependentMaterials,
     getPortal2SearchDirs,
     copyAssetToPackage,
     assetExistsInPortal2,
 } = require("./vmfAssetExtractor")
 const { findPortal2Resources } = require("../data")
+
+/**
+ * Get MDL material dependencies using find_mdl_deps.exe (srctools)
+ * @param {string} mdlPath - Path to the MDL file (e.g., "models/props/cube.mdl")
+ * @param {string} portal2Dir - Path to Portal 2 directory
+ * @param {string[]} searchDirs - Additional search directories (relative to portal2Dir)
+ * @returns {Promise<string[]>} Array of material paths
+ */
+async function getMdlMaterials(mdlPath, portal2Dir, searchDirs = []) {
+    try {
+        // Find the executable - check both dev and packaged paths
+        const devPath = path.join(__dirname, "..", "libs", "areng_mdlDepend", "find_mdl_deps.exe")
+        const packagedPath = path.join(process.resourcesPath || "", "extraResources", "areng_mdlDepend", "find_mdl_deps.exe")
+
+        let exePath = null
+        if (fs.existsSync(devPath)) {
+            exePath = devPath
+        } else if (fs.existsSync(packagedPath)) {
+            exePath = packagedPath
+        }
+
+        if (!exePath) {
+            console.log("find_mdl_deps.exe not found, skipping MDL material extraction")
+            return []
+        }
+
+        // Game directory is the portal2 subfolder
+        const gameDir = path.join(portal2Dir, "portal2")
+
+        // Build extra search paths (full paths to directories)
+        const extraPaths = searchDirs
+            .filter(dir => !dir.includes("|") && !dir.includes("bee2")) // Skip special paths
+            .map(dir => path.join(portal2Dir, dir))
+            .filter(dir => fs.existsSync(dir))
+            .join(";")
+
+        // Build arguments
+        const args = [mdlPath, gameDir]
+        if (extraPaths) {
+            args.push("--search-paths", extraPaths)
+        }
+
+        console.log(`Running find_mdl_deps.exe with args:`, args)
+
+        // Run the executable
+        const { stdout, stderr } = await execFileAsync(exePath, args, {
+            timeout: 30000,
+            maxBuffer: 10 * 1024 * 1024
+        })
+
+        if (stderr) {
+            console.warn("find_mdl_deps.exe stderr:", stderr)
+        }
+
+        // Parse JSON output
+        const result = JSON.parse(stdout)
+        console.log(`find_mdl_deps.exe result:`, result)
+        if (result.success && result.materials) {
+            // Return material paths (they include materials/ prefix)
+            // Strip extensions and deduplicate (srctools returns both .vmt and .vtf)
+            const materials = result.materials.map(m => m.replace(/\.(vmt|vtf)$/, ""))
+            return [...new Set(materials)]
+        }
+        return []
+    } catch (error) {
+        console.warn(`Failed to get MDL materials for ${mdlPath}:`, error.message)
+        return []
+    }
+}
 
 /**
  * Perform autopacking for an instance VMF file
@@ -50,14 +121,13 @@ async function autopackInstance(instancePath, packageDir, itemName) {
             allAssets = allAssets.concat(assets[assetType])
         }
 
-        // Find dependent materials for models
+        // Find dependent materials for models using srctools
         const dependentAssets = []
         for (const asset of allAssets) {
             if (asset.startsWith("models/")) {
-                const dependentMaterials = findDependentMaterials(
-                    asset,
-                    portal2Dir,
-                )
+                console.log(`Finding materials for model: ${asset}`)
+                const dependentMaterials = await getMdlMaterials(asset, portal2Dir, searchDirs)
+                console.log(`Found ${dependentMaterials.length} materials for ${asset}:`, dependentMaterials)
                 dependentAssets.push(...dependentMaterials)
             }
         }
@@ -96,24 +166,17 @@ async function autopackInstance(instancePath, packageDir, itemName) {
         }
 
         // Verify packing
+        // Files are copied to resources/{asset} directly, not resources/{searchDir}/{asset}
         const verificationResults = []
         for (const asset of assetsToPack) {
-            let found = false
-            for (const searchDir of searchDirs) {
-                const assetPath = path.join(portal2Dir, searchDir, asset)
-                if (fs.existsSync(assetPath)) {
-                    const relativePath = path.relative(portal2Dir, assetPath)
-                    const packagePath = path.join(
-                        packageDir,
-                        "resources",
-                        relativePath,
-                    )
-                    if (fs.existsSync(packagePath)) {
-                        found = true
-                        break
-                    }
-                }
+            // For models, check for the .mdl file
+            let assetToCheck = asset
+            if (asset.startsWith("models/") && !asset.endsWith(".mdl")) {
+                assetToCheck = asset + ".mdl"
             }
+
+            const packagePath = path.join(packageDir, "resources", assetToCheck)
+            const found = fs.existsSync(packagePath)
             verificationResults.push({ asset, found })
         }
 
@@ -124,8 +187,12 @@ async function autopackInstance(instancePath, packageDir, itemName) {
             `Autopacking completed: ${successCount}/${totalCount} assets packed`,
         )
 
+        const allPacked = successCount === totalCount
+        const failedAssets = verificationResults.filter((r) => !r.found).map((r) => r.asset)
+
         return {
-            success: successCount === totalCount,
+            success: allPacked,
+            error: allPacked ? null : `Failed to verify ${failedAssets.length} assets: ${failedAssets.join(", ")}`,
             packedFiles,
             verificationResults,
             totalAssets: totalCount,
