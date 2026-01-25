@@ -24,7 +24,7 @@ function extractAssetsFromVMF(vmfPath) {
         }
 
         // Recursive function to find entities and extract their assets
-        const extractAssetsRecursive = (obj) => {
+        const extractAssetsRecursive = (obj, parentKey = "") => {
             if (typeof obj !== "object" || obj === null) return
 
             // Check if this is an entity with asset properties
@@ -61,10 +61,17 @@ function extractAssetsFromVMF(vmfPath) {
                 }
             }
 
+            // Extract materials from brush sides (key is "side" in VMF structure)
+            if (parentKey === "side" || obj.material) {
+                if (obj.material && typeof obj.material === "string") {
+                    assets.MATERIAL.push(obj.material.toLowerCase())
+                }
+            }
+
             // Recursively search all properties
             for (const [key, value] of Object.entries(obj)) {
                 if (typeof value === "object" && value !== null) {
-                    extractAssetsRecursive(value)
+                    extractAssetsRecursive(value, key)
                 }
             }
         }
@@ -78,6 +85,17 @@ function extractAssetsFromVMF(vmfPath) {
                 (asset) => asset && asset.trim(),
             )
         }
+
+        // Filter out tool textures and common engine materials from the check
+        assets.MATERIAL = assets.MATERIAL.filter((mat) => {
+            // Skip tool textures (these are always available)
+            if (mat.startsWith("tools/")) return false
+            // Skip dev textures
+            if (mat.startsWith("dev/")) return false
+            // Skip skybox textures (handled specially)
+            if (mat.startsWith("skybox/")) return false
+            return true
+        })
 
         return assets
     } catch (error) {

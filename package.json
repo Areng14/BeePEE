@@ -139,6 +139,10 @@
                 "filter": [
                     "**/*"
                 ]
+            },
+            {
+                "from": "backend/libs/areng_mdlDepend",
+                "to": "extraResources/areng_mdlDepend"
             }
         ]
     },

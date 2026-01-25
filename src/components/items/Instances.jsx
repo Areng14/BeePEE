@@ -16,6 +16,11 @@ import {
     Divider,
     TextField,
     Alert,
+    CircularProgress,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
 } from "@mui/material"
 import EditIcon from "@mui/icons-material/Edit"
 import DeleteIcon from "@mui/icons-material/Delete"
@@ -28,6 +33,10 @@ import ExpandLessIcon from "@mui/icons-material/ExpandLess"
 import InfoIcon from "@mui/icons-material/Info"
 import LabelIcon from "@mui/icons-material/Label"
 import WarningIcon from "@mui/icons-material/Warning"
+import ImageIcon from "@mui/icons-material/Image"
+import ViewInArIcon from "@mui/icons-material/ViewInAr"
+import MusicNoteIcon from "@mui/icons-material/MusicNote"
+import DescriptionIcon from "@mui/icons-material/Description"
 import { useState, useEffect } from "react"
 import ViewInAr from "@mui/icons-material/ViewInAr"
 
@@ -42,6 +51,12 @@ function Instances({
     const [instanceToDelete, setInstanceToDelete] = useState(null)
     const [isRemovingMissing, setIsRemovingMissing] = useState(false)
     const [expandedStats, setExpandedStats] = useState(new Set())
+    const [isCheckingAssets, setIsCheckingAssets] = useState(false)
+    const [externalAssetsDialog, setExternalAssetsDialog] = useState({
+        open: false,
+        files: [], // Array of { fileName, externalAssets }
+        pendingFiles: [], // Files to add after user acknowledges warning
+    })
 
     // Convert formData instances to array format for rendering
     const instances = formData?.instances
@@ -96,46 +111,32 @@ function Instances({
             const result = await window.package.selectInstanceFile(item.id)
             console.log("Instances: File dialog result:", result)
             if (result.success && result.files && result.files.length > 0) {
-                // Start with current instances
-                let updatedInstances = { ...formData.instances }
+                // Check each file for external assets
+                setIsCheckingAssets(true)
+                const filesWithExternalAssets = []
+                const successfulFiles = result.files.filter(f => f.success)
 
-                // Process each selected file
-                for (const fileResult of result.files) {
-                    if (fileResult.success) {
-                        // Generate a unique index for each new instance
-                        const newIndex = `pending_${Date.now()}_${Math.random()
-                            .toString(36)
-                            .substr(2, 9)}` // Use timestamp + random string to ensure uniqueness
-
-                        // Create new instance object with pending data
-                        const newInstance = {
-                            Name: fileResult.instanceName,
-                            _pending: true,
-                            _filePath: fileResult.filePath, // Store the source file path for when we actually save
+                for (const fileResult of successfulFiles) {
+                    try {
+                        const assetCheck = await window.package.checkVmfExternalAssets(fileResult.filePath)
+                        if (assetCheck.success && assetCheck.hasExternalAssets) {
+                            filesWithExternalAssets.push({
+                                fileName: fileResult.fileName,
+                                filePath: fileResult.filePath,
+                                instanceName: fileResult.instanceName,
+                                externalAssets: assetCheck.assets.external,
+                                summary: assetCheck.summary,
+                            })
                         }
-
-                        // Add to instances collection
-                        updatedInstances[newIndex] = newInstance
-
-                        console.log(
-                            `Instances: Added pending instance: ${newInstance.Name} (will be saved on Save button)`,
-                        )
-
-                        // Small delay to ensure unique timestamps
-                        await new Promise((resolve) => setTimeout(resolve, 10))
-                    } else {
-                        console.error(
-                            "Instances: Failed to process file:",
-                            fileResult.error,
-                        )
+                    } catch (err) {
+                        console.warn(`Failed to check assets for ${fileResult.fileName}:`, err)
                     }
                 }
+                setIsCheckingAssets(false)
 
-                // Update formData with all new pending instances
-                onUpdateInstances(updatedInstances)
-                console.log(
-                    `Instances: Added ${result.files.length} pending instance(s)`,
-                )
+                // External assets check is informational only - autopacker handles copying
+                // Just add instances directly without blocking dialog
+                addPendingInstances(successfulFiles)
             } else if (!result.canceled) {
                 console.error(
                     "Instances: Failed to select instance:",
@@ -144,6 +145,59 @@ function Instances({
             }
         } catch (error) {
             console.error("Instances: Failed to select instance:", error)
+            setIsCheckingAssets(false)
+        }
+    }
+
+    // Helper function to add pending instances
+    const addPendingInstances = async (files) => {
+        let updatedInstances = { ...formData.instances }
+
+        for (const fileResult of files) {
+            if (fileResult.success) {
+                const newIndex = `pending_${Date.now()}_${Math.random()
+                    .toString(36)
+                    .substr(2, 9)}`
+
+                const newInstance = {
+                    Name: fileResult.instanceName,
+                    _pending: true,
+                    _filePath: fileResult.filePath,
+                }
+
+                updatedInstances[newIndex] = newInstance
+
+                console.log(
+                    `Instances: Added pending instance: ${newInstance.Name} (will be saved on Save button)`,
+                )
+
+                await new Promise((resolve) => setTimeout(resolve, 10))
+            }
+        }
+
+        onUpdateInstances(updatedInstances)
+        console.log(`Instances: Added ${files.length} pending instance(s)`)
+    }
+
+    // Handle user acknowledging external assets warning
+    const handleExternalAssetsAcknowledge = () => {
+        addPendingInstances(externalAssetsDialog.pendingFiles)
+        setExternalAssetsDialog({ open: false, files: [], pendingFiles: [] })
+    }
+
+    // Handle user canceling due to external assets
+    const handleExternalAssetsCancel = () => {
+        setExternalAssetsDialog({ open: false, files: [], pendingFiles: [] })
+    }
+
+    // Get icon for asset type
+    const getAssetIcon = (type) => {
+        switch (type) {
+            case "MODEL": return <ViewInArIcon fontSize="small" />
+            case "MATERIAL": return <ImageIcon fontSize="small" />
+            case "SOUND": return <MusicNoteIcon fontSize="small" />
+            case "SCRIPT": return <DescriptionIcon fontSize="small" />
+            default: return <DescriptionIcon fontSize="small" />
         }
     }
 
@@ -689,6 +743,100 @@ function Instances({
                         Delete
                     </Button>
                 </DialogActions>
+            </Dialog>
+
+            {/* External Assets Warning Dialog */}
+            <Dialog
+                open={externalAssetsDialog.open}
+                onClose={handleExternalAssetsCancel}
+                maxWidth="md"
+                fullWidth
+                PaperProps={{
+                    sx: {
+                        bgcolor: "#1e1e1e",
+                        color: "white",
+                    },
+                }}>
+                <DialogTitle sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                    <WarningIcon color="warning" />
+                    External Assets Detected
+                </DialogTitle>
+                <DialogContent>
+                    <Alert severity="warning" sx={{ mb: 2 }}>
+                        The following VMF file(s) use assets that are not part of the base Portal 2 installation.
+                        These custom assets may need to be included in your package for the item to work correctly.
+                    </Alert>
+
+                    {externalAssetsDialog.files.map((file, fileIndex) => (
+                        <Box key={fileIndex} sx={{ mb: 2 }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: "bold", mb: 1 }}>
+                                {file.fileName}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                {file.summary?.externalCount || file.externalAssets.length} external asset(s) found
+                            </Typography>
+                            <List dense sx={{ bgcolor: "rgba(0,0,0,0.2)", borderRadius: 1, maxHeight: 200, overflow: "auto" }}>
+                                {file.externalAssets.slice(0, 20).map((asset, assetIndex) => (
+                                    <ListItem key={assetIndex}>
+                                        <ListItemIcon sx={{ minWidth: 36 }}>
+                                            {getAssetIcon(asset.type)}
+                                        </ListItemIcon>
+                                        <ListItemText
+                                            primary={asset.path}
+                                            secondary={asset.type}
+                                            primaryTypographyProps={{
+                                                variant: "body2",
+                                                sx: { fontFamily: "monospace", fontSize: "0.75rem" }
+                                            }}
+                                            secondaryTypographyProps={{ variant: "caption" }}
+                                        />
+                                    </ListItem>
+                                ))}
+                                {file.externalAssets.length > 20 && (
+                                    <ListItem>
+                                        <ListItemText
+                                            primary={`... and ${file.externalAssets.length - 20} more`}
+                                            primaryTypographyProps={{
+                                                variant: "body2",
+                                                color: "text.secondary",
+                                                sx: { fontStyle: "italic" }
+                                            }}
+                                        />
+                                    </ListItem>
+                                )}
+                            </List>
+                        </Box>
+                    ))}
+                </DialogContent>
+                <DialogActions>
+                    <Button
+                        onClick={handleExternalAssetsCancel}
+                        sx={{ color: "rgba(255,255,255,0.6)" }}>
+                        Cancel
+                    </Button>
+                    <Button
+                        onClick={handleExternalAssetsAcknowledge}
+                        variant="contained"
+                        color="warning">
+                        Add Anyway
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Checking Assets Loading Overlay */}
+            <Dialog
+                open={isCheckingAssets}
+                PaperProps={{
+                    sx: {
+                        bgcolor: "#1e1e1e",
+                        color: "white",
+                        p: 3,
+                    },
+                }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <CircularProgress size={24} />
+                    <Typography>Checking for external assets...</Typography>
+                </Box>
             </Dialog>
         </Box>
     )

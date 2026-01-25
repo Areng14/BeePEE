@@ -102,6 +102,8 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.invoke("remove-instance", { itemId, instanceIndex }),
     getInstanceMetadata: (itemId, instanceIndex) =>
         ipcRenderer.invoke("get-instance-metadata", { itemId, instanceIndex }),
+    checkVmfExternalAssets: (vmfPath) =>
+        ipcRenderer.invoke("check-vmf-external-assets", { vmfPath }),
 
     // ========================================
     // INSTANCE NAMING FUNCTIONS
