@@ -12,6 +12,7 @@
                     "Autopacking custom assets not working",
                     "VMF2OBJ Crashing sometimes during model generation",
                     "Generated models can be previewed even after editor restart",
+                    "Bug where model generation doesnt make vmts",
                     "Codebase changes (got rid of that 5k events.js)"
                 ]
             }

@@ -241,6 +241,8 @@ function register(ipcMain, mainWindow) {
             if (fs.existsSync(stagedMaterialsDir)) {
                 fs.rmSync(stagedMaterialsDir, { recursive: true, force: true })
             }
+            // Clean up tempmdl directory if it exists
+            const tempmdlDir = path.join(stagingDir, "tempmdl")
             if (fs.existsSync(tempmdlDir)) {
                 fs.rmSync(tempmdlDir, { recursive: true, force: true })
             }
