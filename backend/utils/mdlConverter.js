@@ -528,6 +528,7 @@ async function convertMaterialsToPackage(
                 // Extract just the filename, ignore any directory structure
                 const baseFileName = path.basename(entry.name, ".png")
                 const vtfPath = path.join(flatDest, baseFileName + ".vtf")
+                const vmtPath = path.join(flatDest, baseFileName + ".vmt")
 
                 try {
                     console.log(`  Converting ${entry.name}...`)
@@ -535,15 +536,27 @@ async function convertMaterialsToPackage(
                     console.log(`    Target VTF: ${vtfPath}`)
 
                     // Convert PNG directly to VTF (already cartoonified by VMF2OBJ)
-                    // Skip automatic VMT creation - we'll create them ourselves with correct paths
                     await convertImageToVTF(srcPath, vtfPath, {
                         format: "DXT5",
                         generateMipmaps: true,
                         skipVMT: true,
                     })
 
-                    console.log(`    ✅ VTF created`)
-                    console.log(`  ✅ Converted: ${entry.name} → VTF`)
+                    // Create VMT file immediately after VTF
+                    const vmtContent = `patch
+{
+include "materials/models/props_map_editor/item_lighting_common.vmt"
+insert
+{
+$basetexture "models/props_map_editor/bpee/${itemName}/${baseFileName}"
+$selfillum 1
+$model 1
+}
+}
+`
+                    fs.writeFileSync(vmtPath, vmtContent, "utf-8")
+
+                    console.log(`    ✅ VTF + VMT created`)
                 } catch (error) {
                     console.error(`  ❌ FAILED to convert ${entry.name}:`)
                     console.error(`     Error: ${error.message}`)
@@ -555,15 +568,20 @@ async function convertMaterialsToPackage(
 
     // Parse MTL file to get material names and their texture paths
     // Try to find the MTL file - it might have a different name than itemName
+    // VMF2OBJ outputs {baseName}.mtl or {baseName}_0.mtl based on the VMF filename
     let mtlFilePath = path.join(tempDir, itemName + "_0.mtl")
 
-    // If not found, search for any *_0.mtl file in temp directory
+    // If not found, search for any .mtl file in temp directory
     if (!fs.existsSync(mtlFilePath)) {
         const tempFiles = fs.readdirSync(tempDir)
-        const mtlFile = tempFiles.find((f) => f.endsWith("_0.mtl"))
+        // First try *_0.mtl, then any .mtl file
+        let mtlFile = tempFiles.find((f) => f.endsWith("_0.mtl"))
+        if (!mtlFile) {
+            mtlFile = tempFiles.find((f) => f.endsWith(".mtl"))
+        }
         if (mtlFile) {
             mtlFilePath = path.join(tempDir, mtlFile)
-            console.log(`⚠️  Expected MTL file not found, using: ${mtlFile}`)
+            console.log(`📄 Found MTL file: ${mtlFile}`)
         }
     }
 
@@ -599,6 +617,8 @@ async function convertMaterialsToPackage(
 
         // Now create VMT files based on TEXTURE filenames (not material names!)
         // STUDIOMDL references materials by their TEXTURE filename, not the MTL material name
+        const createdVmts = new Set()
+
         for (const [materialName, texturePath] of Object.entries(materialMap)) {
             try {
                 // Extract just the texture filename (no path, no extension)
@@ -626,6 +646,7 @@ $model 1
 }
 `
                 fs.writeFileSync(vmtPath, vmtContent, "utf-8")
+                createdVmts.add(textureFileName)
                 console.log(
                     `  ✅ Created VMT: ${textureFileName}.vmt (for material: ${materialName.split(/[/\\]/).pop()})`,
                 )
@@ -633,6 +654,33 @@ $model 1
                 console.error(
                     `  ❌ Failed to create VMT for material ${materialName}: ${error.message}`,
                 )
+            }
+        }
+
+        // Fallback: Create VMT files for any VTF that doesn't have a corresponding VMT
+        // This handles cases where MTL parsing failed or was incomplete
+        if (fs.existsSync(materialTargetDir)) {
+            const vtfFiles = fs.readdirSync(materialTargetDir).filter(f => f.endsWith('.vtf'))
+            for (const vtfFile of vtfFiles) {
+                const baseName = vtfFile.replace('.vtf', '')
+                if (!createdVmts.has(baseName)) {
+                    const vmtPath = path.join(materialTargetDir, baseName + ".vmt")
+                    if (!fs.existsSync(vmtPath)) {
+                        const vmtContent = `patch
+{
+include "materials/models/props_map_editor/item_lighting_common.vmt"
+insert
+{
+$basetexture "models/props_map_editor/bpee/${itemName}/${baseName}"
+$selfillum 1
+$model 1
+}
+}
+`
+                        fs.writeFileSync(vmtPath, vmtContent, "utf-8")
+                        console.log(`  ✅ Created VMT (fallback): ${baseName}.vmt`)
+                    }
+                }
             }
         }
 
@@ -780,7 +828,10 @@ async function convertAndInstallMDL(
 
     // STAGING MODE: Use .bpee/tempmdl instead of temp_models
     const useStaging = options.useStaging !== false  // Default to true
-    const tempDir = path.join(packagePath, ".bpee", "tempmdl")
+    // Derive tempDir from objPath - materials are in the same directory as the OBJ file
+    // VMF2OBJ outputs materials to {outputDir}/materials/ where outputDir contains the OBJ
+    const tempDir = path.dirname(objPath)
+    console.log(`  TempDir (from objPath): ${tempDir}`)
 
     // Step 1: Convert materials from PNG to VTF/VMT FIRST (unless using shared materials)
     let materialTargetDir
