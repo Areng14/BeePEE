@@ -256,4 +256,17 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.removeAllListeners("update-status")
         ipcRenderer.on("update-status", (event, data) => callback(data))
     },
+
+    // ========================================
+    // CRASH REPORT FUNCTIONS
+    // ========================================
+    submitCrashReport: (userDescription, errorDetails) =>
+        ipcRenderer.invoke("submit-crash-report", { userDescription, errorDetails }),
+    getCrashReportStatus: () =>
+        ipcRenderer.invoke("get-crash-report-status"),
+    onCrashReportData: (callback) => {
+        ipcRenderer.removeAllListeners("crash-report-data")
+        ipcRenderer.on("crash-report-data", (event, data) => callback(data))
+    },
+    isUpdateAvailable: () => ipcRenderer.invoke("is-update-available"),
 })

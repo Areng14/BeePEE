@@ -805,6 +805,22 @@ class Item {
         this.reloadInstances()
     }
 
+    // Generate default ConnectionPoints for a 1x1 floor item (8 points, 2 per face)
+    generateDefaultConnectionPoints() {
+        return {
+            Point: [
+                { Dir: "1 0 0", Pos: "-1 0 0", SignageOffset: "-2 -1 0", Priority: 0 },
+                { Dir: "1 0 0", Pos: "-1 1 0", SignageOffset: "-2 2 0", Priority: 0 },
+                { Dir: "-1 0 0", Pos: "2 0 0", SignageOffset: "3 -1 0", Priority: 0 },
+                { Dir: "-1 0 0", Pos: "2 1 0", SignageOffset: "3 2 0", Priority: 0 },
+                { Dir: "0 1 0", Pos: "0 -1 0", SignageOffset: "-1 -2 0", Priority: 0 },
+                { Dir: "0 1 0", Pos: "1 -1 0", SignageOffset: "2 -2 0", Priority: 0 },
+                { Dir: "0 -1 0", Pos: "0 2 0", SignageOffset: "-1 3 0", Priority: 0 },
+                { Dir: "0 -1 0", Pos: "1 2 0", SignageOffset: "2 3 0", Priority: 0 },
+            ],
+        }
+    }
+
     // Input management functions
     getInputs() {
         const editoritems = this.getEditorItems()
@@ -832,6 +848,12 @@ class Item {
 
         // Add the new input
         editoritems.Item.Exporting.Inputs[inputName] = inputConfig
+
+        // Auto-generate ConnectionPoints if this item has inputs but none defined
+        if (!editoritems.Item.Exporting.ConnectionPoints) {
+            editoritems.Item.Exporting.ConnectionPoints =
+                this.generateDefaultConnectionPoints()
+        }
 
         this.saveEditorItems(editoritems)
         return inputName
@@ -1527,6 +1549,8 @@ class Item {
                             JSON.stringify(metaData, null, 4),
                             "utf-8",
                         )
+                        // Sync in-memory metadata to prevent stale data
+                        this.metadata = metaData
                     }
                     return true
                 }
@@ -1551,6 +1575,9 @@ class Item {
                     JSON.stringify(metaData, null, 4),
                     "utf-8",
                 )
+                // Sync in-memory metadata to prevent stale data
+                // (prevents updateMetadata() from overwriting vbsp_blocks)
+                this.metadata = metaData
             }
 
             // Save to vbsp_config.json
@@ -2133,6 +2160,19 @@ class Item {
     updateMetadata(updates) {
         if (!updates || typeof updates !== "object") {
             throw new Error("Metadata updates must be an object")
+        }
+
+        // Re-read metadata from disk to avoid overwriting data written by
+        // other methods (e.g. saveConditions writes vbsp_blocks to meta.json
+        // and the in-memory copy may be stale)
+        if (fs.existsSync(this.paths.meta)) {
+            try {
+                this.metadata = JSON.parse(
+                    fs.readFileSync(this.paths.meta, "utf-8"),
+                )
+            } catch (e) {
+                // Fall back to existing in-memory metadata
+            }
         }
 
         this.metadata = {

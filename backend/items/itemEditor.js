@@ -4,6 +4,7 @@ let createItemWindow = null // Track the create item window
 let createPackageWindow = null // Track the create package window
 let packageInformationWindow = null // Track the package information window
 let changelogWindow = null // Track the changelog window
+let crashReportWindow = null // Track the crash report window
 const { BrowserWindow, app } = require("electron")
 const path = require("path")
 const { isDev } = require("../utils/isDev.js")
@@ -317,6 +318,62 @@ function createModelPreviewWindow(modelData) {
 }
 
 /**
+ * Create a crash report window
+ * @param {Object|null} errorDetails - Error info or null for manual bug report
+ */
+function createCrashReportWindow(errorDetails) {
+    // If window already exists, focus it
+    if (crashReportWindow && !crashReportWindow.isDestroyed()) {
+        crashReportWindow.focus()
+        return
+    }
+
+    const isManual = !errorDetails
+
+    crashReportWindow = new BrowserWindow({
+        width: 500,
+        height: isManual ? 500 : 650,
+        title: isManual ? "BeePEE - Report a Bug" : "BeePEE - Unexpected Error",
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, "..", "preload.js"),
+        },
+        devTools: isDev,
+        skipTaskbar: false,
+        minimizable: true,
+        maximizable: true,
+        resizable: true,
+        autoHideMenuBar: true,
+    })
+
+    crashReportWindow.on("closed", () => {
+        crashReportWindow = null
+    })
+
+    if (isDev) {
+        crashReportWindow.loadURL(`http://localhost:5173/?route=crash-report`)
+    } else {
+        const appPath = app.getAppPath()
+        crashReportWindow.loadFile(path.join(appPath, "dist", "index.html"), {
+            query: { route: "crash-report" },
+        })
+    }
+
+    crashReportWindow.setMenuBarVisibility(false)
+
+    // Send crash report data after the window has finished loading
+    crashReportWindow.webContents.once("did-finish-load", () => {
+        setTimeout(() => {
+            crashReportWindow.webContents.send("crash-report-data", {
+                errorDetails: errorDetails || null,
+                isManual,
+            })
+        }, 100)
+    })
+}
+
+/**
  * Close all model preview windows to release file handles
  */
 async function closeAllModelPreviewWindows() {
@@ -441,6 +498,8 @@ module.exports = {
     getPackageInformationWindow: () => packageInformationWindow,
     createChangelogWindow,
     getChangelogWindow: () => changelogWindow,
+    createCrashReportWindow,
+    getCrashReportWindow: () => crashReportWindow,
     createModelPreviewWindow,
     closeAllModelPreviewWindows,
     closeAllEditorWindows,

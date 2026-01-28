@@ -130,7 +130,7 @@ function register(ipcMain, mainWindow) {
                 const editoritems = {
                     Item: {
                         Type: "ITEM_CUBE",
-                        ItemClass: "BEE2",
+                        ItemClass: "ItemBase",
                         SubtypeProperty: null,
                         Editor: {
                             SubType: {
@@ -359,7 +359,7 @@ function register(ipcMain, mainWindow) {
                 const editoritems = {
                     Item: {
                         Type: "ITEM_CUBE",
-                        ItemClass: "BEE2",
+                        ItemClass: "ItemBase",
                         Editor: {
                             SubType: {
                                 Name: itemName,
