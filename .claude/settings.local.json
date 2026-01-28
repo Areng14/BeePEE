@@ -25,7 +25,8 @@
       "Bash(node:*)",
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nMove model preview to React component and fix file handle issues\n\n- Migrate 900+ line inline model preview template from shared.js to \n  proper React component \\(ModelPreviewPage.jsx\\) using React Three Fiber\n- Add route handling in App.jsx for model-preview window\n- Add createModelPreviewWindow\\(\\) and closeAllModelPreviewWindows\\(\\) in \n  itemEditor.js following existing window patterns\n- Fix EPERM file handle issues:\n  - Replace net.fetch with fs.promises.readFile in beep:// protocol\n  - Add session.clearCache\\(\\) before closing preview windows\n  - Add clearAllWindowCaches\\(\\) in packageManager before directory deletion\n  - Implement rename-then-delete strategy for locked directories\n  - Add cleanupDeletedDirectories\\(\\) on app startup\n- Add mkdirWithRetry\\(\\) helper with exponential backoff for EPERM/EBUSY\n- Fix grid rendering in model preview using THREE.GridHelper\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(del \"c:\\\\Users\\\\ADMIN\\\\Dropbox\\\\My PC \\(DESKTOP-FBEPBG2\\)\\\\Documents\\\\projects\\\\BeePEE\\\\src\\\\components\\\\CrashReportDialog.jsx\")"
     ],
     "deny": [],
     "ask": [],

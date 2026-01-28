@@ -307,12 +307,12 @@ function register(ipcMain, mainWindow) {
 
             fs.copyFileSync(selectedFilePath, targetIconPath)
 
-            // Convert icon to VTF at standard location
+            // Convert icon to VTF using item ID for unique path
             const { convertImageToVTF } = require("../utils/vtfConverter")
             const vtfPath = path.join(
                 item.packagePath,
-                "resources/materials/models/props_map_editor/palette/bpee/item",
-                "item.vtf",
+                `resources/materials/models/props_map_editor/palette/bpee/${item.id}`,
+                `${item.id}.vtf`,
             )
             try {
                 await convertImageToVTF(selectedFilePath, vtfPath, {
@@ -343,7 +343,7 @@ function register(ipcMain, mainWindow) {
                 fs.writeFileSync(propertiesPath, JSON.stringify(properties, null, 2))
             }
 
-            // Update editoritems.json to use standard palette path
+            // Update editoritems.json to use item-specific palette path
             const editorItemsPath = path.join(item.fullItemPath, "editoritems.json")
             if (fs.existsSync(editorItemsPath)) {
                 const editorItems = JSON.parse(fs.readFileSync(editorItemsPath, "utf-8"))
@@ -354,7 +354,7 @@ function register(ipcMain, mainWindow) {
                         : editor.SubType
 
                     if (!subType.Palette) subType.Palette = {}
-                    subType.Palette.Image = "palette/bpee/item/item"
+                    subType.Palette.Image = `palette/bpee/${item.id}/${item.id}`
 
                     fs.writeFileSync(editorItemsPath, JSON.stringify(editorItems, null, 2))
                 }

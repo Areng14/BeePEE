@@ -10,7 +10,7 @@ import {
 import { CheckCircle, Close } from "@mui/icons-material"
 
 function CreateItemPage() {
-    const [itemId, setItemId] = useState("")
+    const [itemName, setItemName] = useState("")
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
 
@@ -20,20 +20,20 @@ function CreateItemPage() {
 
         try {
             // Validate required fields
-            if (!itemId.trim()) {
-                throw new Error("Item ID is required")
+            if (!itemName.trim()) {
+                throw new Error("Item name is required")
             }
 
-            // Validate item ID format
-            if (!/^[a-zA-Z0-9_]+$/.test(itemId.trim())) {
+            // Validate item name format
+            if (!/^[a-zA-Z0-9_ ]+$/.test(itemName.trim())) {
                 throw new Error(
-                    "Item ID can only contain letters, numbers, and underscores",
+                    "Item name can only contain letters, numbers, spaces, and underscores",
                 )
             }
 
             // Call backend to create item
             const result = await window.electron.invoke("create-item-simple", {
-                itemId: itemId.trim(),
+                name: itemName.trim(),
             })
 
             if (result.success) {
@@ -89,15 +89,15 @@ function CreateItemPage() {
                     )}
 
                     <TextField
-                        label="Item ID"
-                        value={itemId}
-                        onChange={(e) => setItemId(e.target.value)}
-                        placeholder="my_custom_item"
+                        label="Item Name"
+                        value={itemName}
+                        onChange={(e) => setItemName(e.target.value)}
+                        placeholder="My Custom Item"
                         fullWidth
                         required
                         autoFocus
                         disabled={loading}
-                        helperText="Enter a unique identifier for your item (letters, numbers, and underscores only)"
+                        helperText="Enter a name for your item (a unique ID will be generated automatically)"
                     />
 
                     <Alert severity="info">
@@ -129,7 +129,7 @@ function CreateItemPage() {
                         variant="contained"
                         color="primary"
                         onClick={handleCreate}
-                        disabled={loading || !itemId.trim()}
+                        disabled={loading || !itemName.trim()}
                         startIcon={<CheckCircle />}
                         sx={{ minWidth: 120 }}>
                         {loading ? "Creating..." : "Create"}

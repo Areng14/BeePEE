@@ -1,29 +1,19 @@
-            "version": "1.0.1",
-            "date": "2025-01-13",
+            "version": "1.0.5",
+            "date": "2026-01-28",
+            "notes": [
+                "This is an optional notes section for general announcements or important info"
+            ],
             "changes": {
                 "added": [
-                    "Full item creation workflow with separate window",
-                    "Item deletion system with confirmation dialog",
-                    "Welcome screen that shows when no package is loaded",
-                    "Package creation in separate window with proper structure",
-                    "Custom model conversion system (VMF → OBJ → MDL)",
-                    "3DS collision model generation",
-                    "Model generation staging system with save confirmation",
-                    "Random array support in VBSP conditions",
-                    "Automatic item metadata tracking (timestamps, custom models, import status)"
+                    "New feature 1",
+                    "New feature 2"
                 ],
                 "fixed": [
-                    "Instance paths now use relative paths instead of absolute",
-                    "UI updates properly after item creation/deletion",
-                    "\"Item not found\" errors when clicking deleted items",
-                    "BEE2 \"Unknown instance option error\" when parsing editoritems",
-                    "Event listener stacking issues"
+                    "Bug fix 1",
+                    "Bug fix 2"
                 ],
                 "changed": [
-                    "Item IDs now use format: bpee_{itemName}_{author}_{UUID}",
-                    "Package IDs now use format: PACKAGENAME_UUID",
-                    "Instance paths now include BEE2 prefix: instances/BEE2/bpee/{itemId}/",
-                    "Model staging system: changes applied only on Save"
+                    "Changed behavior 1"
                 ]
             }
         },
