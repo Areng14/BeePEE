@@ -16,6 +16,7 @@ class AutoUpdater {
         this.mainWindow = mainWindow
         this.updateCheckInterval = null
         this.autoUpdater = getAutoUpdater()
+        this.updateAvailableVersion = null // Set when an update is found
 
         // Configure auto-updater
         this.autoUpdater.logger = logger
@@ -46,6 +47,7 @@ class AutoUpdater {
             const msg = `Auto-updater: Update available - v${info.version}`
             logger.info(msg)
             console.log(`[${msg}]`)
+            this.updateAvailableVersion = info.version
             this.sendStatusToWindow("update-available", {
                 version: info.version,
                 releaseDate: info.releaseDate,
@@ -61,6 +63,7 @@ class AutoUpdater {
             const msg = `Auto-updater: No updates available. Current version (${info.version}) is the latest.`
             logger.info(msg)
             console.log(`[${msg}]`)
+            this.updateAvailableVersion = null
             this.sendStatusToWindow("update-not-available", {
                 version: info.version,
             })

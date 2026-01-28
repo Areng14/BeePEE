@@ -15,9 +15,11 @@ const {
     createPackageCreationWindow,
     createPackageInformationWindow,
     createChangelogWindow,
+    createCrashReportWindow,
 } = require("./items/itemEditor")
 const { isDev } = require("./utils/isDev.js")
 const { ensurePackagesDir } = require("./utils/packagesDir")
+const { logger } = require("./utils/logger")
 
 // Track last saved .bpee path in memory
 let lastSavedBpeePath = null
@@ -386,6 +388,22 @@ function createMainMenu(mainWindow) {
                     label: "Discord Server",
                     click: () => {
                         shell.openExternal("https://discord.gg/WPzDn4sZY3")
+                    },
+                },
+                { type: "separator" },
+                {
+                    label: "Report Bug...",
+                    click: () => {
+                        createCrashReportWindow(null)
+                    },
+                },
+                {
+                    label: "Open Logs Folder",
+                    click: () => {
+                        const logsDir = logger.getLogsDirectory()
+                        if (logsDir) {
+                            shell.openPath(logsDir)
+                        }
                     },
                 },
                 { type: "separator" },
