@@ -122,10 +122,14 @@ ipcMain.handle("api:loadImage", async (event, filePath) => {
 
 // Check if required Python bin folders exist for areng_ tools
 function checkArengBinFolders() {
+    const baseDir = app.isPackaged
+        ? path.join(process.resourcesPath, "extraResources")
+        : path.join(__dirname, "libs")
+
     const requiredFolders = [
-        path.join(__dirname, "libs", "areng_cartoonify", "_internal"),
-        path.join(__dirname, "libs", "areng_vmfMerge", "_internal"),
-        path.join(__dirname, "libs", "areng_obj23ds", "_internal"),
+        path.join(baseDir, "areng_cartoonify", "_internal"),
+        path.join(baseDir, "areng_vmfMerge", "_internal"),
+        path.join(baseDir, "areng_obj23ds", "_internal"),
     ]
 
     const missingFolders = []
@@ -464,11 +468,34 @@ app.whenReady().then(async () => {
 })
 
 // Handle uncaught exceptions and unhandled rejections
+// Debounce crash report dialogs to avoid spamming on rapid errors
+let lastCrashDialogTime = 0
+const CRASH_DIALOG_DEBOUNCE = 5000 // 5 seconds
+
+function sendCrashReportEvent(errorData) {
+    const now = Date.now()
+    if (now - lastCrashDialogTime < CRASH_DIALOG_DEBOUNCE) return
+    lastCrashDialogTime = now
+
+    try {
+        const { createCrashReportWindow } = require("./items/itemEditor")
+        createCrashReportWindow(errorData)
+    } catch (err) {
+        logger.error("Failed to open crash report window:", err)
+    }
+}
+
 process.on("uncaughtException", (error) => {
     logger.error("Uncaught Exception:", error)
     if (logger.originalConsole) {
         logger.originalConsole.error("Uncaught Exception:", error)
     }
+    sendCrashReportEvent({
+        type: "uncaughtException",
+        message: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+    })
 })
 
 process.on("unhandledRejection", (reason, promise) => {
@@ -476,6 +503,14 @@ process.on("unhandledRejection", (reason, promise) => {
     if (logger.originalConsole) {
         logger.originalConsole.error("Unhandled Rejection at:", promise, "reason:", reason)
     }
+    const message = reason instanceof Error ? reason.message : String(reason)
+    const stack = reason instanceof Error ? reason.stack : undefined
+    sendCrashReportEvent({
+        type: "unhandledRejection",
+        message,
+        stack,
+        timestamp: new Date().toISOString(),
+    })
 })
 
 // Clean up packages directory when app exits (only in production)

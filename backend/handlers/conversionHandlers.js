@@ -109,8 +109,7 @@ function register(ipcMain, mainWindow) {
                 // Convert OBJ to MDL
                 let mdlResult = null
                 try {
-                    console.log("🎯 Starting MDL conversion process...")
-                    const { convertAndInstallMDL } = require("../utils/mdlConverter")
+                        const { convertAndInstallMDL } = require("../utils/mdlConverter")
 
                     const itemName = item.id
                         .replace(/[^a-zA-Z0-9_-]/g, "_")
@@ -124,8 +123,6 @@ function register(ipcMain, mainWindow) {
                     )
 
                     if (mdlResult.success && mdlResult.relativeModelPath) {
-                        console.log("📝 Staging editoritems.json with custom model...")
-
                         const editorItems = item.getEditorItems()
                         const subType = Array.isArray(editorItems.Item.Editor.SubType)
                             ? editorItems.Item.Editor.SubType[0]
@@ -141,8 +138,6 @@ function register(ipcMain, mainWindow) {
                         }
 
                         mdlResult.stagedEditorItems = editorItems
-
-                        console.log(`✅ Staged editoritems with model: ${mdlResult.relativeModelPath}`)
                     }
                 } catch (mdlError) {
                     console.error("❌ MDL conversion failed:", mdlError)
@@ -186,8 +181,7 @@ function register(ipcMain, mainWindow) {
  * Handle variable-based model conversion (multiple instances)
  */
 async function handleVariableConversion(event, item, instanceKey, options) {
-    console.log(`🚀 Starting variable-based model conversion for item "${item.name}"`)
-    console.log(`   Variable: "${instanceKey}"`)
+    console.log(`🔄 Variable model conversion: "${item.name}" (${instanceKey})`)
 
     const { mapVariableValuesToInstances } = require("../utils/mdlConverter")
     const conditions = item.getConditions()
@@ -254,7 +248,6 @@ async function handleVariableConversion(event, item, instanceKey, options) {
  * Handle DEFAULT/First Instance conversion
  */
 async function handleDefaultConversion(event, item, options) {
-    console.log("First Instance selected: using the first registered instance for model generation")
 
     const instanceKeys = Object.keys(item.instances).sort(
         (a, b) => parseInt(a, 10) - parseInt(b, 10),
@@ -327,7 +320,6 @@ async function handleDefaultConversion(event, item, options) {
  * Handle timer variable (fill 0-30 range)
  */
 function handleTimerVariable(sortedValueInstanceMap) {
-    console.log("Timer variable detected, applying 0–30 fill logic...")
 
     let baseInstance = null
     if (sortedValueInstanceMap.has("0") || sortedValueInstanceMap.has(0)) {
@@ -362,7 +354,6 @@ function handleTimerVariable(sortedValueInstanceMap) {
  * Handle atlas-based conversion (multiple models in grid)
  */
 async function handleAtlasConversion(event, item, instanceKey, finalInstanceMap, options) {
-    console.log(`📐 Using VMF Atlas approach (grid layout)...`)
 
     const uniqueInstances = [...new Set(finalInstanceMap.values())]
 
@@ -405,8 +396,6 @@ async function handleAtlasConversion(event, item, instanceKey, finalInstanceMap,
         spacing: 256,
     })
 
-    console.log(`✅ VMF Atlas created: ${combinedVmfPath}`)
-
     event.sender.send("conversion-progress", {
         stage: "vmf2obj",
         message: `Converting ${vmfFiles.length} models in grid layout...`,
@@ -425,8 +414,6 @@ async function handleAtlasConversion(event, item, instanceKey, finalInstanceMap,
         throw new Error(`VMF2OBJ did not create expected output: ${combinedObjPath}`)
     }
 
-    console.log(`✅ Combined OBJ created: ${combinedObjPath}`)
-
     event.sender.send("conversion-progress", {
         stage: "split",
         message: "Splitting combined model into individual variants...",
@@ -441,7 +428,6 @@ async function handleAtlasConversion(event, item, instanceKey, finalInstanceMap,
     )
 
     // Convert materials once (shared)
-    console.log(`🎨 Converting materials to VTF/VMT format (shared)...`)
     const { convertMaterialsToPackage } = require("../utils/mdlConverter")
     const materialsSourceDir = path.join(tempDir, "materials")
     const sharedFolderName = item.id.toLowerCase()
@@ -464,7 +450,6 @@ async function handleAtlasConversion(event, item, instanceKey, finalInstanceMap,
     )
 
     // Convert each split OBJ to MDL
-    console.log(`🔨 Converting split OBJs to MDL...`)
     event.sender.send("conversion-progress", {
         stage: "mdl",
         message: `Converting ${splitResults.length} models to MDL format...`,
@@ -507,8 +492,7 @@ async function handleAtlasConversion(event, item, instanceKey, finalInstanceMap,
     const successfulResults = conversionResults.filter((r) => r.modelPath)
     const failedResults = conversionResults.filter((r) => r.error)
 
-    console.log(`✅ Successful: ${successfulResults.length}`)
-    console.log(`❌ Failed: ${failedResults.length}`)
+    console.log(`Model conversion: ${successfulResults.length} succeeded, ${failedResults.length} failed`)
 
     if (successfulResults.length === 0) {
         dialog.showMessageBox({
@@ -549,8 +533,6 @@ async function handleAtlasConversion(event, item, instanceKey, finalInstanceMap,
     )
 
     editorItems.Item.Editor.SubType = newSubTypes
-
-    console.log(`📝 Staged editoritems.json with ${newSubTypes.length} SubTypes`)
 
     dialog.showMessageBox({
         type: successfulResults.length === conversionResults.length ? "info" : "warning",

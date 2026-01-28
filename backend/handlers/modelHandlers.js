@@ -42,6 +42,14 @@ function register(ipcMain, mainWindow) {
                 throw new Error("Failed to save model name to editoritems.json")
             }
 
+            // If switching away from a bpee/ generated model, clear hasCustomModel flag
+            if (!modelName || !modelName.startsWith("bpee/")) {
+                const metadata = item.getMetadata()
+                if (metadata?.hasCustomModel) {
+                    item.updateMetadata({ hasCustomModel: false })
+                }
+            }
+
             const updatedItem = item.toJSONWithExistence()
             mainWindow.webContents.send("item-updated", updatedItem)
             sendItemUpdateToEditor(itemId, updatedItem)
@@ -112,11 +120,6 @@ function register(ipcMain, mainWindow) {
     // Save staged editoritems (from model generation)
     ipcMain.handle("save-staged-editoritems", async (event, { itemId, stagedEditorItems, hasObjFiles = false }) => {
         try {
-            console.log(`🔍 save-staged-editoritems called with:`)
-            console.log(`   itemId: ${itemId}`)
-            console.log(`   hasObjFiles: ${hasObjFiles}`)
-            console.log(`   stagedEditorItems: ${stagedEditorItems ? 'provided' : 'null'}`)
-
             const item = packages
                 .flatMap((p) => p.items)
                 .find((i) => i.id === itemId)
@@ -127,59 +130,35 @@ function register(ipcMain, mainWindow) {
             }
 
             item.saveEditorItems(stagedEditorItems)
-            console.log(`✅ Saved staged editoritems for item: ${item.name}`)
 
             // Check if a custom model was added
             const subType = stagedEditorItems?.Item?.Editor?.SubType
             const subTypes = Array.isArray(subType) ? subType : [subType]
 
-            console.log(`🔍 Checking ${subTypes.length} SubType(s) for custom model`)
-
             let hasValidCustomModel = false
             for (const st of subTypes) {
-                console.log(`   SubType Model: ${JSON.stringify(st?.Model)}`)
-                if (!st?.Model?.ModelName) {
-                    console.log(`   ⏭️ Skipping SubType - no ModelName`)
-                    continue
-                }
+                if (!st?.Model?.ModelName) continue
 
                 const modelName = st.Model.ModelName
-                console.log(`   ModelName: ${modelName}`)
-                console.log(`   Starts with 'bpee/': ${typeof modelName === 'string' && modelName.startsWith('bpee/')}`)
-
                 if (typeof modelName === 'string' && modelName.startsWith('bpee/')) {
-                    // Model files are stored in props_map_editor/bpee/... but editoritems references bpee/...
                     const modelPath = path.join(item.packagePath, "resources", "models", "props_map_editor", modelName)
-                    console.log(`   Full model path: ${modelPath}`)
-                    console.log(`   File exists: ${fs.existsSync(modelPath)}`)
-                    console.log(`   hasObjFiles: ${hasObjFiles}`)
 
                     if (fs.existsSync(modelPath) && hasObjFiles) {
                         hasValidCustomModel = true
-                        console.log(`✅ Found custom model file: ${modelPath} (OBJ files confirmed)`)
                         break
-                    } else if (fs.existsSync(modelPath) && !hasObjFiles) {
-                        console.log(`⚠️ Model file exists but no OBJ files found - not marking as custom model: ${modelPath}`)
-                    } else {
-                        console.log(`⚠️ Custom model path found in editoritems but file doesn't exist: ${modelPath}`)
                     }
                 }
             }
 
-            console.log(`🔍 hasValidCustomModel result: ${hasValidCustomModel}`)
-
             if (hasValidCustomModel) {
                 item.updateMetadata({ hasCustomModel: true })
-                console.log(`✅ Updated meta.json: marked item as having custom model`)
-            } else {
-                console.log(`⚠️ Not marking as custom model - conditions not met`)
             }
 
             const updatedItem = item.toJSONWithExistence()
-            console.log(`📤 Sending item-updated with metadata:`, updatedItem.metadata)
             mainWindow.webContents.send("item-updated", updatedItem)
             sendItemUpdateToEditor(itemId, updatedItem)
 
+            console.log(`✅ Saved staged editoritems for: ${item.name}`)
             return { success: true }
         } catch (error) {
             console.error("Failed to save staged editoritems:", error)
@@ -199,11 +178,8 @@ function register(ipcMain, mainWindow) {
             const stagingDir = path.join(packagePath, ".bpee")
 
             if (!fs.existsSync(stagingDir)) {
-                console.log("No staged files found, skipping copy")
                 return { success: true, copied: false }
             }
-
-            console.log(`📋 Copying staged files from .bpee/ to resources/...`)
 
             // Copy staged models
             const stagedModelsDir = path.join(stagingDir, "models")
@@ -227,14 +203,9 @@ function register(ipcMain, mainWindow) {
             if (fs.existsSync(objModelsDir)) {
                 const files = fs.readdirSync(objModelsDir)
                 hasObjFiles = files.some(file => file.endsWith('.obj'))
-                if (hasObjFiles) {
-                    console.log(`✅ Found OBJ files in ${objModelsDir}`)
-                }
             }
-            console.log(`   hasObjFiles: ${hasObjFiles}`)
 
             // Clean up staging directory after successful copy
-            console.log(`🧹 Cleaning up staging directory...`)
             if (fs.existsSync(stagedModelsDir)) {
                 fs.rmSync(stagedModelsDir, { recursive: true, force: true })
             }
@@ -247,7 +218,6 @@ function register(ipcMain, mainWindow) {
                 fs.rmSync(tempmdlDir, { recursive: true, force: true })
             }
 
-            console.log(`✅ Staged files copied successfully`)
             return { success: true, copied: true, hasObjFiles }
         } catch (error) {
             console.error("Failed to copy staged files:", error)
@@ -271,7 +241,6 @@ function copyRecursive(src, dest, packagePath) {
         }
     } else {
         fs.copyFileSync(src, dest)
-        console.log(`  Copied: ${path.relative(packagePath, dest)}`)
     }
 }
 

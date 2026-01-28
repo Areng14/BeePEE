@@ -355,6 +355,12 @@ function ItemEditor() {
         // Add to undo stack before making changes
         addToUndoStack(section, `Change ${field}`)
 
+        // If the user changes the model away from a generated model, clear staged editoritems
+        // so the old generated model data doesn't overwrite their new choice on save
+        if (field === "modelName" && value !== "Generate" && !(typeof value === "string" && value.startsWith("bpee/"))) {
+            setStagedEditorItems(null)
+        }
+
         setFormData((prev) => {
             const newData = {
                 ...prev,
@@ -796,6 +802,9 @@ function ItemEditor() {
             if (savePromises.length > 0) {
                 await Promise.all(savePromises)
             }
+
+            // Ensure ConnectionPoints exist if item has I/O
+            await window.package?.ensureConnectionPoints?.(item.id)
 
             if (!hasErrors) {
                 // Show checkmark icon temporarily

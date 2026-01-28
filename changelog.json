@@ -1,6 +1,15 @@
 {
     "versions": [
         {
+            "version": "1.0.4",
+            "date": "2026-1-26",
+            "changes": {
+                "fixed": [
+                    "Autopacking causing an error when importing an instance"
+                ]
+            }
+        },
+        {
             "version": "1.0.3",
             "date": "2026-1-25",
             "changes": {
