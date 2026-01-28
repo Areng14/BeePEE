@@ -11,13 +11,13 @@ import {
 } from "@mui/material"
 
 function CreateItemDialog({ open, onClose, onItemCreated }) {
-    const [itemId, setItemId] = useState("")
+    const [itemName, setItemName] = useState("")
     const [error, setError] = useState("")
     const [loading, setLoading] = useState(false)
 
     // Reset form when dialog opens
     const handleOpen = () => {
-        setItemId("")
+        setItemName("")
         setError("")
         setLoading(false)
     }
@@ -28,20 +28,20 @@ function CreateItemDialog({ open, onClose, onItemCreated }) {
 
         try {
             // Validate required fields
-            if (!itemId.trim()) {
-                throw new Error("Item ID is required")
+            if (!itemName.trim()) {
+                throw new Error("Item name is required")
             }
 
-            // Validate item ID format
-            if (!/^[a-zA-Z0-9_]+$/.test(itemId.trim())) {
+            // Validate item name format
+            if (!/^[a-zA-Z0-9_ ]+$/.test(itemName.trim())) {
                 throw new Error(
-                    "Item ID can only contain letters, numbers, and underscores",
+                    "Item name can only contain letters, numbers, spaces, and underscores",
                 )
             }
 
             // Call backend to create item
             const result = await window.electron.invoke("create-item-simple", {
-                itemId: itemId.trim(),
+                name: itemName.trim(),
             })
 
             if (result.success) {
@@ -83,13 +83,13 @@ function CreateItemDialog({ open, onClose, onItemCreated }) {
                     )}
 
                     <TextField
-                        label="Item ID *"
-                        value={itemId}
-                        onChange={(e) => setItemId(e.target.value)}
+                        label="Item Name *"
+                        value={itemName}
+                        onChange={(e) => setItemName(e.target.value)}
                         fullWidth
                         autoFocus
-                        helperText="Enter a unique identifier for your item (letters, numbers, and underscores only)"
-                        placeholder="e.g., my_custom_item"
+                        helperText="Enter a name for your item (a unique ID will be generated automatically)"
+                        placeholder="e.g., My Custom Item"
                     />
 
                     <Alert severity="info">
@@ -104,7 +104,7 @@ function CreateItemDialog({ open, onClose, onItemCreated }) {
                     onClick={handleCreate}
                     variant="contained"
                     fullWidth
-                    disabled={loading || !itemId.trim()}>
+                    disabled={loading || !itemName.trim()}>
                     {loading ? "Creating..." : "Create Item"}
                 </Button>
                 <Button onClick={onClose} disabled={loading} fullWidth>

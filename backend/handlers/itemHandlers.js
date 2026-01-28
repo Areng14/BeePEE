@@ -337,16 +337,13 @@ function register(ipcMain, mainWindow) {
                 const sanitizedName = itemName
                     .replace(/[^a-zA-Z0-9]/g, "")
                     .toLowerCase()
-                const sanitizedAuthor = (author || "unknown")
-                    .replace(/[^a-zA-Z0-9]/g, "")
-                    .toLowerCase()
                 const uuid = crypto
                     .randomBytes(2)
                     .toString("hex")
                     .toUpperCase()
 
-                const itemId = `bpee_${sanitizedName}_${sanitizedAuthor}_${uuid}`
-                const itemFolder = `${sanitizedName}_${sanitizedAuthor}`
+                const itemId = `bpee_${sanitizedName}_${uuid}`
+                const itemFolder = sanitizedName
                 const itemFolderPath = path.join(
                     packagePath,
                     "items",

@@ -1,6 +1,23 @@
 {
     "versions": [
         {
+            "version": "1.0.5",
+            "date": "2026-1-28",
+            "notes": [
+                "If you encounter a bug, or if beemod crashes on startup because of your package go to help > report bug to report bugs. Please be as descritpive as possible"
+            ],
+            "changes": {
+                "added": [
+                    "Report bug feature to catch more bugs from users",
+                    "Crash report feature to also catch more bugs"
+                ],
+                "fixed": [
+                    "ItemClass set to BEE2 instead of ItemBase causing BEE2 to crash on startup",
+                    "Items created in BeePEE does not have ConnectionPoints leading to grayed out connections"
+                ]
+            }
+        },
+        {
             "version": "1.0.4",
             "date": "2026-1-26",
             "changes": {

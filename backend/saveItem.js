@@ -8,17 +8,19 @@ const {
 
 /**
  * Handles VTF conversion for palette images referenced in editoritems.json
- * Always uses the standard path: palette/bpee/item/item
+ * Uses the item ID for unique paths: palette/bpee/{itemId}/{itemId}
  * @param {Object} editorItems - The editoritems JSON object
  * @param {string} iconPath - Path to the icon file that was just saved
  * @param {string} packagePath - Path to the package directory
  * @param {string} editorItemsPath - Path to the editoritems.json file
+ * @param {string} itemId - The item's unique ID
  */
 async function handleVTFConversion(
     editorItems,
     iconPath,
     packagePath,
     editorItemsPath,
+    itemId,
 ) {
     const editor = editorItems.Item?.Editor
     if (!editor?.SubType) return
@@ -27,8 +29,8 @@ async function handleVTFConversion(
         ? editor.SubType[0]
         : editor.SubType
 
-    // Always use the standard path for BeePEE items
-    const standardVTFPath = path.join(
+    // Use item ID for unique VTF path
+    const vtfPath = path.join(
         packagePath,
         "resources",
         "materials",
@@ -36,23 +38,23 @@ async function handleVTFConversion(
         "props_map_editor",
         "palette",
         "bpee",
-        "item",
-        "item.vtf",
+        itemId,
+        `${itemId}.vtf`,
     )
 
     try {
-        // Convert the icon to VTF format at the standard location
-        await convertImageToVTF(iconPath, standardVTFPath, {
+        // Convert the icon to VTF format
+        await convertImageToVTF(iconPath, vtfPath, {
             format: "DXT5",
             generateMipmaps: true,
         })
 
-        // Update editoritems to use the standard path
+        // Update editoritems to use the item-specific path
         if (!subType.Palette) subType.Palette = {}
-        subType.Palette.Image = "palette/bpee/item/item"
+        subType.Palette.Image = `palette/bpee/${itemId}/${itemId}`
 
         console.log(
-            `Successfully converted icon to VTF and updated reference: ${standardVTFPath}`,
+            `Successfully converted icon to VTF and updated reference: ${vtfPath}`,
         )
     } catch (error) {
         console.error(`Failed to handle VTF conversion:`, error)
@@ -209,6 +211,7 @@ async function saveItem(item) {
                         targetIconPath,
                         packagePath,
                         editorItemsPath,
+                        item.id,
                     )
                 } catch (error) {
                     console.error("Failed to convert icon to VTF:", error)

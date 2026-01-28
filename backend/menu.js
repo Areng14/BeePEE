@@ -28,6 +28,19 @@ let lastSavedBpeePath = null
 function getCurrentPackageName() {
     const currentPackageDir = getCurrentPackageDir()
     if (currentPackageDir) {
+        // Try to get the actual package name from info.json
+        try {
+            const infoPath = path.join(currentPackageDir, "info.json")
+            if (fs.existsSync(infoPath)) {
+                const packageInfo = JSON.parse(fs.readFileSync(infoPath, "utf-8"))
+                if (packageInfo.Name) {
+                    // Sanitize the name for use as filename
+                    return packageInfo.Name.replace(/[^a-zA-Z0-9_ -]/g, "_")
+                }
+            }
+        } catch (err) {
+            // Fall back to folder name if info.json can't be read
+        }
         return path.basename(currentPackageDir)
     }
     return "package"

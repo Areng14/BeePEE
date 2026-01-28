@@ -12,6 +12,7 @@ import {
     BugReport,
     BuildCircle,
     AutoAwesome,
+    InfoOutlined,
 } from "@mui/icons-material"
 
 function ChangelogPage() {
@@ -138,6 +139,52 @@ function ChangelogPage() {
                                     />
                                 )}
                             </Stack>
+
+                            {/* Notes (if any) */}
+                            {version.notes && version.notes.length > 0 && (
+                                <Box
+                                    sx={{
+                                        mb: 2,
+                                        p: 2,
+                                        borderRadius: 1,
+                                        bgcolor: "rgba(33, 150, 243, 0.08)",
+                                        border: "1px solid rgba(33, 150, 243, 0.2)",
+                                    }}>
+                                    <Stack
+                                        direction="row"
+                                        spacing={1}
+                                        alignItems="center"
+                                        sx={{ mb: 1 }}>
+                                        <InfoOutlined
+                                            sx={{
+                                                fontSize: 18,
+                                                color: "info.main",
+                                            }}
+                                        />
+                                        <Typography
+                                            variant="subtitle2"
+                                            sx={{
+                                                fontWeight: 600,
+                                                color: "info.main",
+                                            }}>
+                                            Notes
+                                        </Typography>
+                                    </Stack>
+                                    <Stack spacing={0.5}>
+                                        {version.notes.map((note, noteIndex) => (
+                                            <Typography
+                                                key={noteIndex}
+                                                variant="body2"
+                                                sx={{
+                                                    color: "text.secondary",
+                                                    pl: 3.5,
+                                                }}>
+                                                {note}
+                                            </Typography>
+                                        ))}
+                                    </Stack>
+                                </Box>
+                            )}
 
                             {/* Changes by Category */}
                             <Stack spacing={2}>
