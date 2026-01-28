@@ -2,7 +2,7 @@
  * Instance management handlers - add, remove, edit instances
  */
 
-const { dialog, BrowserWindow } = require("electron")
+const { app, dialog, BrowserWindow } = require("electron")
 const { spawn } = require("child_process")
 const fs = require("fs")
 const path = require("path")
@@ -24,18 +24,15 @@ const execFileAsync = promisify(execFile)
  */
 async function getMdlDependencies(mdlPath, portal2Dir) {
     try {
-        // Find the executable - check both dev and packaged paths
-        const devPath = path.join(__dirname, "..", "libs", "areng_mdlDepend", "find_mdl_deps.exe")
-        const packagedPath = path.join(process.resourcesPath || "", "extraResources", "areng_mdlDepend", "find_mdl_deps.exe")
+        // Use app.isPackaged to pick the correct path - don't rely on fs.existsSync
+        // because ASAR transparency makes files inside the archive appear to exist,
+        // but native executables can't run from inside ASAR
+        const isDev = !app.isPackaged
+        const exePath = isDev
+            ? path.join(__dirname, "..", "libs", "areng_mdlDepend", "find_mdl_deps.exe")
+            : path.join(process.resourcesPath || "", "extraResources", "areng_mdlDepend", "find_mdl_deps.exe")
 
-        let exePath = null
-        if (fs.existsSync(devPath)) {
-            exePath = devPath
-        } else if (fs.existsSync(packagedPath)) {
-            exePath = packagedPath
-        }
-
-        if (!exePath) {
+        if (!fs.existsSync(exePath)) {
             console.log("find_mdl_deps.exe not found, skipping MDL dependency check")
             return { success: false, error: "find_mdl_deps.exe not found", materials: [] }
         }

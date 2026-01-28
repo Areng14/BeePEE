@@ -147,6 +147,10 @@ contextBridge.exposeInMainWorld("package", {
     removeOutput: (itemId, outputName) =>
         ipcRenderer.invoke("remove-output", { itemId, outputName }),
 
+    // Ensure ConnectionPoints exist if item has I/O
+    ensureConnectionPoints: (itemId) =>
+        ipcRenderer.invoke("ensure-connection-points", { itemId }),
+
     // ========================================
     // VARIABLES MANAGEMENT FUNCTIONS
     // ========================================

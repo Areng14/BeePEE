@@ -805,6 +805,32 @@ class Item {
         this.reloadInstances()
     }
 
+    // Check if item has I/O but no ConnectionPoints, and generate defaults if needed
+    ensureConnectionPoints() {
+        try {
+            const editoritems = this.getEditorItems()
+            const exporting = editoritems.Item?.Exporting
+            if (!exporting) return
+
+            const hasInputs =
+                exporting.Inputs && Object.keys(exporting.Inputs).length > 0
+            const hasOutputs =
+                exporting.Outputs && Object.keys(exporting.Outputs).length > 0
+            const hasConnectionPoints = !!exporting.ConnectionPoints
+
+            if ((hasInputs || hasOutputs) && !hasConnectionPoints) {
+                editoritems.Item.Exporting.ConnectionPoints =
+                    this.generateDefaultConnectionPoints()
+                this.saveEditorItems(editoritems)
+                console.log(
+                    `Auto-generated ConnectionPoints for ${this.name} (has I/O but none defined)`,
+                )
+            }
+        } catch (error) {
+            // Silently ignore - item may not have editoritems yet
+        }
+    }
+
     // Generate default ConnectionPoints for a 1x1 floor item (8 points, 2 per face)
     generateDefaultConnectionPoints() {
         return {
@@ -849,7 +875,7 @@ class Item {
         // Add the new input
         editoritems.Item.Exporting.Inputs[inputName] = inputConfig
 
-        // Auto-generate ConnectionPoints if this item has inputs but none defined
+        // Auto-generate ConnectionPoints if this item has I/O but none defined
         if (!editoritems.Item.Exporting.ConnectionPoints) {
             editoritems.Item.Exporting.ConnectionPoints =
                 this.generateDefaultConnectionPoints()
@@ -956,6 +982,12 @@ class Item {
 
         // Add the new output
         editoritems.Item.Exporting.Outputs[outputName] = outputConfig
+
+        // Auto-generate ConnectionPoints if this item has I/O but none defined
+        if (!editoritems.Item.Exporting.ConnectionPoints) {
+            editoritems.Item.Exporting.ConnectionPoints =
+                this.generateDefaultConnectionPoints()
+        }
 
         this.saveEditorItems(editoritems)
         return outputName

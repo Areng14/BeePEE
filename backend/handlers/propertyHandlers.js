@@ -281,6 +281,21 @@ function register(ipcMain, mainWindow) {
             return { success: false, error: error.message }
         }
     })
+
+    // Ensure ConnectionPoints exist if item has I/O (called during save)
+    ipcMain.handle("ensure-connection-points", async (event, { itemId }) => {
+        try {
+            const item = packages
+                .flatMap((p) => p.items)
+                .find((i) => i.id === itemId)
+            if (!item) throw new Error("Item not found")
+
+            item.ensureConnectionPoints()
+            return { success: true }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
 }
 
 module.exports = { register }

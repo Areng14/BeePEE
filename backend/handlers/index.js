@@ -14,6 +14,7 @@ const conversionHandlers = require("./conversionHandlers")
 const resourceHandlers = require("./resourceHandlers")
 const updateHandlers = require("./updateHandlers")
 const dialogHandlers = require("./dialogHandlers")
+const crashReportHandlers = require("./crashReportHandlers")
 
 /**
  * Register all IPC handlers
@@ -32,6 +33,7 @@ function registerAll(ipcMain, mainWindow) {
     resourceHandlers.register(ipcMain, mainWindow)
     updateHandlers.register(ipcMain, mainWindow)
     dialogHandlers.register(ipcMain, mainWindow)
+    crashReportHandlers.register(ipcMain, mainWindow)
 
     console.log("✅ All IPC handlers registered")
 }

@@ -10,9 +10,6 @@ const execAsync = promisify(exec)
 
 // Helper to get MareTF path for Electron
 function getMareTFPath() {
-    console.log("isDev:", isDev)
-    console.log("__dirname:", __dirname)
-
     const maretfPath = isDev
         ? path.join(__dirname, "..", "libs", "maretf", "maretf.exe")
         : path.join(
@@ -21,9 +18,6 @@ function getMareTFPath() {
               "maretf",
               "maretf.exe",
           )
-
-    console.log("Looking for MareTF at:", maretfPath)
-    console.log("MareTF exists:", fs.existsSync(maretfPath))
 
     return maretfPath
 }
@@ -60,10 +54,6 @@ async function prepareImageForVTF(imagePath, tempPath) {
         // Cap the maximum size to keep VTF files smaller (max 512x512 instead of going higher)
         targetSize = Math.min(targetSize, 512)
 
-        console.log(
-            `Resizing image from ${width}x${height} to ${targetSize}x${targetSize} (stretched to fit)`,
-        )
-
         // Resize to square power-of-2 dimensions by stretching to fit
         await sharp(imagePath)
             .resize(targetSize, targetSize, {
@@ -94,7 +84,6 @@ async function convertImageToVTF(imagePath, outputPath, options = {}) {
         if (fs.existsSync(outputPath)) {
             try {
                 fs.unlinkSync(outputPath)
-                console.log(`Removed existing VTF file: ${outputPath}`)
             } catch (removeError) {
                 console.warn(
                     `Failed to remove existing VTF file: ${removeError.message}`,
@@ -121,8 +110,6 @@ async function convertImageToVTF(imagePath, outputPath, options = {}) {
 
                 // Add speed optimizations
                 const command = `"${maretfPath}" create "${processedImagePath}" -o "${outputPath}" --format "${format}" --version "${version}" --filter BOX --no-mips --quiet`
-
-                console.log(`Running MareTF: ${command}`)
 
                 // Use spawn instead of exec to have better process control
                 const { spawn } = require("child_process")
@@ -184,10 +171,6 @@ async function convertImageToVTF(imagePath, outputPath, options = {}) {
 
                 // MareTF uses stderr for some normal output, so check if file was actually created
                 if (fs.existsSync(outputPath)) {
-                    console.log(
-                        `Successfully converted ${imagePath} to VTF format: ${outputPath}`,
-                    )
-
                     // Clean up temporary processed image if it was created
                     if (
                         processedImagePath !== imagePath &&
@@ -195,13 +178,8 @@ async function convertImageToVTF(imagePath, outputPath, options = {}) {
                     ) {
                         try {
                             fs.unlinkSync(processedImagePath)
-                            console.log(
-                                `Cleaned up temporary image: ${processedImagePath}`,
-                            )
                         } catch (cleanupError) {
-                            console.warn(
-                                `Failed to cleanup temp image: ${cleanupError.message}`,
-                            )
+                            // Ignore temp cleanup failures
                         }
                     }
 
@@ -231,12 +209,8 @@ async function convertImageToVTF(imagePath, outputPath, options = {}) {
                 if (maretfProcess && !maretfProcess.killed) {
                     try {
                         maretfProcess.kill("SIGTERM")
-                        console.log("Killed hanging MareTF process")
                     } catch (killError) {
-                        console.warn(
-                            "Failed to kill MareTF process:",
-                            killError.message,
-                        )
+                        // Ignore kill failures
                     }
                 }
 
@@ -264,13 +238,8 @@ async function convertImageToVTF(imagePath, outputPath, options = {}) {
         ) {
             try {
                 fs.unlinkSync(processedImagePath)
-                console.log(
-                    `Cleaned up temporary image after error: ${processedImagePath}`,
-                )
             } catch (cleanupError) {
-                console.warn(
-                    `Failed to cleanup temp image after error: ${cleanupError.message}`,
-                )
+                // Ignore temp cleanup failures
             }
         }
 
@@ -312,7 +281,6 @@ $model 1
 `
 
         fs.writeFileSync(vmtPath, vmtContent, "utf-8")
-        console.log(`✅ Created VMT file: ${vmtPath}`)
     } catch (error) {
         console.error(`Failed to create VMT file: ${error.message}`)
         throw error
@@ -402,9 +370,6 @@ function updateEditorItemsWithVTF(
             const materialsReferencePath = `models/props_map_editor/${cleanPath}`
 
             subType.Palette.Image = materialsReferencePath
-            console.log(
-                `Updated Image path from ${originalImagePath} to ${materialsReferencePath}`,
-            )
         }
     }
 

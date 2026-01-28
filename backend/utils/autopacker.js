@@ -10,6 +10,7 @@ const {
     assetExistsInPortal2,
 } = require("./vmfAssetExtractor")
 const { findPortal2Resources } = require("../data")
+const { isDev } = require("./isDev.js")
 
 /**
  * Get MDL material dependencies using find_mdl_deps.exe (srctools)
@@ -20,18 +21,14 @@ const { findPortal2Resources } = require("../data")
  */
 async function getMdlMaterials(mdlPath, portal2Dir, searchDirs = []) {
     try {
-        // Find the executable - check both dev and packaged paths
-        const devPath = path.join(__dirname, "..", "libs", "areng_mdlDepend", "find_mdl_deps.exe")
-        const packagedPath = path.join(process.resourcesPath || "", "extraResources", "areng_mdlDepend", "find_mdl_deps.exe")
+        // Use isDev to pick the correct path - don't rely on fs.existsSync()
+        // because ASAR transparency makes files inside the archive appear to exist,
+        // but native executables can't run from inside ASAR
+        const exePath = isDev
+            ? path.join(__dirname, "..", "libs", "areng_mdlDepend", "find_mdl_deps.exe")
+            : path.join(process.resourcesPath || "", "extraResources", "areng_mdlDepend", "find_mdl_deps.exe")
 
-        let exePath = null
-        if (fs.existsSync(devPath)) {
-            exePath = devPath
-        } else if (fs.existsSync(packagedPath)) {
-            exePath = packagedPath
-        }
-
-        if (!exePath) {
+        if (!fs.existsSync(exePath)) {
             console.log("find_mdl_deps.exe not found, skipping MDL material extraction")
             return []
         }

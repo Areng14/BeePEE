@@ -10,6 +10,7 @@ import WelcomePage from "./pages/WelcomePage"
 import ModelPreviewPage from "./pages/ModelPreviewPage"
 import LoadingPopup from "./components/LoadingPopup"
 import UpdateNotification from "./components/UpdateNotification"
+import CrashReportPage from "./pages/CrashReportPage"
 import { ItemProvider } from "./contexts/ItemContext"
 import "./global.css"
 
@@ -23,6 +24,7 @@ function App() {
     const showPackageInformation = routeParam === "package-information"
     const showChangelog = routeParam === "changelog"
     const showModelPreview = routeParam === "model-preview"
+    const showCrashReport = routeParam === "crash-report"
     const [packageLoaded, setPackageLoaded] = useState(false)
     const [loadingState, setLoadingState] = useState({
         open: false,
@@ -30,7 +32,6 @@ function App() {
         message: "Loading...",
         error: null,
     })
-
     useEffect(() => {
         // window.package should be available immediately after preload script loads
         if (!window.package) {
@@ -105,6 +106,9 @@ function App() {
             ) : showModelPreview ? (
                 // Show ModelPreviewPage directly for production windows
                 <ModelPreviewPage />
+            ) : showCrashReport ? (
+                // Show CrashReportPage directly for production windows
+                <CrashReportPage />
             ) : (
                 // Use normal routing for main window and development
                 <>
@@ -148,6 +152,10 @@ function App() {
                             <Route
                                 path="/model-preview"
                                 element={<ModelPreviewPage />}
+                            />
+                            <Route
+                                path="/crash-report"
+                                element={<CrashReportPage />}
                             />
                         </Routes>
                     </HashRouter>
