@@ -7,7 +7,7 @@
 
 // This placeholder gets replaced at build time
 // DO NOT commit an actual endpoint here - use the inject script
-const CRASH_REPORT_ENDPOINT = "__CRASH_REPORT_ENDPOINT__"
+const CRASH_REPORT_ENDPOINT = "https://beebot.up.railway.app/pee-report"
 
 /**
  * Get the crash report endpoint URL
