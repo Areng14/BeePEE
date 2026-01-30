@@ -110,6 +110,8 @@ const validateBlock = (
             return validateOffsetInstanceBlock(block)
         case "debug":
             return validateDebugBlock(block, availableVariables)
+        case "setInstVar":
+            return validateSetInstVarBlock(block)
         default:
             return []
     }
@@ -826,6 +828,28 @@ const validateDebugBlock = (block, availableVariables = []) => {
             message:
                 "Debug block has no message - consider adding one for better debugging",
             field: "message",
+        })
+    }
+
+    return errors
+}
+
+const validateSetInstVarBlock = (block) => {
+    const errors = []
+
+    if (!block.variable || block.variable.trim() === "") {
+        errors.push({
+            type: "error",
+            message: "Change Fixup must have a variable entered",
+            field: "variable",
+        })
+    }
+
+    if (!block.newValue || block.newValue.trim() === "") {
+        errors.push({
+            type: "warning",
+            message: "Change Fixup has no new value set",
+            field: "newValue",
         })
     }
 
@@ -1906,6 +1930,47 @@ function DebugBlock({ block, onUpdateProperty, availableVariables }) {
     )
 }
 
+function SetInstVarBlock({ block, onUpdateProperty }) {
+    return (
+        <Box sx={{ p: 2 }}>
+            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Change Fixup Variable
+            </Typography>
+
+            <Stack spacing={2}>
+                <TextField
+                    fullWidth
+                    size="small"
+                    label="Variable"
+                    placeholder="$variable_name"
+                    value={block.variable || ""}
+                    onChange={(e) =>
+                        onUpdateProperty("variable", e.target.value)
+                    }
+                />
+
+                <TextField
+                    fullWidth
+                    size="small"
+                    label="New Value"
+                    placeholder="Enter new value"
+                    value={block.newValue || ""}
+                    onChange={(e) =>
+                        onUpdateProperty("newValue", e.target.value)
+                    }
+                />
+            </Stack>
+
+            <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mt: 2 }}>
+                Sets the instance variable to a new value when this condition runs
+            </Typography>
+        </Box>
+    )
+}
+
 // Sortable Block Component - Generic for all block types
 function SortableBlock({
     block,
@@ -2011,6 +2076,8 @@ function SortableBlock({
                 return <Functions fontSize="small" />
             case "debug":
                 return <Category fontSize="small" />
+            case "setInstVar":
+                return <SwapVert fontSize="small" />
             default:
                 return <Category fontSize="small" />
         }
@@ -2033,6 +2100,7 @@ function SortableBlock({
             mapInstVar: "#9C27B0", // Purple - Map action
             offsetInstance: "#9C27B0", // Purple - Offset action
             debug: "#9C27B0", // Purple - Debug action
+            setInstVar: "#9C27B0", // Purple - Change fixup action
         }
 
         return (
@@ -2188,6 +2256,14 @@ function SortableBlock({
                         block={block}
                         onUpdateProperty={handleUpdateProperty}
                         availableVariables={availableVariables}
+                    />
+                )
+
+            case "setInstVar":
+                return (
+                    <SetInstVarBlock
+                        block={block}
+                        onUpdateProperty={handleUpdateProperty}
                     />
                 )
 
@@ -3411,6 +3487,14 @@ const BLOCK_DEFINITIONS = {
         canContainChildren: false,
         childContainers: [],
     },
+    setInstVar: {
+        displayName: "Change Fixup",
+        description:
+            "Set an instance variable to a new value (e.g., change $start_enabled to 1)",
+        category: "Actions",
+        canContainChildren: false,
+        childContainers: [],
+    },
 }
 
 function Conditions({
@@ -3768,6 +3852,12 @@ function Conditions({
                         Debug: {
                             Message: block.message || "",
                         },
+                    }
+
+                case "setInstVar":
+                    // Format: "setInstVar" "$variable new_value"
+                    return {
+                        setInstVar: `${block.variable || ""} ${block.newValue || ""}`,
                     }
 
                 default:
@@ -4583,6 +4673,22 @@ function Conditions({
                     blocks.push(randomBlock)
                 }
 
+                // Process setInstVar (Change Fixup) blocks
+                if (condition.setInstVar) {
+                    // Format: "$variable value" or just "$variable"
+                    const parts = condition.setInstVar.trim().split(/\s+/)
+                    const variable = parts[0] || ""
+                    const newValue = parts.slice(1).join(" ") || ""
+                    const setInstVarBlock = {
+                        id: `setInstVar_${generateUniqueId()}`,
+                        type: "setInstVar",
+                        displayName: "Change Fixup",
+                        variable: variable,
+                        newValue: newValue,
+                    }
+                    blocks.push(setInstVarBlock)
+                }
+
                 return blocks
             }
 
@@ -4804,6 +4910,22 @@ function Conditions({
                                 offset: conditionData.OffsetInst,
                             }
                             caseBlock.thenBlocks.push(offsetBlock)
+                        }
+
+                        // Handle setInstVar (Change Fixup)
+                        if (conditionData.setInstVar) {
+                            // Format: "$variable value" or "$variable"
+                            const parts = conditionData.setInstVar.trim().split(/\s+/)
+                            const variable = parts[0] || ""
+                            const newValue = parts.slice(1).join(" ") || ""
+                            const setInstVarBlock = {
+                                id: `setInstVar_${generateUniqueId()}`,
+                                type: "setInstVar",
+                                displayName: "Change Fixup",
+                                variable: variable,
+                                newValue: newValue,
+                            }
+                            caseBlock.thenBlocks.push(setInstVarBlock)
                         }
                     }
 
