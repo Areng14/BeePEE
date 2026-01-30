@@ -332,7 +332,7 @@ function createCrashReportWindow(errorDetails) {
 
     crashReportWindow = new BrowserWindow({
         width: 500,
-        height: 1000,
+        height: 550,
         title: isManual ? "BeePEE - Report a Bug" : "BeePEE - Unexpected Error",
         webPreferences: {
             nodeIntegration: false,
