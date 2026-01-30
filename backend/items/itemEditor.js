@@ -5,6 +5,7 @@ let createPackageWindow = null // Track the create package window
 let packageInformationWindow = null // Track the package information window
 let changelogWindow = null // Track the changelog window
 let crashReportWindow = null // Track the crash report window
+let beePackageWindow = null // Track the bee-package.json editor window
 const { BrowserWindow, app } = require("electron")
 const path = require("path")
 const { isDev } = require("../utils/isDev.js")
@@ -374,6 +375,49 @@ function createCrashReportWindow(errorDetails) {
 }
 
 /**
+ * Create the bee-package.json editor window
+ */
+function createBeePackageWindow(mainWindow) {
+    // If window already exists, focus it
+    if (beePackageWindow && !beePackageWindow.isDestroyed()) {
+        beePackageWindow.focus()
+        return
+    }
+
+    beePackageWindow = new BrowserWindow({
+        width: 550,
+        height: 600,
+        title: "BeePEE - BeePM Package Info",
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, "..", "preload.js"),
+        },
+        devTools: isDev,
+        skipTaskbar: false,
+        minimizable: true,
+        maximizable: false,
+        resizable: true,
+        autoHideMenuBar: true,
+    })
+
+    beePackageWindow.on("closed", () => {
+        beePackageWindow = null
+    })
+
+    if (isDev) {
+        beePackageWindow.loadURL(`http://localhost:5173/?route=bee-package`)
+    } else {
+        const appPath = app.getAppPath()
+        beePackageWindow.loadFile(path.join(appPath, "dist", "index.html"), {
+            query: { route: "bee-package" },
+        })
+    }
+
+    beePackageWindow.setMenuBarVisibility(false)
+}
+
+/**
  * Close all model preview windows to release file handles
  */
 async function closeAllModelPreviewWindows() {
@@ -500,6 +544,8 @@ module.exports = {
     getChangelogWindow: () => changelogWindow,
     createCrashReportWindow,
     getCrashReportWindow: () => crashReportWindow,
+    createBeePackageWindow,
+    getBeePackageWindow: () => beePackageWindow,
     createModelPreviewWindow,
     closeAllModelPreviewWindows,
     closeAllEditorWindows,

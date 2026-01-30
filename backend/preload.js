@@ -273,4 +273,11 @@ contextBridge.exposeInMainWorld("package", {
         ipcRenderer.on("crash-report-data", (event, data) => callback(data))
     },
     isUpdateAvailable: () => ipcRenderer.invoke("is-update-available"),
+
+    // ========================================
+    // BEE PACKAGE INFO FUNCTIONS
+    // ========================================
+    getBeePackageInfo: () => ipcRenderer.invoke("get-bee-package-info"),
+    saveBeePackageInfo: (beePackageData) =>
+        ipcRenderer.invoke("save-bee-package-info", beePackageData),
 })

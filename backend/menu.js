@@ -16,6 +16,7 @@ const {
     createPackageInformationWindow,
     createChangelogWindow,
     createCrashReportWindow,
+    createBeePackageWindow,
 } = require("./items/itemEditor")
 const { isDev } = require("./utils/isDev.js")
 const { ensurePackagesDir } = require("./utils/packagesDir")
@@ -374,6 +375,22 @@ function createMainMenu(mainWindow) {
                             return
                         }
                         createPackageInformationWindow(mainWindow)
+                    },
+                },
+                {
+                    label: "BeePM Package Info...",
+                    accelerator: "Ctrl+Shift+B",
+                    click: () => {
+                        const currentPackageDir = getCurrentPackageDir()
+                        if (!currentPackageDir) {
+                            dialog.showMessageBox(mainWindow, {
+                                type: "info",
+                                message: "No package is currently open",
+                                detail: "Please open or create a package first",
+                            })
+                            return
+                        }
+                        createBeePackageWindow(mainWindow)
                     },
                 },
             ],

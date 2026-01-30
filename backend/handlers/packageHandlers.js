@@ -326,6 +326,86 @@ function register(ipcMain, mainWindow) {
             dialog.showErrorBox("Save As Failed", err.message)
         }
     })
+
+    // Get bee-package.json info (or defaults from info.json)
+    ipcMain.handle("get-bee-package-info", async () => {
+        try {
+            const currentPackageDir = getCurrentPackageDir()
+            if (!currentPackageDir) {
+                return { success: false, error: "No package loaded" }
+            }
+
+            const beePackagePath = path.join(currentPackageDir, "bee-package.json")
+            const infoPath = path.join(currentPackageDir, "info.json")
+
+            // Check if bee-package.json exists
+            if (fs.existsSync(beePackagePath)) {
+                const beePackage = JSON.parse(fs.readFileSync(beePackagePath, "utf-8"))
+                return { success: true, info: beePackage, exists: true }
+            }
+
+            // Generate defaults from info.json
+            if (!fs.existsSync(infoPath)) {
+                return { success: false, error: "info.json not found" }
+            }
+
+            const packageInfo = JSON.parse(fs.readFileSync(infoPath, "utf-8"))
+
+            // Generate default bee-package.json structure
+            const defaultBeePackage = {
+                id: packageInfo.ID || "",
+                name: packageInfo.Name || "",
+                author: packageInfo.Author || "",
+                version: "1.0.0",
+                compatibleWith: ">=2.4.41",
+            }
+
+            return { success: true, info: defaultBeePackage, exists: false }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
+
+    // Save bee-package.json
+    ipcMain.handle("save-bee-package-info", async (event, beePackageData) => {
+        try {
+            const currentPackageDir = getCurrentPackageDir()
+            if (!currentPackageDir) {
+                return { success: false, error: "No package loaded" }
+            }
+
+            const beePackagePath = path.join(currentPackageDir, "bee-package.json")
+
+            // Validate required fields
+            if (!beePackageData.id?.trim()) {
+                return { success: false, error: "Package ID is required" }
+            }
+            if (!beePackageData.name?.trim()) {
+                return { success: false, error: "Package name is required" }
+            }
+            if (!beePackageData.author?.trim()) {
+                return { success: false, error: "Author is required" }
+            }
+            if (!beePackageData.version?.trim()) {
+                return { success: false, error: "Version is required" }
+            }
+
+            // Build the bee-package.json object
+            const beePackage = {
+                id: beePackageData.id.trim(),
+                name: beePackageData.name.trim(),
+                author: beePackageData.author.trim(),
+                version: beePackageData.version.trim(),
+                compatibleWith: beePackageData.compatibleWith?.trim() || ">=2.4.41",
+            }
+
+            fs.writeFileSync(beePackagePath, JSON.stringify(beePackage, null, 2))
+
+            return { success: true }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    })
 }
 
 module.exports = { register }

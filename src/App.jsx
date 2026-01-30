@@ -11,6 +11,7 @@ import ModelPreviewPage from "./pages/ModelPreviewPage"
 import LoadingPopup from "./components/LoadingPopup"
 import UpdateNotification from "./components/UpdateNotification"
 import CrashReportPage from "./pages/CrashReportPage"
+import BeePackagePage from "./pages/BeePackagePage"
 import { ItemProvider } from "./contexts/ItemContext"
 import "./global.css"
 
@@ -25,6 +26,7 @@ function App() {
     const showChangelog = routeParam === "changelog"
     const showModelPreview = routeParam === "model-preview"
     const showCrashReport = routeParam === "crash-report"
+    const showBeePackage = routeParam === "bee-package"
     const [packageLoaded, setPackageLoaded] = useState(false)
     const [loadingState, setLoadingState] = useState({
         open: false,
@@ -109,6 +111,9 @@ function App() {
             ) : showCrashReport ? (
                 // Show CrashReportPage directly for production windows
                 <CrashReportPage />
+            ) : showBeePackage ? (
+                // Show BeePackagePage directly for production windows
+                <BeePackagePage />
             ) : (
                 // Use normal routing for main window and development
                 <>
@@ -156,6 +161,10 @@ function App() {
                             <Route
                                 path="/crash-report"
                                 element={<CrashReportPage />}
+                            />
+                            <Route
+                                path="/bee-package"
+                                element={<BeePackagePage />}
                             />
                         </Routes>
                     </HashRouter>
