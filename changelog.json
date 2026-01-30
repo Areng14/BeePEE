@@ -9,7 +9,8 @@
             "changes": {
                 "added": [
                     "Report bug feature to catch more bugs from users",
-                    "Crash report feature to also catch more bugs"
+                    "Crash report feature to also catch more bugs",
+                    "New change fixup block"
                 ],
                 "fixed": [
                     "ItemClass set to BEE2 instead of ItemBase causing BEE2 to crash on startup",

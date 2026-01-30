@@ -7,7 +7,7 @@
     "author": "Areng",
     "repository": {
         "type": "git",
-        "url": "https://github.com/Areng14/BeePEE.git"
+        "url": "https://github.com/BeemodTools/BeePEE.git"
     },
     "scripts": {
         "dev": "concurrently -k \"vite\" \"electron .\"",
