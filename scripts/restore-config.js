@@ -1,4 +1,14 @@
 /**
+ * Restores the placeholder in crashReportConfig.js after build
+ * This prevents accidentally committing the real endpoint
+ */
+
+const fs = require("fs")
+const path = require("path")
+
+const CONFIG_FILE = path.join(__dirname, "..", "backend", "utils", "crashReportConfig.js")
+
+const TEMPLATE = `/**
  * Crash report endpoint configuration
  *
  * The placeholder below is replaced at build time by scripts/inject-config.js
@@ -22,3 +32,7 @@ function getCrashReportEndpoint() {
 }
 
 module.exports = { getCrashReportEndpoint }
+`
+
+fs.writeFileSync(CONFIG_FILE, TEMPLATE, "utf-8")
+console.log("Restored placeholder in crashReportConfig.js")

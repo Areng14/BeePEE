@@ -11,8 +11,8 @@
     },
     "scripts": {
         "dev": "concurrently -k \"vite\" \"electron .\"",
-        "build": "vite build && electron-builder",
-        "publish": "vite build && electron-builder --publish always",
+        "build": "node scripts/inject-config.js && vite build && electron-builder && node scripts/restore-config.js",
+        "publish": "node scripts/inject-config.js && vite build && electron-builder --publish always && node scripts/restore-config.js",
         "start": "electron .",
         "format": "prettier --write .",
         "lint": "eslint . --fix",
@@ -25,7 +25,7 @@
         "publish": [
             {
                 "provider": "github",
-                "owner": "Areng14",
+                "owner": "BeemodTools",
                 "repo": "BeePEE",
                 "releaseType": "release"
             }
