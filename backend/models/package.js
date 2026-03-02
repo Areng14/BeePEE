@@ -10,6 +10,7 @@ class Package {
         const packageName = path.parse(this.path).name
         this.packageDir = path.join(getPackagesDir(), packageName)
         this.items = []
+        this.signages = []
     }
 
     isLoaded() {
@@ -35,13 +36,8 @@ class Package {
                 this.name = parsedInfo.ID
             }
 
-            // Items
-            let rawitems = parsedInfo["Item"]
-            if (!rawitems) {
-                throw new Error(
-                    `[package : ${this.name}]: Invalid package format - no items found`,
-                )
-            }
+            // Items (now optional - packages can have only signages)
+            let rawitems = parsedInfo["Item"] || []
 
             // Convert single item to array
             if (!Array.isArray(rawitems)) {
@@ -56,6 +52,76 @@ class Package {
                         itemJSON: element,
                     }),
             )
+
+            // Signages (also optional)
+            let rawSignages = parsedInfo["Signage"] || []
+
+            // Convert single signage to array
+            if (!Array.isArray(rawSignages)) {
+                rawSignages = [rawSignages]
+            }
+
+            // Parse signages and resolve icon paths
+            this.signages = rawSignages.map((sig) => {
+                // Process styles to resolve icon paths
+                const processedStyles = {}
+                if (sig.Styles) {
+                    for (const [styleKey, styleValue] of Object.entries(
+                        sig.Styles,
+                    )) {
+                        // Handle style inheritance (e.g., "BORING_STYLE" = "FANCY_STYLE")
+                        if (typeof styleValue === "string") {
+                            processedStyles[styleKey] = styleValue
+                        } else if (styleValue && typeof styleValue === "object") {
+                            const iconPath = styleValue.icon
+                            let resolvedIcon = null
+                            if (iconPath) {
+                                // Resolve icon path relative to package
+                                // Icon can be:
+                                // - "items/clean/BEE/signage/cake.png" -> resources/BEE2/items/...
+                                // - "PACKAGE:path/file.png" -> resources/BEE2/path/file.png
+                                // - "filename.png" -> resources/BEE2/items/filename.png
+                                if (iconPath.includes(":")) {
+                                    // Package reference - just use the part after ':'
+                                    const pathPart = iconPath.split(":")[1]
+                                    resolvedIcon = path.join(
+                                        this.packageDir,
+                                        "resources/BEE2",
+                                        pathPart,
+                                    )
+                                } else if (iconPath.includes("/")) {
+                                    // Path with directories - prepend resources/BEE2
+                                    resolvedIcon = path.join(
+                                        this.packageDir,
+                                        "resources/BEE2",
+                                        iconPath,
+                                    )
+                                } else {
+                                    // Simple filename - look in BEE2/items
+                                    resolvedIcon = path.join(
+                                        this.packageDir,
+                                        "resources/BEE2/items",
+                                        iconPath,
+                                    )
+                                }
+                            }
+                            processedStyles[styleKey] = {
+                                ...styleValue,
+                                icon: resolvedIcon,
+                            }
+                        }
+                    }
+                }
+
+                return {
+                    id: sig.ID,
+                    name: sig.Name,
+                    hidden: sig.Hidden === "1" || sig.Hidden === true,
+                    primary: sig.Primary || null,
+                    secondary: sig.Secondary || null,
+                    styles: processedStyles,
+                }
+            })
 
             // Set importedVersion for items that don't have it (for imported packages)
             try {
@@ -91,12 +157,13 @@ class Package {
                 console.log(`⏭️ No VBSP instances to import in ${this.name}\n`)
             }
 
-            return this.items
+            return { items: this.items, signages: this.signages }
         } catch (error) {
             console.error(
                 `[package : ${this.name}]: Failed to load - ${error.message}`,
             )
             this.items = []
+            this.signages = []
             throw error
         }
     }

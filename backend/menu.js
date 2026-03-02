@@ -155,10 +155,10 @@ function createMainMenu(mainWindow) {
 
                             const pkg = await loadPackage(result.filePaths[0])
                             // currentPackageDir is now managed in packageManager.js
-                            mainWindow.webContents.send(
-                                "package:loaded",
-                                pkg.items,
-                            )
+                            mainWindow.webContents.send("package:loaded", {
+                                items: pkg.items,
+                                signages: pkg.signages,
+                            })
                         } catch (error) {
                             dialog.showErrorBox(
                                 "Open Failed",
@@ -207,10 +207,10 @@ function createMainMenu(mainWindow) {
                                 },
                             )
 
-                            mainWindow.webContents.send(
-                                "package:loaded",
-                                pkg.items,
-                            )
+                            mainWindow.webContents.send("package:loaded", {
+                                items: pkg.items,
+                                signages: pkg.signages,
+                            })
                         } catch (error) {
                             // Error is already sent to frontend via progress update
                             // No need for additional dialog since we show it in the loading popup

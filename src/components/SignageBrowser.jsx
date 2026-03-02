@@ -3,10 +3,35 @@ import { Box, Grid, Tooltip } from "@mui/material"
 import { Image as SignageIcon } from "@mui/icons-material"
 import AddButton from "./AddItem"
 
-// Placeholder signage icon component
+// Signage icon component with hidden signage handling
 function SignageIconCell({ signage, onEdit }) {
+    const [imageSrc, setImageSrc] = useState(null)
+    const isHidden = signage.hidden
+
+    useEffect(() => {
+        // Get icon from first available style
+        const styles = signage.styles || {}
+        const firstStyleKey = Object.keys(styles)[0]
+        const iconPath = firstStyleKey ? styles[firstStyleKey]?.icon : null
+
+        if (iconPath) {
+            window.package
+                .loadFile(iconPath)
+                .then(setImageSrc)
+                .catch((error) => {
+                    console.warn(
+                        `Failed to load icon for signage ${signage.name}:`,
+                        error,
+                    )
+                    setImageSrc(null)
+                })
+        }
+    }, [signage])
+
     return (
-        <Tooltip title={signage.name || "Signage"} placement="top">
+        <Tooltip
+            title={`${signage.name || "Signage"}${isHidden ? " (Hidden/Secondary)" : ""}`}
+            placement="top">
             <Box
                 onClick={onEdit}
                 sx={{
@@ -21,12 +46,42 @@ function SignageIconCell({ signage, onEdit }) {
                     alignItems: "center",
                     justifyContent: "center",
                     backgroundColor: "background.paper",
+                    opacity: isHidden ? 0.5 : 1,
+                    position: "relative",
                     "&:hover": {
                         borderColor: "primary.main",
                         backgroundColor: "action.hover",
                     },
                 }}>
-                <SignageIcon sx={{ fontSize: 48, color: "text.secondary" }} />
+                {isHidden && (
+                    <Box
+                        sx={{
+                            position: "absolute",
+                            top: 4,
+                            right: 4,
+                            fontSize: 10,
+                            color: "text.disabled",
+                            backgroundColor: "rgba(0,0,0,0.5)",
+                            px: 0.5,
+                            borderRadius: 0.5,
+                            zIndex: 1,
+                        }}>
+                        2nd
+                    </Box>
+                )}
+                {imageSrc ? (
+                    <img
+                        src={imageSrc}
+                        alt={signage.name}
+                        style={{
+                            width: "100%",
+                            height: "100%",
+                            objectFit: "cover",
+                        }}
+                    />
+                ) : (
+                    <SignageIcon sx={{ fontSize: 48, color: "text.secondary" }} />
+                )}
             </Box>
         </Tooltip>
     )
@@ -36,9 +91,53 @@ function SignageBrowser() {
     const [signages, setSignages] = useState([])
     const [gridSize, setGridSize] = useState({ cols: 12, rows: 8 })
 
-    // TODO: Load signages from package when backend is ready
     useEffect(() => {
-        console.log("SignageBrowser mounted")
+        console.log("SignageBrowser mounted, setting up package listener")
+
+        // Fetch current signages on mount (in case package was already loaded)
+        const fetchCurrentSignages = async () => {
+            try {
+                const currentSignages =
+                    await window.package.getCurrentSignages?.()
+                if (currentSignages && currentSignages.length > 0) {
+                    console.log(
+                        "SignageBrowser: Fetched current signages on mount:",
+                        currentSignages.length,
+                    )
+                    setSignages(currentSignages)
+                }
+            } catch (error) {
+                console.log(
+                    "SignageBrowser: No current signages available (this is normal for packages without signages)",
+                )
+            }
+        }
+        fetchCurrentSignages()
+
+        // Handle package load and updates
+        const handlePackageLoaded = (data) => {
+            console.log("SignageBrowser: Package loaded callback fired")
+            // Handle both old format (items array) and new format ({ items, signages })
+            const loadedSignages = Array.isArray(data)
+                ? []
+                : data?.signages || []
+            console.log("SignageBrowser: Loaded signages:", loadedSignages.length)
+            setSignages(loadedSignages)
+        }
+
+        // Handle package close
+        const handlePackageClosed = () => {
+            console.log("SignageBrowser: Package closed, clearing signages")
+            setSignages([])
+        }
+
+        // Register listeners
+        window.package.onPackageLoaded(handlePackageLoaded)
+        window.package.onPackageClosed(handlePackageClosed)
+
+        return () => {
+            console.log("Cleaning up SignageBrowser listeners")
+        }
     }, [])
 
     useEffect(() => {

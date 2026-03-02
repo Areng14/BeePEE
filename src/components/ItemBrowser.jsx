@@ -32,12 +32,14 @@ function ItemBrowser() {
         fetchCurrentItems()
 
         // Handle initial package load and updates (includes create/delete)
-        const handlePackageLoaded = (loadedItems) => {
+        const handlePackageLoaded = (data) => {
             console.log("Package loaded callback fired")
+            // Handle both old format (items array) and new format ({ items, signages })
+            const loadedItems = Array.isArray(data) ? data : data?.items || []
             console.log("loadedItems:", loadedItems)
             console.log("loadedItems length:", loadedItems?.length)
 
-            setItems(loadedItems || [])
+            setItems(loadedItems)
             console.log("setItems called")
         }
 

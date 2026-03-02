@@ -28,15 +28,29 @@ contextBridge.exposeInMainWorld("package", {
     loadPackage: () => ipcRenderer.invoke("dialog:loadPackage"),
     loadFile: (path) => ipcRenderer.invoke("api:loadImage", path),
     getCurrentItems: () => ipcRenderer.invoke("get-current-items"),
+    getCurrentSignages: () => ipcRenderer.invoke("get-current-signages"),
     onPackageLoaded: (callback) => {
         // Note: We DON'T remove all listeners here because multiple components need to listen
-        // (App.jsx for navigation, ItemBrowser for loading items)
-        ipcRenderer.on("package:loaded", (event, items) => {
-            console.log(
-                "preload.js: Received package:loaded event with items:",
-                items?.length,
-            )
-            callback(items)
+        // (App.jsx for navigation, ItemBrowser for loading items, SignageBrowser for signages)
+        ipcRenderer.on("package:loaded", (event, data) => {
+            // Handle both old format (items array) and new format ({ items, signages })
+            if (Array.isArray(data)) {
+                // Old format - just items array (backwards compat)
+                console.log(
+                    "preload.js: Received package:loaded event with items (old format):",
+                    data?.length,
+                )
+                callback(data)
+            } else {
+                // New format - object with items and signages
+                console.log(
+                    "preload.js: Received package:loaded event with items:",
+                    data?.items?.length,
+                    "signages:",
+                    data?.signages?.length,
+                )
+                callback(data)
+            }
         })
     },
     onPackageClosed: (callback) => {

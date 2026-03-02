@@ -1201,10 +1201,10 @@ const reg_loadPackagePopup = () => {
 
         // Send package loaded event to main window
         if (mainWindow) {
-            mainWindow.webContents.send(
-                "package:loaded",
-                pkg.items.map((item) => item.toJSONWithExistence()),
-            )
+            mainWindow.webContents.send("package:loaded", {
+                items: pkg.items.map((item) => item.toJSONWithExistence()),
+                signages: pkg.signages,
+            })
         }
 
         return pkg.items // return the package's items

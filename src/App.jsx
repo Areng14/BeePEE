@@ -57,7 +57,7 @@ function App() {
         }
 
         // Listen for package loaded event
-        const handlePackageLoaded = (items) => {
+        const handlePackageLoaded = () => {
             setPackageLoaded(true)
         }
 

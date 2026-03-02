@@ -50,11 +50,11 @@ function register(ipcMain, mainWindow) {
             const infoPath = require("path").join(currentPackageDir, "info.json")
             const pkg = await loadPackage(infoPath)
 
-            // Send updated items to main window
-            mainWindow.webContents.send(
-                "package:loaded",
-                pkg.items.map((item) => item.toJSONWithExistence()),
-            )
+            // Send updated items and signages to main window
+            mainWindow.webContents.send("package:loaded", {
+                items: pkg.items.map((item) => item.toJSONWithExistence()),
+                signages: pkg.signages,
+            })
 
             return { success: true }
         } catch (error) {
@@ -82,6 +82,20 @@ function register(ipcMain, mainWindow) {
             )
         } catch (error) {
             console.error("Failed to get current items:", error)
+            return []
+        }
+    })
+
+    // Get current signages
+    ipcMain.handle("get-current-signages", async () => {
+        try {
+            if (packages.length === 0) {
+                return []
+            }
+            const currentPackage = packages[0]
+            return currentPackage.signages || []
+        } catch (error) {
+            console.error("Failed to get current signages:", error)
             return []
         }
     })

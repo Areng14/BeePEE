@@ -104,10 +104,10 @@ function register(ipcMain, mainWindow) {
                 const pkg = await loadPackage(infoPath)
 
                 // Send to frontend
-                mainWindow.webContents.send(
-                    "package:loaded",
-                    pkg.items.map((item) => item.toJSONWithExistence()),
-                )
+                mainWindow.webContents.send("package:loaded", {
+                    items: pkg.items.map((item) => item.toJSONWithExistence()),
+                    signages: pkg.signages,
+                })
 
                 // Close creation window
                 const createWindow = getCreatePackageWindow()
@@ -265,10 +265,10 @@ function register(ipcMain, mainWindow) {
                 message: "Package imported and loaded successfully!",
             })
 
-            mainWindow.webContents.send(
-                "package:loaded",
-                pkg.items.map((item) => item.toJSONWithExistence()),
-            )
+            mainWindow.webContents.send("package:loaded", {
+                items: pkg.items.map((item) => item.toJSONWithExistence()),
+                signages: pkg.signages,
+            })
 
             return { success: true }
         } catch (error) {

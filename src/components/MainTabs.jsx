@@ -1,8 +1,9 @@
-import { useState } from "react"
-import { Box, IconButton, Tooltip } from "@mui/material"
+import { useState, useEffect } from "react"
+import { Box, IconButton, Tooltip, Typography } from "@mui/material"
 import {
     Inventory2 as ItemsIcon,
     Image as SignagesIcon,
+    Warning as WarningIcon,
 } from "@mui/icons-material"
 import ItemBrowser from "./ItemBrowser"
 import SignageBrowser from "./SignageBrowser"
@@ -25,6 +26,36 @@ const TAB_CONFIG = [
 
 function MainTabs() {
     const [activeTab, setActiveTab] = useState(0)
+    const [packageEmpty, setPackageEmpty] = useState(false)
+
+    useEffect(() => {
+        const handlePackageLoaded = (data) => {
+            // Handle both old format (items array) and new format ({ items, signages })
+            const hasItems = Array.isArray(data)
+                ? data.length > 0
+                : (data?.items?.length || 0) > 0
+            const hasSignages = Array.isArray(data)
+                ? false
+                : (data?.signages?.length || 0) > 0
+
+            setPackageEmpty(!hasItems && !hasSignages)
+        }
+
+        window.package.onPackageLoaded(handlePackageLoaded)
+
+        // Also check on mount
+        const checkCurrentPackage = async () => {
+            try {
+                const items = (await window.package.getCurrentItems?.()) || []
+                const signages =
+                    (await window.package.getCurrentSignages?.()) || []
+                setPackageEmpty(items.length === 0 && signages.length === 0)
+            } catch {
+                // Ignore - package might not be loaded
+            }
+        }
+        checkCurrentPackage()
+    }, [])
 
     const ActiveComponent = TAB_CONFIG[activeTab]?.component
 
@@ -68,7 +99,29 @@ function MainTabs() {
             </Box>
 
             {/* Content */}
-            <Box sx={{ flex: 1, overflow: "auto" }}>
+            <Box sx={{ flex: 1, overflow: "auto", position: "relative" }}>
+                {packageEmpty && (
+                    <Box
+                        sx={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            p: 2,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 1,
+                            backgroundColor: "warning.dark",
+                            color: "warning.contrastText",
+                            zIndex: 10,
+                        }}>
+                        <WarningIcon />
+                        <Typography>
+                            This package has no items or signages!
+                        </Typography>
+                    </Box>
+                )}
                 {ActiveComponent && <ActiveComponent />}
             </Box>
         </Box>
