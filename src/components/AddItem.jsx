@@ -1,18 +1,10 @@
 import { Box } from "@mui/material"
 import { Add } from "@mui/icons-material"
 
-function AddButton() {
-    const handleClick = async () => {
-        try {
-            await window.electron.invoke("open-create-item-window")
-        } catch (error) {
-            console.error("Failed to open create item window:", error)
-        }
-    }
-
+function AddButton({ onClick }) {
     return (
         <Box
-            onClick={handleClick}
+            onClick={onClick}
             sx={{
                 width: 96,
                 height: 96,

@@ -914,16 +914,17 @@ function ItemEditor() {
                     sx={{
                         borderRight: 1,
                         borderColor: "divider",
-                        minWidth: 80,
-                        maxWidth: 80,
+                        minWidth: 56,
+                        maxWidth: 56,
                         bgcolor: "background.paper",
                         "& .MuiTabs-indicator": {
                             left: 0,
                             width: 3,
                         },
                         "& .MuiTab-root": {
-                            minWidth: 80,
-                            width: 80,
+                            minWidth: 56,
+                            width: 56,
+                            minHeight: 48,
                             alignItems: "center",
                             justifyContent: "center",
                         },

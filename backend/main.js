@@ -34,7 +34,7 @@ protocol.registerSchemesAsPrivileged([
 const createWindow = () => {
     const win = new BrowserWindow({
         title: "BeePEE",
-        width: 1024,
+        width: 1032, // Compensate for the sidebar
         height: 512,
         webPreferences: {
             preload: path.join(__dirname, "preload.js"),

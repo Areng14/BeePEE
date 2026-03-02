@@ -133,6 +133,14 @@ function ItemBrowser() {
         window.package.openItemEditor(currentItem)
     }
 
+    const handleAddItem = async () => {
+        try {
+            await window.electron.invoke("open-create-item-window")
+        } catch (error) {
+            console.error("Failed to open create item window:", error)
+        }
+    }
+
     const itemsInLastRow = items.length % gridSize.cols
     const placeholdersToCompleteRow =
         itemsInLastRow === 0 ? 0 : gridSize.cols - itemsInLastRow
@@ -153,7 +161,7 @@ function ItemBrowser() {
 
                 {/* Add button - first placeholder */}
                 <Grid size="auto">
-                    <AddButton />
+                    <AddButton onClick={handleAddItem} />
                 </Grid>
 
                 {/* Regular placeholder cells */}

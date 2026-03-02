@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route } from "react-router-dom"
 import { useState, useEffect } from "react"
 import ItemBrowser from "./components/ItemBrowser"
+import MainTabs from "./components/MainTabs"
 import ItemEditor from "./components/ItemEditor"
 import CreateItemPage from "./pages/CreateItemPage"
 import CreatePackagePage from "./pages/CreatePackagePage"
@@ -125,9 +126,9 @@ function App() {
                                     packageLoaded
                                         ? (() => {
                                               console.log(
-                                                  "Rendering ItemBrowser (packageLoaded=true)",
+                                                  "Rendering MainTabs (packageLoaded=true)",
                                               )
-                                              return <ItemBrowser />
+                                              return <MainTabs />
                                           })()
                                         : (() => {
                                               console.log(
