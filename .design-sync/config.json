@@ -8,12 +8,16 @@
         "SignageEditor": "src/components/SignageEditor.jsx",
         "SignageInfo": "src/components/signages/Info.jsx",
         "SignageStyles": "src/components/signages/Styles.jsx",
+        "AddSignageDialog": "src/components/signages/AddSignageDialog.jsx",
+        "SignageDesigner": "src/components/signages/SignageDesigner.jsx",
         "SignageProvider": null,
         "BeePEETheme": null
     },
     "cssEntry": "src/global.css",
     "provider": { "component": "BeePEETheme" },
     "overrides": {
-        "SignageEditor": { "cardMode": "single", "viewport": "960x1024" }
+        "SignageEditor": { "cardMode": "single", "viewport": "960x1024" },
+        "AddSignageDialog": { "cardMode": "single", "viewport": "620x420" },
+        "SignageDesigner": { "cardMode": "single", "viewport": "960x620" }
     }
 }

@@ -7,6 +7,8 @@
 - Repo install was skipped (node_modules already live from active development; repo lives in Dropbox — `npm ci` would be slow and disruptive). `package-lock.json` → `npm ci` if a fresh clone ever needs it.
 - Playwright: local browser cache has chromium-1200 and chromium-1208; `playwright@1.58.0` (pins 1208) is installed in `.ds-sync/`.
 
+- `.design-sync/templates/` holds hand-authored `.dc.html` design templates uploaded to the project's `templates/` tree OUTSIDE the converter (needs its own `finalize_plan` with `templates/**` writes — the standard plan globs don't cover it). `support.js`/`ds-base.js` are copies of the app-generated runtime from `templates/signage-editor/`.
+
 ## Known render warns
 
 - `[FONT_MISSING] "Avenir"` — Avenir appears only as a fallback member of the `system-ui` font stack in global.css. It is Apple-proprietary, never ships, and never renders (system-ui always resolves first, including in the real app). Accepted; do not bundle a substitute.

@@ -4,6 +4,8 @@
 export { default as SignageEditor } from "../src/components/SignageEditor"
 export { default as SignageInfo } from "../src/components/signages/Info"
 export { default as SignageStyles } from "../src/components/signages/Styles"
+export { default as AddSignageDialog } from "../src/components/signages/AddSignageDialog"
+export { default as SignageDesigner } from "../src/components/signages/SignageDesigner"
 export { SignageProvider, useSignageContext } from "../src/contexts/SignageContext"
 export { theme } from "../src/theme"
 export { BeePEETheme } from "./mock-providers"

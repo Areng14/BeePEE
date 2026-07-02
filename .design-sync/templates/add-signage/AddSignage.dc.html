@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Add Signage" description="BeePEE new-signage dialog — name field with live ID preview, optional Clean-style picture, Create disabled until named" -->
+<helmet>
+  <style>
+    *{-webkit-font-smoothing:antialiased}
+  </style>
+</helmet>
+<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#151617;padding:32px;box-sizing:border-box;font-family:system-ui,-apple-system,'Segoe UI',sans-serif">
+  <div style="width:100%;max-width:400px;background:#2a2d30;border:1px solid #3a3a3a;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.4);overflow:hidden">
+
+    <div style="padding:18px 20px;border-bottom:1px solid #3a3a3a;color:#e0e0e0;font-size:18px;font-weight:600">New Signage</div>
+
+    <div style="padding:20px">
+
+      <sc-if value="{{ created }}" hint-placeholder-val="{{ false }}">
+        <div style="background:rgba(29,179,79,0.15);border:1px solid #1db34f;color:#5fe08a;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px">Signage created — opening editor…</div>
+      </sc-if>
+
+      <label style="display:block;color:rgba(255,255,255,0.6);font-size:12px;margin-bottom:6px">Name</label>
+      <input value="{{ name }}" onChange="{{ updateName }}" placeholder="e.g. Cake" style="width:100%;box-sizing:border-box;background:transparent;color:#c3c7c9;border:1px solid #555;border-radius:8px;padding:12px 14px;font:400 15px system-ui;outline:none" style-focus="border-color:#d2b019">
+      <sc-if value="{{ hasName }}" hint-placeholder-val="{{ true }}">
+        <div style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:6px;font-family:ui-monospace,Consolas,monospace">{{ idPreview }}</div>
+      </sc-if>
+      <sc-if value="{{ noName }}" hint-placeholder-val="{{ false }}">
+        <div style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:6px">Display name — the ID is generated automatically</div>
+      </sc-if>
+
+      <label style="display:block;color:rgba(255,255,255,0.6);font-size:12px;margin:18px 0 6px">Signage picture (Clean style, optional)</label>
+      <div onClick="{{ pickImage }}" style="border:2px dashed #555;border-radius:8px;height:130px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#1d1e1f;cursor:pointer;overflow:hidden" style-hover="border-color:#d2b019">
+        <sc-if value="{{ hasPreview }}" hint-placeholder-val="{{ false }}">
+          <img src="{{ preview }}" alt="preview" style="width:100%;height:100%;object-fit:contain">
+        </sc-if>
+        <sc-if value="{{ noPreview }}" hint-placeholder-val="{{ true }}">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="#666"><path d="M19 7v2.99s-1.99.01-2 0V7h-3s.01-1.99 0-2h3V2h2v3h3v2h-3zm-3 4V8h-3V5H5a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2v-8h-3zM5 19l3-4 2 3 3-4 4 5H5z"/></svg>
+          <span style="color:rgba(255,255,255,0.5);font-size:13px">Click to select a PNG</span>
+        </sc-if>
+      </div>
+    </div>
+
+    <div style="padding:14px 20px 20px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #3a3a3a">
+      <button onClick="{{ cancel }}" style="min-width:80px;background:transparent;color:#c3c7c9;border:1px solid #555;border-radius:6px;padding:9px 14px;font:500 14px system-ui;cursor:pointer" style-hover="border-color:#777">Cancel</button>
+      <sc-if value="{{ canCreate }}" hint-placeholder-val="{{ false }}">
+        <button onClick="{{ create }}" style="min-width:80px;background:#d2b019;color:#1d1e1f;border:none;border-radius:6px;padding:9px 14px;font:600 14px system-ui;cursor:pointer" style-hover="background:#e0be22">Create</button>
+      </sc-if>
+      <sc-if value="{{ cannotCreate }}" hint-placeholder-val="{{ true }}">
+        <button disabled="{{ true }}" style="min-width:80px;background:#4a4a3a;color:#888;border:none;border-radius:6px;padding:9px 14px;font:600 14px system-ui;cursor:not-allowed">Create</button>
+      </sc-if>
+    </div>
+
+    <input type="file" accept="image/png" ref="{{ fileRef }}" onChange="{{ onFileChange }}" style="display:none">
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:520,&quot;height&quot;:560}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this._fileRef = React.createRef();
+    this.state = { name: "", preview: null, created: false };
+  }
+
+  onFileChange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => this.setState({ preview: reader.result });
+    reader.readAsDataURL(file);
+  };
+
+  renderVals() {
+    const { name, preview, created } = this.state;
+    const trimmed = name.trim();
+    const sanitized = trimmed.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+    return {
+      name,
+      created,
+      hasName: !!trimmed,
+      noName: !trimmed,
+      idPreview: "ID: SIGN_BPEE_" + (sanitized || "NAME") + "_####",
+      preview: preview || "",
+      hasPreview: !!preview,
+      noPreview: !preview,
+      canCreate: !!trimmed,
+      cannotCreate: !trimmed,
+      fileRef: this._fileRef,
+      onFileChange: this.onFileChange,
+      updateName: (e) => this.setState({ name: e.target.value, created: false }),
+      pickImage: () => {
+        const el = this._fileRef.current;
+        if (el) { el.value = ""; el.click(); }
+      },
+      create: () => {
+        this.setState({ created: true });
+        setTimeout(() => this.setState({ name: "", preview: null, created: false }), 2200);
+      },
+      cancel: () => this.setState({ name: "", preview: null, created: false })
+    };
+  }
+}
+</script>
+</body>
+</html>
