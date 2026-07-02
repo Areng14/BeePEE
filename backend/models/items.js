@@ -114,6 +114,14 @@ class Item {
         const editorInstances =
             parsedEditoritems.Item?.Exporting?.Instances || {}
         Object.entries(editorInstances).forEach(([key, instance]) => {
+            // Skip keys written by the old NaN-index bug so they don't
+            // propagate back into editoritems.json or the exported package
+            if (key === "NaN" || key.startsWith("pending_")) {
+                console.warn(
+                    `Skipping invalid instance key "${key}" in editoritems for item ${this.id}`,
+                )
+                return
+            }
             this.instances[key] = {
                 Name: instance.Name,
                 source: "editor",
@@ -260,12 +268,13 @@ class Item {
                     continue
                 }
 
-                // Find next available index
-                const keys = Object.keys(existingInstances)
+                // Find next available index (ignore non-numeric keys so a
+                // bad key can't poison Math.max into NaN)
+                const numericKeys = Object.keys(existingInstances)
+                    .map((k) => parseInt(k, 10))
+                    .filter(Number.isInteger)
                 const nextIndex =
-                    keys.length > 0
-                        ? Math.max(...keys.map((k) => parseInt(k))) + 1
-                        : 0
+                    numericKeys.length > 0 ? Math.max(...numericKeys) + 1 : 0
 
                 // Get VMF stats for the instance
                 let vmfStats = {
@@ -340,6 +349,13 @@ class Item {
         const editorInstances =
             parsedEditoritems.Item?.Exporting?.Instances || {}
         Object.entries(editorInstances).forEach(([key, instance]) => {
+            // Skip keys written by the old NaN-index bug
+            if (key === "NaN" || key.startsWith("pending_")) {
+                console.warn(
+                    `Skipping invalid instance key "${key}" in editoritems for item ${this.id}`,
+                )
+                return
+            }
             this.instances[key] = {
                 Name: instance.Name,
                 // Preserve VMF stats if they exist in the saved data
@@ -665,10 +681,14 @@ class Item {
     }
 
     addInstance(instanceName) {
-        // Find the next available index
-        const keys = Object.keys(this.instances)
+        // Find the next available index. Ignore non-numeric keys - a single
+        // bad key (e.g. "NaN") would otherwise poison Math.max and write
+        // another "NaN" entry into editoritems.json
+        const numericKeys = Object.keys(this.instances)
+            .map((k) => parseInt(k, 10))
+            .filter(Number.isInteger)
         const nextIndex =
-            keys.length > 0 ? Math.max(...keys.map((k) => parseInt(k))) + 1 : 0
+            numericKeys.length > 0 ? Math.max(...numericKeys) + 1 : 0
 
         // Add the new instance
         this.instances[nextIndex.toString()] = {
@@ -2079,6 +2099,24 @@ class Item {
                 const metadata = JSON.parse(
                     fs.readFileSync(this.paths.meta, "utf-8"),
                 )
+
+                // Repair metadata written by older versions: instance maps
+                // must only have numeric keys ("NaN"/"pending_..." keys were
+                // written by a bug and can break instance enumeration)
+                for (const mapKey of ["instanceNames", "instanceErrors"]) {
+                    const map = metadata[mapKey]
+                    if (map && typeof map === "object") {
+                        for (const key of Object.keys(map)) {
+                            if (!/^\d+$/.test(key)) {
+                                console.warn(
+                                    `Dropping invalid ${mapKey} key "${key}" from meta.json for item ${this.id}`,
+                                )
+                                delete map[key]
+                            }
+                        }
+                    }
+                }
+
                 return metadata
             }
         } catch (error) {
@@ -2226,10 +2264,20 @@ class Item {
     }
 
     setInstanceName(index, name) {
+        // Guard against NaN/pending indices leaking in from the frontend -
+        // they would be serialized as literal "NaN"/"pending_..." keys in
+        // meta.json and corrupt the package metadata
+        const key = String(index)
+        if (!/^\d+$/.test(key)) {
+            console.warn(
+                `Ignoring instance name for invalid index "${key}" on item ${this.id}`,
+            )
+            return
+        }
         if (!this.metadata.instanceNames) {
             this.metadata.instanceNames = {}
         }
-        this.metadata.instanceNames[index] = name
+        this.metadata.instanceNames[key] = name
         this.saveMetadata()
     }
 

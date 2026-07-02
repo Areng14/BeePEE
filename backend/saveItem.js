@@ -115,6 +115,19 @@ async function saveItem(item) {
         ...item.details,
     }
 
+    // The editor sends Description as a plain (possibly multiline) string,
+    // but properties.txt stores multiline descriptions as repeated ""-keyed
+    // lines (loaded as desc_N keys). A raw string containing newlines would
+    // produce invalid VDF on export, which hangs BEEmod on startup.
+    const description = properties.Properties.Description
+    if (typeof description === "string" && /\r?\n/.test(description)) {
+        const descriptionLines = {}
+        description.split(/\r?\n/).forEach((line, index) => {
+            descriptionLines[`desc_${index}`] = line
+        })
+        properties.Properties.Description = descriptionLines
+    }
+
     // Handle staged icon if provided
     if (item.iconData && item.iconData.stagedIconPath) {
         try {
