@@ -105,6 +105,7 @@ contextBridge.exposeInMainWorld("package", {
         }
     },
     saveSignage: (signageData) => ipcRenderer.invoke("save-signage", signageData),
+    createSignage: (data) => ipcRenderer.invoke("create-signage", data),
     onSignageUpdated: (callback) => {
         ipcRenderer.removeAllListeners("signage-updated")
         if (callback) {

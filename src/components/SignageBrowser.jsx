@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { Box, Grid, Tooltip } from "@mui/material"
 import { Image as SignageIcon } from "@mui/icons-material"
 import AddButton from "./AddItem"
+import AddSignageDialog from "./signages/AddSignageDialog"
 
 // Signage icon component with hidden signage handling
 function SignageIconCell({ signage, onEdit }) {
@@ -90,6 +91,7 @@ function SignageIconCell({ signage, onEdit }) {
 function SignageBrowser() {
     const [signages, setSignages] = useState([])
     const [gridSize, setGridSize] = useState({ cols: 12, rows: 8 })
+    const [addDialogOpen, setAddDialogOpen] = useState(false)
 
     useEffect(() => {
         console.log("SignageBrowser mounted, setting up package listener")
@@ -171,8 +173,7 @@ function SignageBrowser() {
     }
 
     const handleAddSignage = () => {
-        console.log("Add signage clicked")
-        // TODO: Open add signage dialog
+        setAddDialogOpen(true)
     }
 
     const signagesInLastRow = signages.length % gridSize.cols
@@ -217,6 +218,11 @@ function SignageBrowser() {
                     ),
                 )}
             </Grid>
+
+            <AddSignageDialog
+                open={addDialogOpen}
+                onClose={() => setAddDialogOpen(false)}
+            />
         </Box>
     )
 }

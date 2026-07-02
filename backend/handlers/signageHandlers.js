@@ -4,6 +4,7 @@
 
 const fs = require("fs")
 const path = require("path")
+const crypto = require("crypto")
 const { packages, getCurrentPackageDir } = require("../packageManager")
 const {
     createSignageEditor,
@@ -28,6 +29,125 @@ function register(ipcMain, mainWindow) {
         } catch (error) {
             console.error("Failed to open signage editor:", error)
             throw error
+        }
+    })
+
+    // Create a new signage
+    ipcMain.handle("create-signage", async (event, { name, iconPath, iconData }) => {
+        try {
+            const packageDir = getCurrentPackageDir()
+            if (!packageDir) {
+                throw new Error("No package is currently loaded")
+            }
+            if (!name || !name.trim()) {
+                throw new Error("Signage name is required")
+            }
+
+            const infoPath = path.join(packageDir, "info.json")
+            const packageInfo = JSON.parse(fs.readFileSync(infoPath, "utf-8"))
+
+            // Ensure Signage array exists
+            if (!packageInfo.Signage) {
+                packageInfo.Signage = []
+            } else if (!Array.isArray(packageInfo.Signage)) {
+                packageInfo.Signage = [packageInfo.Signage]
+            }
+
+            // Generate a unique ID: SIGN_BPEE_<NAME>_<4-hex chars>
+            const sanitizedName = name
+                .replace(/[^a-zA-Z0-9]/g, "")
+                .toUpperCase()
+            const existingIds = new Set([
+                ...packageInfo.Signage.map((s) => s.ID),
+                ...packages
+                    .flatMap((p) => p.signages || [])
+                    .map((s) => s.id),
+            ])
+            let signageId
+            do {
+                const uuid = crypto
+                    .randomBytes(2)
+                    .toString("hex")
+                    .toUpperCase()
+                signageId = `SIGN_BPEE_${sanitizedName}_${uuid}`
+            } while (existingIds.has(signageId))
+
+            const newSignage = { ID: signageId, Name: name.trim() }
+            const resolvedStyles = {}
+
+            // Optional starting icon — stored on the Clean style, written
+            // into resources/BEE2 the same way save-signage stages icons.
+            // Either a picked file (iconPath) or a designer-rasterized PNG
+            // (iconData, a data URL).
+            let iconFilename = null
+            const bee2Dir = path.join(packageDir, "resources", "BEE2")
+            if (iconPath && fs.existsSync(iconPath)) {
+                if (!fs.existsSync(bee2Dir)) {
+                    fs.mkdirSync(bee2Dir, { recursive: true })
+                }
+                iconFilename = path.basename(iconPath)
+                fs.copyFileSync(iconPath, path.join(bee2Dir, iconFilename))
+            } else if (
+                typeof iconData === "string" &&
+                iconData.startsWith("data:image/png;base64,")
+            ) {
+                if (!fs.existsSync(bee2Dir)) {
+                    fs.mkdirSync(bee2Dir, { recursive: true })
+                }
+                iconFilename = `${signageId.toLowerCase()}.png`
+                fs.writeFileSync(
+                    path.join(bee2Dir, iconFilename),
+                    Buffer.from(iconData.split(",")[1], "base64"),
+                )
+            }
+            if (iconFilename) {
+                const overlay = `signage/${iconFilename.replace(/\.[^.]+$/, "")}`
+                newSignage.Styles = {
+                    BEE2_CLEAN: {
+                        type: "square",
+                        overlay,
+                        icon: iconFilename,
+                    },
+                }
+                resolvedStyles.BEE2_CLEAN = {
+                    type: "square",
+                    overlay,
+                    icon: path.join(bee2Dir, iconFilename),
+                }
+            }
+
+            packageInfo.Signage.push(newSignage)
+            fs.writeFileSync(infoPath, JSON.stringify(packageInfo, null, 2))
+
+            // Update in-memory package
+            const memSignage = {
+                id: signageId,
+                name: name.trim(),
+                hidden: false,
+                secondary: null,
+                styles: resolvedStyles,
+            }
+            const pkg = packages.find((p) => p.packageDir === packageDir)
+            if (pkg) {
+                if (!pkg.signages) pkg.signages = []
+                pkg.signages.push(memSignage)
+            }
+
+            // Refresh browser UI
+            mainWindow.webContents.send("package:loaded", {
+                items: packages
+                    .flatMap((p) => p.items)
+                    .map((i) => i.toJSONWithExistence()),
+                signages: packages.flatMap((p) => p.signages || []),
+            })
+
+            // Open the editor so the user can configure styles right away
+            createSignageEditor(memSignage, mainWindow)
+
+            return { success: true, signageId }
+        } catch (error) {
+            console.error("Failed to create signage:", error)
+            return { success: false, error: error.message }
         }
     })
 
