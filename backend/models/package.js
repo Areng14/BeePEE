@@ -61,6 +61,11 @@ class Package {
                 rawSignages = [rawSignages]
             }
 
+            // Filter out null/undefined/invalid signage entries
+            rawSignages = rawSignages.filter(
+                (sig) => sig && typeof sig === "object" && sig.ID
+            )
+
             // Parse signages and resolve icon paths
             this.signages = rawSignages.map((sig) => {
                 // Process styles to resolve icon paths
@@ -97,10 +102,10 @@ class Package {
                                         iconPath,
                                     )
                                 } else {
-                                    // Simple filename - look in BEE2/items
+                                    // Simple filename - look directly in BEE2
                                     resolvedIcon = path.join(
                                         this.packageDir,
-                                        "resources/BEE2/items",
+                                        "resources/BEE2",
                                         iconPath,
                                     )
                                 }

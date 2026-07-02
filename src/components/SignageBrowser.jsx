@@ -157,8 +157,17 @@ function SignageBrowser() {
     }, [])
 
     const handleEditSignage = (signageId) => {
-        console.log("Edit signage:", signageId)
-        // TODO: Open signage editor
+        console.log("Attempting to open editor for signage:", signageId)
+
+        // Find the signage in current state
+        const signage = signages.find((s) => s.id === signageId)
+        if (!signage) {
+            console.warn("Signage not found:", signageId)
+            return
+        }
+
+        // Open signage editor
+        window.package.openSignageEditor(signage)
     }
 
     const handleAddSignage = () => {
