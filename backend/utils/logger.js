@@ -12,6 +12,14 @@ class Logger {
         this.stream = null
         this.maxLogFiles = 10
         this.isInitialized = false
+        this.verbose = false
+    }
+
+    /**
+     * Enable/disable verbose (debug) logging at runtime
+     */
+    setVerbose(enabled) {
+        this.verbose = !!enabled
     }
 
     /**
@@ -264,10 +272,10 @@ class Logger {
     }
 
     /**
-     * Log debug message (only in development)
+     * Log debug message (in development, or when verbose logging is enabled)
      */
     debug(message, ...args) {
-        if (!app.isPackaged) {
+        if (!app.isPackaged || this.verbose) {
             this.writeLog("debug", message, ...args)
         }
     }

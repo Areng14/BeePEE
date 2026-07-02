@@ -53,6 +53,38 @@ function ItemEditor() {
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
 
+    // User preferences (Settings → Warnings / Developer)
+    const [hideWarnings, setHideWarnings] = useState(false)
+    const [skipDeleteConfirmations, setSkipDeleteConfirmations] =
+        useState(false)
+    const [showItemIds, setShowItemIds] = useState(false)
+
+    useEffect(() => {
+        const loadPreferences = async () => {
+            try {
+                const warningsResult =
+                    await window.package.getSetting("hideWarnings")
+                if (warningsResult.success && warningsResult.value !== undefined) {
+                    setHideWarnings(warningsResult.value)
+                }
+                const skipResult = await window.package.getSetting(
+                    "skipDeleteConfirmations",
+                )
+                if (skipResult.success && skipResult.value !== undefined) {
+                    setSkipDeleteConfirmations(skipResult.value)
+                }
+                const showIdResult =
+                    await window.package.getSetting("showItemIds")
+                if (showIdResult.success && showIdResult.value !== undefined) {
+                    setShowItemIds(showIdResult.value)
+                }
+            } catch (error) {
+                console.log("Failed to load editor preferences:", error)
+            }
+        }
+        loadPreferences()
+    }, [])
+
     // Model generation staging
     const [isGeneratingModel, setIsGeneratingModel] = useState(false)
     const [stagedEditorItems, setStagedEditorItems] = useState(null)
@@ -180,7 +212,10 @@ function ItemEditor() {
             if (desc && typeof desc === "object") {
                 const descValues = Object.keys(desc)
                     .filter((key) => key.startsWith("desc_"))
-                    .sort()
+                    .sort(
+                        (a, b) =>
+                            parseInt(a.slice(5), 10) - parseInt(b.slice(5), 10),
+                    )
                     .map((key) => desc[key])
                     .filter((value) => value && value.trim() !== "")
                     .join("\n")
@@ -331,6 +366,9 @@ function ItemEditor() {
             other: [], // Tab 5 - Editor Model
         }
 
+        // "Hide non-critical warnings" setting suppresses these badges
+        if (hideWarnings) return warnings
+
         // Check Info tab fields
         if (!formData.name?.trim()) warnings.info.push("Name")
         if (!formData.author?.trim()) warnings.info.push("Author")
@@ -345,7 +383,7 @@ function ItemEditor() {
         if (!item?.metadata?.hasCustomModel && !formData.modelName) warnings.other.push("Editor Model")
 
         return warnings
-    }, [formData.name, formData.author, formData.description, formData.stagedIconPath, formData.instances, formData.modelName, item?.icon, item?.metadata?.hasCustomModel])
+    }, [formData.name, formData.author, formData.description, formData.stagedIconPath, formData.instances, formData.modelName, item?.icon, item?.metadata?.hasCustomModel, hideWarnings])
 
     const handleTabChange = (event, newValue) => {
         setTabValue(newValue)
@@ -648,6 +686,9 @@ function ItemEditor() {
             }
 
             // Save instances if modified
+            // Maps temporary "pending_..." indices to the real numeric index
+            // assigned by the backend when the instance is added during this save
+            const pendingIndexMap = {}
             if (formData._modified.instances) {
                 try {
                     const currentInstances = formData.instances || {}
@@ -675,11 +716,18 @@ function ItemEditor() {
                                 `Adding pending instance: ${instanceData.Name}`,
                             )
                             // Use a new backend function to add instance from file path
-                            await window.package.addInstanceFromFile(
-                                item.id,
-                                instanceData._filePath,
-                                instanceData.Name,
-                            )
+                            const addResult =
+                                await window.package.addInstanceFromFile(
+                                    item.id,
+                                    instanceData._filePath,
+                                    instanceData.Name,
+                                )
+                            if (
+                                addResult?.success &&
+                                addResult.index !== undefined
+                            ) {
+                                pendingIndexMap[index] = String(addResult.index)
+                            }
                         }
                     }
                 } catch (error) {
@@ -695,20 +743,36 @@ function ItemEditor() {
                     for (const [instanceIndex, newName] of Object.entries(
                         editingNames,
                     )) {
+                        // Pending instances get their real index assigned
+                        // during this save; anything still non-numeric would
+                        // be written to meta.json as a literal "NaN" key
+                        const resolvedIndex =
+                            pendingIndexMap[instanceIndex] ?? instanceIndex
+                        const numericIndex = parseInt(resolvedIndex, 10)
+                        if (
+                            !Number.isInteger(numericIndex) ||
+                            numericIndex < 0
+                        ) {
+                            console.warn(
+                                `Skipping instance name for unresolved index: ${instanceIndex}`,
+                            )
+                            continue
+                        }
+
                         const trimmedName = newName.trim()
-                        const defaultName = `Instance ${parseInt(instanceIndex) + 1}`
+                        const defaultName = `Instance ${numericIndex + 1}`
 
                         if (trimmedName === defaultName || trimmedName === "") {
                             // Remove custom name
                             await window.package.removeInstanceName(
                                 item.id,
-                                parseInt(instanceIndex),
+                                numericIndex,
                             )
                         } else {
                             // Set custom name
                             await window.package.setInstanceName(
                                 item.id,
-                                parseInt(instanceIndex),
+                                numericIndex,
                                 trimmedName,
                             )
                         }
@@ -911,6 +975,7 @@ function ItemEditor() {
                     onChange={handleTabChange}
                     orientation="vertical"
                     variant="scrollable"
+                    scrollButtons={false}
                     sx={{
                         borderRight: 1,
                         borderColor: "divider",
@@ -1081,6 +1146,8 @@ function ItemEditor() {
                             item={item}
                             formData={formData}
                             onUpdate={updateFormData}
+                            hideWarnings={hideWarnings}
+                            showId={showItemIds}
                         />
                     </Box>
                     <Box sx={{ display: tabValue === 1 ? "block" : "none" }}>
@@ -1262,11 +1329,20 @@ function ItemEditor() {
                         </Button>
                     </Tooltip>
                     <Box sx={{ flex: 1 }} />
-                    <Tooltip title="Delete this item permanently">
+                    <Tooltip
+                        title={
+                            skipDeleteConfirmations
+                                ? "Delete this item permanently (confirmation skipped)"
+                                : "Delete this item permanently"
+                        }>
                         <Button
                             variant="outlined"
                             startIcon={<Delete />}
-                            onClick={() => setDeleteDialogOpen(true)}
+                            onClick={() =>
+                                skipDeleteConfirmations
+                                    ? handleDeleteItem()
+                                    : setDeleteDialogOpen(true)
+                            }
                             color="error"
                             disabled={isDeleting}>
                             Delete

@@ -8,22 +8,72 @@ const {
     closePackage,
     getCurrentPackageDir,
 } = require("./packageManager")
-const { dialog, BrowserWindow } = require("electron")
+const { app, dialog, BrowserWindow } = require("electron")
 const path = require("path")
 const fs = require("fs")
+const { exec } = require("child_process")
+
+// Helper to kill BEE2.exe process if running
+function killBeemod() {
+    return new Promise((resolve) => {
+        exec('taskkill /F /IM BEE2.exe', (err) => {
+            // Ignore errors (process might not be running)
+            if (err) {
+                console.log("BEE2.exe not running or could not be killed:", err.message)
+            } else {
+                console.log("BEE2.exe process killed")
+            }
+            // Small delay to ensure file locks are released
+            setTimeout(resolve, 500)
+        })
+    })
+}
 const {
     createPackageCreationWindow,
     createPackageInformationWindow,
     createChangelogWindow,
     createCrashReportWindow,
     createBeePackageWindow,
+    createSettingsWindow,
 } = require("./items/itemEditor")
 const { isDev } = require("./utils/isDev.js")
 const { ensurePackagesDir } = require("./utils/packagesDir")
 const { logger } = require("./utils/logger")
+const { getSetting } = require("./utils/settings")
 
 // Track last saved .bpee path in memory
 let lastSavedBpeePath = null
+
+// Window the menu was built for (needed to rebuild when settings change)
+let menuMainWindow = null
+
+// Menu items that only make sense with a package loaded
+const PACKAGE_MENU_IDS = [
+    "close-package",
+    "save-package",
+    "save-package-as",
+    "export-package",
+    "package-information",
+    "beepm-package-info",
+]
+
+// Enable/disable package-dependent menu items based on whether a package is loaded
+function updateMenuState() {
+    const menu = Menu.getApplicationMenu()
+    if (!menu) return
+    const hasPackage = !!getCurrentPackageDir()
+    for (const id of PACKAGE_MENU_IDS) {
+        const item = menu.getMenuItemById(id)
+        if (item) item.enabled = hasPackage
+    }
+}
+
+// Rebuild the menu from scratch (e.g. when the devMode setting changes)
+function rebuildMenu() {
+    if (menuMainWindow && !menuMainWindow.isDestroyed()) {
+        createMainMenu(menuMainWindow)
+    }
+}
 
 // Helper to get the current package name for saving
 function getCurrentPackageName() {
@@ -48,6 +98,7 @@ function getCurrentPackageName() {
 }
 
 function createMainMenu(mainWindow) {
+    menuMainWindow = mainWindow
     const template = [
         {
             label: "File",
@@ -219,6 +270,7 @@ function createMainMenu(mainWindow) {
                 },
                 { type: "separator" },
                 {
+                    id: "close-package",
                     label: "Close Package",
                     accelerator: "Ctrl+W",
                     click: async () => {
@@ -237,6 +289,7 @@ function createMainMenu(mainWindow) {
                 },
                 { type: "separator" },
                 {
+                    id: "save-package",
                     label: "Save Package",
                     accelerator: "Ctrl+S",
                     click: async () => {
@@ -275,6 +328,7 @@ function createMainMenu(mainWindow) {
                     },
                 },
                 {
+                    id: "save-package-as",
                     label: "Save Package As...",
                     accelerator: "Ctrl+Shift+S",
                     click: async () => {
@@ -308,6 +362,7 @@ function createMainMenu(mainWindow) {
                 },
                 { type: "separator" },
                 {
+                    id: "export-package",
                     label: "Export Package...",
                     accelerator: "Ctrl+E",
                     click: async () => {
@@ -315,30 +370,178 @@ function createMainMenu(mainWindow) {
                             const currentPackageDir = getCurrentPackageDir()
                             if (!currentPackageDir)
                                 throw new Error("No package loaded")
-                            const { canceled, filePath } =
-                                await dialog.showSaveDialog(mainWindow, {
+
+                            // When "Launch BEEMod after export" is on, the export
+                            // is sent straight to the BEEMod packages folder (no
+                            // save dialog) and BEE2 is launched afterwards.
+                            const launchBeemod = getSetting("launchBeemodAfterExport", false)
+                            const beemodPath = getSetting("beemodPath", null)
+                            const exportToBeemod = launchBeemod && !!beemodPath
+
+                            if (launchBeemod && !beemodPath) {
+                                console.warn(
+                                    "Launch BEEMod after export is on, but no BEEMod path is set — falling back to a save dialog.",
+                                )
+                            }
+
+                            let filePath
+
+                            if (exportToBeemod) {
+                                // Read BEEMod config to find packages directory
+                                let packagesDir = path.join(beemodPath, "packages") // default
+
+                                try {
+                                    const configPath = path.join(
+                                        process.env.APPDATA || "",
+                                        "BEEMOD2",
+                                        "config",
+                                        "config.cfg"
+                                    )
+                                    if (fs.existsSync(configPath)) {
+                                        const configContent = fs.readFileSync(configPath, "utf-8")
+                                        const packageMatch = configContent.match(/^package=(.+)$/m)
+                                        if (packageMatch) {
+                                            const packageSetting = packageMatch[1].trim()
+                                            // Check if it's absolute or relative
+                                            if (path.isAbsolute(packageSetting)) {
+                                                packagesDir = packageSetting
+                                            } else {
+                                                // Relative to BEEMod folder
+                                                packagesDir = path.join(beemodPath, packageSetting)
+                                            }
+                                        }
+                                    }
+                                } catch (err) {
+                                    console.warn("Could not read BEEMod config, using default packages path:", err.message)
+                                }
+
+                                // Export to packages/BeePEE subfolder
+                                const beemodPackagesDir = path.join(packagesDir, "BeePEE")
+                                if (!fs.existsSync(beemodPackagesDir)) {
+                                    fs.mkdirSync(beemodPackagesDir, { recursive: true })
+                                }
+                                filePath = path.join(beemodPackagesDir, getCurrentPackageName() + ".bee_pack")
+
+                                // Kill BEE2.exe if running to release file locks
+                                await killBeemod()
+                            } else {
+                                // Show save dialog (preferred format from settings)
+                                const exportFormat = getSetting("exportFormat", "bee_pack")
+                                const formatFilters = [
+                                    {
+                                        name: "BEEmod Package",
+                                        extensions: ["bee_pack"],
+                                    },
+                                    {
+                                        name: "Zip Archive",
+                                        extensions: ["zip"],
+                                    },
+                                ]
+                                if (exportFormat === "zip") formatFilters.reverse()
+
+                                const result = await dialog.showSaveDialog(mainWindow, {
                                     title: "Export Package",
                                     defaultPath:
-                                        getCurrentPackageName() + ".bee_pack",
-                                    filters: [
-                                        {
-                                            name: "BEEmod Package",
-                                            extensions: ["bee_pack"],
-                                        },
-                                    ],
+                                        getCurrentPackageName() +
+                                        (exportFormat === "zip" ? ".zip" : ".bee_pack"),
+                                    filters: formatFilters,
                                 })
-                            if (canceled || !filePath) return
-                            await exportPackageAsBeePack(
-                                currentPackageDir,
-                                filePath,
-                            )
-                            dialog.showMessageBox(mainWindow, {
-                                message: `Package exported to: ${filePath}`,
-                                type: "info",
-                            })
+                                if (result.canceled || !result.filePath) return
+                                filePath = result.filePath
+                            }
+
+                            // Auto-backup the package as .bpee before exporting
+                            if (getSetting("autoBackupBeforeExport", true)) {
+                                try {
+                                    const backupsDir = path.join(
+                                        app.getPath("userData"),
+                                        "backups",
+                                    )
+                                    fs.mkdirSync(backupsDir, { recursive: true })
+                                    const stamp = new Date()
+                                        .toISOString()
+                                        .replace(/[:.]/g, "-")
+                                    const backupPath = path.join(
+                                        backupsDir,
+                                        `${getCurrentPackageName()}-${stamp}.bpee`,
+                                    )
+                                    await savePackageAsBpee(
+                                        currentPackageDir,
+                                        backupPath,
+                                    )
+                                    console.log("Pre-export backup saved:", backupPath)
+
+                                    // Keep only the 10 most recent backups
+                                    const backups = fs
+                                        .readdirSync(backupsDir)
+                                        .filter((f) => f.endsWith(".bpee"))
+                                        .map((f) => ({
+                                            name: f,
+                                            path: path.join(backupsDir, f),
+                                            time: fs
+                                                .statSync(path.join(backupsDir, f))
+                                                .mtime.getTime(),
+                                        }))
+                                        .sort((a, b) => b.time - a.time)
+                                    for (const old of backups.slice(10)) {
+                                        try {
+                                            fs.unlinkSync(old.path)
+                                        } catch (err) {
+                                            console.warn(
+                                                "Failed to prune old backup:",
+                                                old.name,
+                                            )
+                                        }
+                                    }
+                                } catch (err) {
+                                    console.warn(
+                                        "Pre-export backup failed (continuing with export):",
+                                        err.message,
+                                    )
+                                }
+                            }
+
+                            await exportPackageAsBeePack(currentPackageDir, filePath)
+
+                            // Open folder or launch BEEMod based on settings
+                            const openFolder = getSetting("openFolderAfterExport", true)
+
+                            if (exportToBeemod) {
+                                // Launch BEE2.exe
+                                const bee2Exe = path.join(beemodPath, "BEE2.exe")
+                                console.log("Looking for BEE2.exe at:", bee2Exe)
+                                if (fs.existsSync(bee2Exe)) {
+                                    console.log("Launching BEE2.exe...")
+                                    // Use exec with start command for Windows
+                                    exec(`start "" "${bee2Exe}"`, { cwd: beemodPath }, (err) => {
+                                        if (err) console.error("Failed to launch BEE2:", err)
+                                    })
+                                } else {
+                                    console.warn("BEE2.exe not found at:", bee2Exe)
+                                }
+                                dialog.showMessageBox(mainWindow, {
+                                    message: `Package exported to BEEMod packages folder!`,
+                                    type: "info",
+                                })
+                            } else if (openFolder) {
+                                shell.showItemInFolder(filePath)
+                            } else {
+                                dialog.showMessageBox(mainWindow, {
+                                    message: `Package exported to: ${filePath}`,
+                                    type: "info",
+                                })
+                            }
                         } catch (err) {
                             dialog.showErrorBox("Export Failed", err.message)
                         }
+                    },
+                },
+                { type: "separator" },
+                {
+                    label: "Preferences...",
+                    accelerator: "Ctrl+,",
+                    click: () => {
+                        createSettingsWindow(mainWindow)
                     },
                 },
                 { type: "separator" },
@@ -362,6 +565,7 @@ function createMainMenu(mainWindow) {
                 { role: "selectAll", accelerator: "Ctrl+A" },
                 { type: "separator" },
                 {
+                    id: "package-information",
                     label: "Package Information...",
                     accelerator: "Ctrl+Shift+I",
                     click: () => {
@@ -378,6 +582,7 @@ function createMainMenu(mainWindow) {
                     },
                 },
                 {
+                    id: "beepm-package-info",
                     label: "BeePM Package Info...",
                     accelerator: "Ctrl+Shift+B",
                     click: () => {
@@ -462,8 +667,8 @@ function createMainMenu(mainWindow) {
         },
     ]
 
-    // Only add developer tools in development mode
-    if (isDev) {
+    // Add developer tools in development mode, or when the Developer mode setting is on
+    if (isDev || getSetting("devMode", false)) {
         template.push({
             label: "Dev",
             submenu: [
@@ -520,7 +725,8 @@ function createMainMenu(mainWindow) {
 
     const menu = Menu.buildFromTemplate(template)
     Menu.setApplicationMenu(menu)
+    updateMenuState()
     return menu
 }
 
-module.exports = { createMainMenu }
+module.exports = { createMainMenu, updateMenuState, rebuildMenu }

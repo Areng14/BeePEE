@@ -397,6 +397,15 @@ function isArrayLikeObject(obj) {
 }
 
 // Helper function to convert JSON to VDF format
+// VDF quoted tokens can't contain raw newlines or double quotes (the BEE2
+// parser has no escape handling for them) - sanitize so a stray character in
+// user-entered text can't produce a malformed file that hangs BEEmod on load
+function sanitizeVdfToken(value) {
+    return String(value)
+        .replace(/\r?\n/g, " ")
+        .replace(/"/g, "'")
+}
+
 function convertJsonToVdf(jsonData, indent = 0, parentKey = null) {
     const indentStr = "\t".repeat(indent)
     let vdfString = ""
@@ -407,7 +416,7 @@ function convertJsonToVdf(jsonData, indent = 0, parentKey = null) {
     }
 
     if (typeof jsonData !== "object" || jsonData === null) {
-        return `"${jsonData}"`
+        return `"${sanitizeVdfToken(jsonData)}"`
     }
 
     // Check if this object represents an array (all keys are sequential numbers 0, 1, 2, ...)
@@ -429,7 +438,7 @@ function convertJsonToVdf(jsonData, indent = 0, parentKey = null) {
             for (const key of sortedKeys) {
                 const value = jsonData[key]
                 // Use empty string as key for desc_ prefixed keys, otherwise use the numeric key
-                vdfString += `${indentStr}"${key}" "${value}"\n`
+                vdfString += `${indentStr}"${key}" "${sanitizeVdfToken(value)}"\n`
             }
         } else {
             // For object values, create separate blocks for each element
@@ -469,7 +478,7 @@ function convertJsonToVdf(jsonData, indent = 0, parentKey = null) {
                         for (const k of sortedKeys) {
                             // Handle desc_ prefix - convert to empty string
                             const innerKey = k.startsWith("desc_") ? "" : k
-                            vdfString += `${"\t".repeat(indent + 1)}"${innerKey}" "${value[k]}"\n`
+                            vdfString += `${"\t".repeat(indent + 1)}"${innerKey}" "${sanitizeVdfToken(value[k])}"\n`
                         }
                         vdfString += `${indentStr}}\n`
                     } else if (vdfKey === "Instances") {
@@ -514,7 +523,7 @@ function convertJsonToVdf(jsonData, indent = 0, parentKey = null) {
                 }
             } else {
                 // Simple key-value pair
-                vdfString += `${indentStr}"${vdfKey}" "${value}"\n`
+                vdfString += `${indentStr}"${vdfKey}" "${sanitizeVdfToken(value)}"\n`
             }
         }
     }
@@ -932,9 +941,18 @@ const extractPackage = async (pathToPackage, packageDir) => {
         })
         stream.on("error", (error) => {
             console.error("Extraction error details:", error)
+            const rawMessage = String(error.message || error)
+            // 7zip reports disk-full as "There is not enough space on the disk",
+            // Node as ENOSPC - surface a clear, actionable message instead
+            const isDiskFull = /ENOSPC|not enough space|no space left/i.test(
+                rawMessage,
+            )
+            const message = isDiskFull
+                ? `Not enough disk space to extract the package. Free up space on the drive containing "${packageDir}" and try again.`
+                : `Extraction failed - ${rawMessage}`
             reject(
                 new Error(
-                    `[package : ${path.basename(pathToPackage)}]: Extraction failed - ${error.message || error}`,
+                    `[package : ${path.basename(pathToPackage)}]: ${message}`,
                 ),
             )
         })
@@ -1058,6 +1076,7 @@ const importPackage = async (pathToPackage) => {
 
 const loadPackage = async (pathToPackage, skipProgressReset = false) => {
     return timeOperation("Load package", async () => {
+        let extractionDir = null
         try {
             // Close all editor/preview windows to release file handles before loading
             try {
@@ -1129,6 +1148,7 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
                     }
                 }
                 fs.mkdirSync(packageDir, { recursive: true })
+                extractionDir = packageDir
 
                 if (!skipProgressReset) {
                     sendProgressUpdate(20, "Extracting package files...")
@@ -1161,6 +1181,17 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
 
             // Set the current package directory
             currentPackageDir = pkg.packageDir
+            notifyPackageStateChanged()
+
+            // Remember the last opened package (for "Open last package on startup")
+            try {
+                const { getSetting, setSetting } = require("./utils/settings")
+                if (getSetting("openLastPackageOnStartup", false)) {
+                    setSetting("lastPackagePath", pathToPackage)
+                }
+            } catch (err) {
+                console.warn("Failed to remember last package:", err.message)
+            }
 
             // Update window title with package name
             if (global.titleManager) {
@@ -1174,6 +1205,22 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
             return pkg
         } catch (error) {
             console.error("Failed to load package:", error)
+
+            // Clean up a partially extracted directory so a failed load
+            // (e.g. disk full) doesn't leave a broken package behind
+            if (extractionDir && fs.existsSync(extractionDir)) {
+                try {
+                    fs.rmSync(extractionDir, { recursive: true, force: true })
+                    console.log(
+                        "Cleaned up partially extracted package directory",
+                    )
+                } catch (cleanupError) {
+                    console.warn(
+                        "Failed to clean up package directory:",
+                        cleanupError.message,
+                    )
+                }
+            }
 
             // Send error to frontend
             sendProgressUpdate(100, "Package load failed!", error.message)
@@ -1373,8 +1420,22 @@ async function exportPackageAsBeePack(packageDir, outputBeePackPath) {
 
             sendProgressUpdate(90, "Cleaning up temporary files...")
 
-            // Clean up temporary directory
-            fs.rmSync(tempExportDir, { recursive: true, force: true })
+            // Clean up temporary directory with retry (Dropbox can cause ENOTEMPTY)
+            const cleanupWithRetry = async (dir, retries = 3) => {
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        fs.rmSync(dir, { recursive: true, force: true })
+                        return
+                    } catch (err) {
+                        if (i < retries - 1 && err.code === "ENOTEMPTY") {
+                            await new Promise((r) => setTimeout(r, 500))
+                        } else {
+                            throw err
+                        }
+                    }
+                }
+            }
+            await cleanupWithRetry(tempExportDir)
 
             sendProgressUpdate(100, "Package exported successfully!")
         } catch (error) {
@@ -1440,12 +1501,27 @@ const closePackage = async () => {
     // Remove all packages from memory
     packages.length = 0
 
+    // Clear the current package directory so package-dependent
+    // features (save/export menu items, etc.) know nothing is loaded
+    currentPackageDir = null
+    notifyPackageStateChanged()
+
     // Clear window title
     if (global.titleManager) {
         global.titleManager.clearPackage()
     }
 
     return true
+}
+
+// Tell the menu to re-evaluate package-dependent items.
+// Lazy require to avoid a circular import (menu.js requires this module).
+function notifyPackageStateChanged() {
+    try {
+        require("./menu").updateMenuState()
+    } catch (err) {
+        // Menu may not be built yet (e.g. during startup)
+    }
 }
 
 // Function to set main window reference

@@ -3,6 +3,7 @@ const path = require("path")
 const { createMainMenu } = require("./menu.js")
 const fs = require("fs")
 const { reg_events } = require("./events.js")
+const { createSetupWindow } = require("./items/itemEditor.js")
 const { WindowTitleManager } = require("./windowTitleManager.js")
 const { setMainWindow, clearPackagesDirectory, cleanupDeletedDirectories } = require("./packageManager.js")
 const { logger, initializeLogger } = require("./utils/logger.js")
@@ -176,6 +177,37 @@ app.whenReady().then(async () => {
         // Continue anyway - error will be caught when trying to create packages
     }
 
+    // Check if setup is complete
+    const { getSetting } = require("./utils/settings.js")
+
+    // Apply verbose logging preference
+    logger.setVerbose(getSetting("verboseLogging", false))
+
+    const setupComplete = getSetting("setupComplete", false)
+    const beemodPath = getSetting("beemodPath", null)
+    const needsSetup = !setupComplete || !beemodPath
+
+    if (needsSetup) {
+        logger.info("First run detected - showing setup window")
+
+        // Register settings handlers early so setup window can use them
+        const { registerSettingsHandlersEarly } = require("./handlers")
+        registerSettingsHandlersEarly(ipcMain)
+
+        // Show setup window and wait for it to close
+        await createSetupWindow(null)
+        logger.info("Setup window closed")
+
+        // Check if setup was completed - if not, quit the app
+        const setupCompleteNow = getSetting("setupComplete", false)
+        const beemodPathNow = getSetting("beemodPath", null)
+        if (!setupCompleteNow || !beemodPathNow) {
+            logger.info("Setup was cancelled - quitting app")
+            app.quit()
+            return
+        }
+    }
+
     // Register custom file protocol for secure local file access
     protocol.handle("beep", async (request) => {
         try {
@@ -314,6 +346,22 @@ app.whenReady().then(async () => {
     logger.info("🔧 Registered beep:// protocol for secure file access")
 
     const window = createWindow()
+
+    // Auto-open the last package on startup if enabled (skipped when a
+    // file association is already loading a package)
+    const openLast = getSetting("openLastPackageOnStartup", false)
+    const lastPackagePath = getSetting("lastPackagePath", null)
+    if (
+        !isLoadingFileOnStartup &&
+        openLast &&
+        lastPackagePath &&
+        fs.existsSync(lastPackagePath)
+    ) {
+        logger.info(`Opening last package on startup: ${lastPackagePath}`)
+        window.webContents.once("did-finish-load", () => {
+            setTimeout(() => handleFileOpen(lastPackagePath), 500)
+        })
+    }
 
     // Check for version change and show changelog if needed
     const { getLastSeenVersion, setLastSeenVersion } = require("./utils/settings.js")

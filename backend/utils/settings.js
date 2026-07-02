@@ -57,6 +57,20 @@ function setLastSeenVersion(version) {
     return setSetting("lastSeenVersion", version)
 }
 
+// Delete all settings
+function deleteAllSettings() {
+    try {
+        const settingsPath = getSettingsPath()
+        if (fs.existsSync(settingsPath)) {
+            fs.unlinkSync(settingsPath)
+        }
+        return true
+    } catch (error) {
+        console.error("Failed to delete settings:", error)
+        return false
+    }
+}
+
 module.exports = {
     loadSettings,
     saveSettings,
@@ -64,4 +78,5 @@ module.exports = {
     setSetting,
     getLastSeenVersion,
     setLastSeenVersion,
+    deleteAllSettings,
 }

@@ -11,6 +11,7 @@ import {
     Select,
     MenuItem,
     Alert,
+    InputAdornment,
 } from "@mui/material"
 import {
     Visibility,
@@ -18,11 +19,12 @@ import {
     FolderOpen,
     Image,
     Warning,
+    Lock,
 } from "@mui/icons-material"
 import ReactMarkdown from "react-markdown"
 import { useState, useEffect } from "react"
 
-function Info({ item, formData, onUpdate }) {
+function Info({ item, formData, onUpdate, hideWarnings = false, showId = false }) {
     const [iconSrc, setIconSrc] = useState(null)
     const [iconError, setIconError] = useState(false)
     const [isPreview, setIsPreview] = useState(false)
@@ -124,6 +126,7 @@ function Info({ item, formData, onUpdate }) {
             <Stack spacing={2} sx={{ height: "100%" }}>
                 {/* Warning alert for missing fields */}
                 {(() => {
+                    if (hideWarnings) return null
                     const missing = []
                     if (!formData.name?.trim()) missing.push("Name")
                     if (!formData.author?.trim()) missing.push("Author")
@@ -135,6 +138,29 @@ function Info({ item, formData, onUpdate }) {
                         </Alert>
                     ) : null
                 })()}
+
+                {showId && (
+                    <TextField
+                        label="ID"
+                        value={item?.id || ""}
+                        disabled
+                        helperText="Fixed identifier — cannot be changed"
+                        fullWidth
+                        variant="outlined"
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <Lock
+                                        sx={{
+                                            fontSize: 16,
+                                            color: "text.disabled",
+                                        }}
+                                    />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+                )}
 
                 <TextField
                     label="Name"
