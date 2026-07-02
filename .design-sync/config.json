@@ -1,0 +1,19 @@
+{
+    "pkg": "beepee",
+    "globalName": "BeePEE",
+    "shape": "package",
+    "readmeHeader": ".design-sync/conventions.md",
+    "projectId": "0c43a9c5-cc95-4fa1-9372-671e53adf60c",
+    "componentSrcMap": {
+        "SignageEditor": "src/components/SignageEditor.jsx",
+        "SignageInfo": "src/components/signages/Info.jsx",
+        "SignageStyles": "src/components/signages/Styles.jsx",
+        "SignageProvider": null,
+        "BeePEETheme": null
+    },
+    "cssEntry": "src/global.css",
+    "provider": { "component": "BeePEETheme" },
+    "overrides": {
+        "SignageEditor": { "cardMode": "single", "viewport": "960x1024" }
+    }
+}

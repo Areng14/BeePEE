@@ -6,6 +6,138 @@ BeePEE is an Electron-based application for creating and editing Portal 2 Puzzle
 
 ## BEEmod doccumentation for beemod itself and package things can be found in /docs_backup
 
+---
+
+## Editor Window UI Style Guide
+
+All editor windows (ItemEditor, SettingsPage, SignageEditor, etc.) should follow these styling conventions for consistency.
+
+### Window Structure
+
+```jsx
+<Box sx={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+    {/* Main Content Area with Vertical Sidebar */}
+    <Box sx={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        {/* Vertical Tab Sidebar */}
+        <Tabs orientation="vertical" ... />
+
+        {/* Content Area */}
+        <Box sx={{ flex: 1, overflow: "auto", p: 2 }}>
+            {/* Tab Content */}
+        </Box>
+    </Box>
+
+    {/* Footer */}
+    <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
+        {/* Save/Close buttons */}
+    </Box>
+</Box>
+```
+
+### Vertical Tab Sidebar
+
+```jsx
+<Tabs
+    orientation="vertical"
+    variant="scrollable"
+    sx={{
+        borderRight: 1,
+        borderColor: "divider",
+        minWidth: 56,
+        maxWidth: 56,
+        bgcolor: "background.paper",
+        "& .MuiTabs-indicator": {
+            left: 0,
+            width: 3,
+        },
+        "& .MuiTab-root": {
+            minWidth: 56,
+            width: 56,
+            minHeight: 48,
+            alignItems: "center",
+            justifyContent: "center",
+        },
+    }}>
+    <Tooltip title="Tab Name" placement="right">
+        <Tab icon={<IconName />} />
+    </Tooltip>
+</Tabs>
+```
+
+### Tab Content Layout
+
+```jsx
+<Box>
+    {/* Header */}
+    <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+        <Typography variant="h6">Tab Title</Typography>
+    </Box>
+
+    {/* Content */}
+    <Stack spacing={2}>
+        {/* Form fields, etc. */}
+    </Stack>
+</Box>
+```
+
+### Form Fields
+
+- **TextFields**: Use `fullWidth`, `variant="outlined"`, `size="small"` for compact layouts
+- **Stack spacing**: Use `spacing={2}` for form field groups
+- **Section labels**: Use `variant="subtitle2"` with `fontWeight={600}`
+- **Helper text**: Use `variant="caption"` with `color="text.secondary"`
+- **Icons in labels**: `sx={{ fontSize: 18, color: "text.secondary" }}`
+
+### Buttons
+
+```jsx
+{/* Primary action */}
+<Button variant="contained" startIcon={<Save />} sx={{ flex: 1 }}>Save</Button>
+
+{/* Secondary action */}
+<Button variant="outlined" startIcon={<Close />} sx={{ flex: 1 }}>Close</Button>
+
+{/* Destructive action */}
+<Button variant="outlined" color="error" startIcon={<Delete />}>Delete</Button>
+
+{/* Browse/file picker */}
+<Button variant="outlined" size="small" sx={{ minWidth: 80 }}>
+    <FolderOpen sx={{ fontSize: 18 }} />
+</Button>
+```
+
+### Footer Layout
+
+```jsx
+<Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
+    <Stack direction="row" spacing={1}>
+        <Button variant="contained" sx={{ flex: 1 }}>Save</Button>
+        <Button variant="outlined" sx={{ flex: 1 }}>Close</Button>
+        {/* Optional spacer for right-aligned buttons */}
+        <Box sx={{ flex: 1 }} />
+        <Button variant="outlined" color="error">Delete</Button>
+    </Stack>
+</Box>
+```
+
+### Key Values
+
+| Property | Value |
+|----------|-------|
+| Content padding | `p: 2` |
+| Header margin bottom | `mb: 2` |
+| Stack spacing | `spacing={2}` |
+| Tab sidebar width | `56px` |
+| Tab indicator | `left: 0, width: 3` |
+| Footer padding | `p: 2` |
+| Button spacing | `spacing={1}` |
+
+### Window Dimensions (backend)
+
+Standard editor windows use `width: 960, height: 1024` in `backend/items/itemEditor.js`.
+
+---
+
 ## Recent Development Work
 
 ### Welcome Screen & Package Creation
