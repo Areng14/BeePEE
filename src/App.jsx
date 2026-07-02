@@ -8,12 +8,16 @@ import CreatePackagePage from "./pages/CreatePackagePage"
 import PackageInformationPage from "./pages/PackageInformationPage"
 import ChangelogPage from "./pages/ChangelogPage"
 import WelcomePage from "./pages/WelcomePage"
+import SetupPage from "./pages/SetupPage"
+import SettingsPage from "./pages/SettingsPage"
 import ModelPreviewPage from "./pages/ModelPreviewPage"
 import LoadingPopup from "./components/LoadingPopup"
 import UpdateNotification from "./components/UpdateNotification"
 import CrashReportPage from "./pages/CrashReportPage"
 import BeePackagePage from "./pages/BeePackagePage"
+import SignageEditor from "./components/SignageEditor"
 import { ItemProvider } from "./contexts/ItemContext"
+import { SignageProvider } from "./contexts/SignageContext"
 import "./global.css"
 
 function App() {
@@ -28,13 +32,37 @@ function App() {
     const showModelPreview = routeParam === "model-preview"
     const showCrashReport = routeParam === "crash-report"
     const showBeePackage = routeParam === "bee-package"
+    const showSignageEditor = routeParam === "signage-editor"
+    const showSettings = routeParam === "settings"
+    const showSetup = routeParam === "setup"
     const [packageLoaded, setPackageLoaded] = useState(false)
+    const [setupComplete, setSetupComplete] = useState(null) // null = loading, true/false = known
     const [loadingState, setLoadingState] = useState({
         open: false,
         progress: 0,
         message: "Loading...",
         error: null,
     })
+    // Check if setup is complete on mount
+    useEffect(() => {
+        const checkSetup = async () => {
+            if (!window.package?.checkSetupComplete) {
+                // If API is not available, assume setup is complete (for backwards compatibility)
+                setSetupComplete(true)
+                return
+            }
+            try {
+                const result = await window.package.checkSetupComplete()
+                setSetupComplete(result.setupComplete)
+            } catch (error) {
+                console.error("Failed to check setup status:", error)
+                // On error, assume setup is complete to avoid blocking
+                setSetupComplete(true)
+            }
+        }
+        checkSetup()
+    }, [])
+
     useEffect(() => {
         // window.package should be available immediately after preload script loads
         if (!window.package) {
@@ -115,6 +143,28 @@ function App() {
             ) : showBeePackage ? (
                 // Show BeePackagePage directly for production windows
                 <BeePackagePage />
+            ) : showSignageEditor ? (
+                // Show SignageEditor directly for production windows
+                <SignageProvider>
+                    <SignageEditor />
+                </SignageProvider>
+            ) : showSettings ? (
+                // Show SettingsPage directly for production windows
+                <SettingsPage />
+            ) : showSetup ? (
+                // Show SetupPage directly for production setup window
+                <SetupPage
+                    onSetupComplete={async () => {
+                        // Close setup window and signal main window
+                        await window.package?.closeSetupWindow?.()
+                    }}
+                />
+            ) : setupComplete === null ? (
+                // Still checking setup status - show loading
+                <LoadingPopup open={true} progress={0} message="Loading..." />
+            ) : !setupComplete ? (
+                // Setup not complete - show setup page
+                <SetupPage onSetupComplete={() => setSetupComplete(true)} />
             ) : (
                 // Use normal routing for main window and development
                 <>
@@ -166,6 +216,18 @@ function App() {
                             <Route
                                 path="/bee-package"
                                 element={<BeePackagePage />}
+                            />
+                            <Route
+                                path="/signage-editor"
+                                element={
+                                    <SignageProvider>
+                                        <SignageEditor />
+                                    </SignageProvider>
+                                }
+                            />
+                            <Route
+                                path="/settings"
+                                element={<SettingsPage />}
                             />
                         </Routes>
                     </HashRouter>

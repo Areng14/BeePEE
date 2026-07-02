@@ -1,4 +1,5 @@
 const openEditors = new Map()
+const openSignageEditors = new Map() // Track signage editor windows
 const openModelPreviewWindows = new Map() // Track model preview windows
 let createItemWindow = null // Track the create item window
 let createPackageWindow = null // Track the create package window
@@ -6,6 +7,8 @@ let packageInformationWindow = null // Track the package information window
 let changelogWindow = null // Track the changelog window
 let crashReportWindow = null // Track the crash report window
 let beePackageWindow = null // Track the bee-package.json editor window
+let setupWindow = null // Track the setup window
+let settingsWindow = null // Track the settings window
 const { BrowserWindow, app } = require("electron")
 const path = require("path")
 const { isDev } = require("../utils/isDev.js")
@@ -67,6 +70,70 @@ function sendItemUpdateToEditor(itemId, updatedItem) {
         editorWindow.webContents.send("item-updated", updatedItem)
     } else {
         console.log(`No open editor window found for item: ${itemId}`)
+    }
+}
+
+/**
+ * Create a signage editor window
+ * @param {object} signage - The signage object to edit
+ * @param {BrowserWindow} mainWindow - The main window reference
+ */
+function createSignageEditor(signage, mainWindow) {
+    if (openSignageEditors.has(signage.id)) {
+        openSignageEditors.get(signage.id).focus()
+        return
+    }
+
+    const window = new BrowserWindow({
+        width: 960,
+        height: 1024,
+        title: `BeePEE - Edit Signage: ${signage.name}`,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, "..", "preload.js"),
+        },
+        devTools: isDev,
+        skipTaskbar: false,
+        minimizable: true,
+        maximizable: true,
+        resizable: true,
+        autoHideMenuBar: true,
+    })
+
+    openSignageEditors.set(signage.id, window)
+
+    window.on("closed", () => {
+        openSignageEditors.delete(signage.id)
+    })
+
+    if (isDev) {
+        window.loadURL(`http://localhost:5173/?route=signage-editor`)
+    } else {
+        const appPath = app.getAppPath()
+        window.loadFile(path.join(appPath, "dist", "index.html"), {
+            query: { route: "signage-editor" },
+        })
+    }
+
+    window.setMenuBarVisibility(false)
+
+    // Send signage data after the window has finished loading
+    window.webContents.once("did-finish-load", () => {
+        setTimeout(() => {
+            window.webContents.send("load-signage", signage)
+        }, 100)
+    })
+}
+
+// Function to send signage-updated event to the correct editor window
+function sendSignageUpdateToEditor(signageId, updatedSignage) {
+    const editorWindow = openSignageEditors.get(signageId)
+    if (editorWindow && !editorWindow.isDestroyed()) {
+        console.log(`Sending signage-updated to editor window for signage: ${signageId}`)
+        editorWindow.webContents.send("signage-updated", updatedSignage)
+    } else {
+        console.log(`No open editor window found for signage: ${signageId}`)
     }
 }
 
@@ -503,11 +570,37 @@ async function closeAllEditorWindows() {
 }
 
 /**
+ * Close all signage editor windows
+ */
+async function closeAllSignageEditorWindows() {
+    const closePromises = []
+    for (const [key, window] of openSignageEditors) {
+        if (window && !window.isDestroyed()) {
+            closePromises.push(
+                new Promise((resolve) => {
+                    window.once("closed", resolve)
+                    window.close()
+                })
+            )
+        } else {
+            openSignageEditors.delete(key)
+        }
+    }
+
+    if (closePromises.length > 0) {
+        console.log(`Closing ${closePromises.length} signage editor window(s)...`)
+        await Promise.all(closePromises)
+        await new Promise((resolve) => setTimeout(resolve, 300))
+    }
+}
+
+/**
  * Close all windows (editors, model previews, etc.) to release all file handles
  */
 async function closeAllWindows() {
     console.log('Closing all BeePEE windows to release file handles...')
     await closeAllEditorWindows()
+    await closeAllSignageEditorWindows()
     await closeAllModelPreviewWindows()
 
     // Also close create item and create package windows if open
@@ -530,10 +623,121 @@ async function closeAllWindows() {
     console.log('All BeePEE windows closed')
 }
 
+/**
+ * Create the setup window for first-run configuration
+ * @param {BrowserWindow} mainWindow - The main window reference
+ * @returns {Promise} Resolves when setup is complete or window is closed
+ */
+function createSetupWindow(mainWindow) {
+    return new Promise((resolve) => {
+        // If window already exists, focus it
+        if (setupWindow && !setupWindow.isDestroyed()) {
+            setupWindow.focus()
+            return
+        }
+
+        setupWindow = new BrowserWindow({
+            width: 640,
+            height: 640,
+            title: "BeePEE Setup",
+            resizable: false,
+            minimizable: false,
+            maximizable: false,
+            webPreferences: {
+                nodeIntegration: false,
+                contextIsolation: true,
+                preload: path.join(__dirname, "..", "preload.js"),
+            },
+            devTools: isDev,
+            autoHideMenuBar: true,
+        })
+
+        setupWindow.setMenuBarVisibility(false)
+
+        setupWindow.on("closed", () => {
+            setupWindow = null
+            resolve()
+        })
+
+        if (isDev) {
+            setupWindow.loadURL(`http://localhost:5173/?route=setup`)
+        } else {
+            const appPath = app.getAppPath()
+            setupWindow.loadFile(path.join(appPath, "dist", "index.html"), {
+                query: { route: "setup" },
+            })
+        }
+    })
+}
+
+/**
+ * Close the setup window
+ */
+function closeSetupWindow() {
+    if (setupWindow && !setupWindow.isDestroyed()) {
+        setupWindow.close()
+    }
+}
+
+/**
+ * Create the settings/preferences window
+ * @param {BrowserWindow} mainWindow - The main window reference
+ */
+function createSettingsWindow(mainWindow) {
+    // If window already exists, focus it
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+        settingsWindow.focus()
+        return
+    }
+
+    settingsWindow = new BrowserWindow({
+        width: 960,
+        height: 1024,
+        title: "BeePEE - Preferences",
+        resizable: true,
+        minimizable: true,
+        maximizable: true,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, "..", "preload.js"),
+        },
+        devTools: isDev,
+        autoHideMenuBar: true,
+    })
+
+    settingsWindow.setMenuBarVisibility(false)
+
+    settingsWindow.on("closed", () => {
+        settingsWindow = null
+    })
+
+    if (isDev) {
+        settingsWindow.loadURL(`http://localhost:5173/?route=settings`)
+    } else {
+        const appPath = app.getAppPath()
+        settingsWindow.loadFile(path.join(appPath, "dist", "index.html"), {
+            query: { route: "settings" },
+        })
+    }
+}
+
+/**
+ * Close the settings window
+ */
+function closeSettingsWindow() {
+    if (settingsWindow && !settingsWindow.isDestroyed()) {
+        settingsWindow.close()
+    }
+}
+
 module.exports = {
     createItemEditor,
     sendItemUpdateToEditor,
     openEditors,
+    createSignageEditor,
+    sendSignageUpdateToEditor,
+    openSignageEditors,
     createItemCreationWindow,
     getCreateItemWindow: () => createItemWindow,
     createPackageCreationWindow,
@@ -551,4 +755,10 @@ module.exports = {
     closeAllEditorWindows,
     closeAllWindows,
     openModelPreviewWindows,
+    createSetupWindow,
+    closeSetupWindow,
+    getSetupWindow: () => setupWindow,
+    createSettingsWindow,
+    closeSettingsWindow,
+    getSettingsWindow: () => settingsWindow,
 }

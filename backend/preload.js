@@ -91,6 +91,30 @@ contextBridge.exposeInMainWorld("package", {
     },
 
     // ========================================
+    // SIGNAGE EDITING FUNCTIONS
+    // ========================================
+    openSignageEditor: (signage) =>
+        ipcRenderer.invoke("open-signage-editor", signage),
+    onSignageLoaded: (callback) => {
+        if (callback) {
+            ipcRenderer.on("load-signage", (event, signage) =>
+                callback(event, signage),
+            )
+        } else {
+            ipcRenderer.removeAllListeners("load-signage")
+        }
+    },
+    saveSignage: (signageData) => ipcRenderer.invoke("save-signage", signageData),
+    onSignageUpdated: (callback) => {
+        ipcRenderer.removeAllListeners("signage-updated")
+        if (callback) {
+            ipcRenderer.on("signage-updated", (event, signage) =>
+                callback(event, signage),
+            )
+        }
+    },
+
+    // ========================================
     // INSTANCE MANAGEMENT FUNCTIONS
     // ========================================
     editInstance: (instancePath) =>
@@ -294,4 +318,26 @@ contextBridge.exposeInMainWorld("package", {
     getBeePackageInfo: () => ipcRenderer.invoke("get-bee-package-info"),
     saveBeePackageInfo: (beePackageData) =>
         ipcRenderer.invoke("save-bee-package-info", beePackageData),
+
+    // ========================================
+    // SETTINGS FUNCTIONS
+    // ========================================
+    getSettings: () => ipcRenderer.invoke("get-settings"),
+    saveSettings: (settings) => ipcRenderer.invoke("save-settings", settings),
+    getSetting: (key, defaultValue) =>
+        ipcRenderer.invoke("get-setting", { key, defaultValue }),
+    setSetting: (key, value) =>
+        ipcRenderer.invoke("set-setting", { key, value }),
+    checkSetupComplete: () => ipcRenderer.invoke("check-setup-complete"),
+    getPortal2Path: () => ipcRenderer.invoke("get-portal2-path"),
+    setPortal2Path: (path) => ipcRenderer.invoke("set-portal2-path", { path }),
+    getBeemodPath: () => ipcRenderer.invoke("get-beemod-path"),
+    setBeemodPath: (path) => ipcRenderer.invoke("set-beemod-path", { path }),
+    completeSetup: (portal2Path, beemodPath) =>
+        ipcRenderer.invoke("complete-setup", { portal2Path, beemodPath }),
+    browsePortal2Path: () => ipcRenderer.invoke("browse-portal2-path"),
+    browseBeemodPath: () => ipcRenderer.invoke("browse-beemod-path"),
+    closeSetupWindow: () => ipcRenderer.invoke("close-setup-window"),
+    closeSettingsWindow: () => ipcRenderer.invoke("close-settings-window"),
+    deleteAllSettings: () => ipcRenderer.invoke("delete-all-settings"),
 })
