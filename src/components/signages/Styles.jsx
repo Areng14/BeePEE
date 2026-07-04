@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react"
 import {
-    Paper,
     Typography,
     IconButton,
     Box,
@@ -11,243 +10,450 @@ import {
     DialogTitle,
     DialogContent,
     DialogActions,
-    FormControl,
-    InputLabel,
-    Select,
+    Autocomplete,
+    TextField,
+    Chip,
+    Menu,
     MenuItem,
+    ListItemIcon,
+    ListItemText,
+    Divider,
 } from "@mui/material"
+import { useTheme } from "@mui/material/styles"
+import { ChoiceCard } from "./AddSignageDialog"
 import {
     Delete,
-    Image as ImageIcon,
     Add,
-    AddPhotoAlternate,
+    Upload,
+    Brush,
+    Link as LinkIcon,
+    LinkOff,
+    MoreVert,
+    ChevronRight,
 } from "@mui/icons-material"
 
-// Known BEE2 styles a signage icon can target (see docs_backup/Dev/infotxt.md)
+// Style IDs shipped with BEEmod (the part after the colon in its
+// "GROUP:STYLE" ids). Custom IDs can be added through the + tile.
 const STYLE_CATALOG = [
     ["BEE2_CLEAN", "Clean"],
-    ["BEE2_1950s", "1950s"],
-    ["BEE2_1960s", "1960s"],
-    ["BEE2_1970s", "1970s"],
-    ["BEE2_1980s", "1980s"],
+    ["BEE2_CLEAN_ORIGINAL", "Clean Original"],
     ["BEE2_PORTAL_1", "Portal 1"],
+    ["BEE2_BTS", "BTS"],
     ["BEE2_OVERGROWN", "Overgrown"],
-    ["BEE2_ART_THERAPY", "Art Therapy"],
+    ["BEE2_1950S", "1950s"],
+    ["BEE2_1960S", "1960s"],
+    ["BEE2_1970S", "1970s"],
+    ["BEE2_1980S", "1980s"],
 ]
+// Friendly display name: catalog label when known, otherwise a prettified
+// version of the ID ("BEE2_MY_STYLE" -> "My Style"). Tooltips keep the
+// exact ID.
+export const styleDisplayName = (id) => {
+    const known = STYLE_CATALOG.find(([cid]) => cid === id)
+    if (known) return known[1]
+    return String(id)
+        .replace(/^BEE2_/, "")
+        .split("_")
+        .filter(Boolean)
+        .map((w) => w[0] + w.slice(1).toLowerCase())
+        .join(" ")
+}
+const catalogLabel = styleDisplayName
 
-function StyleCard({ styleId, styleConfig, onStyleChange, onRemove }) {
-    const [iconPreview, setIconPreview] = useState(null)
+// The designer composes on the CLEAN backplate, which also fits Clean
+// Original and Portal 1 — other styles use uploaded images.
+const DESIGNER_STYLES = ["BEE2_CLEAN", "BEE2_CLEAN_ORIGINAL", "BEE2_PORTAL_1"]
+const designerSupports = (id) => DESIGNER_STYLES.includes(id)
 
-    // Load icon preview
-    useEffect(() => {
-        if (styleConfig?.icon) {
-            // Try to load as file path first
-            if (styleConfig.icon.includes("/") || styleConfig.icon.includes("\\")) {
-                window.package
-                    ?.loadFile(styleConfig.icon)
-                    .then(setIconPreview)
-                    .catch(() => setIconPreview(null))
-            } else {
-                setIconPreview(null)
-            }
-        } else {
-            setIconPreview(null)
-        }
-    }, [styleConfig])
+// Follows inheritance strings ("BEE2_1980S": "BEE2_CLEAN") to the actual
+// icon config; depth-capped against cycles.
+const resolveStyleConfig = (styles, id, depth = 0) => {
+    const cfg = styles?.[id]
+    if (typeof cfg === "string" && depth < 5)
+        return resolveStyleConfig(styles, cfg, depth + 1)
+    return cfg && typeof cfg === "object" ? cfg : null
+}
 
-    const handleSelectIcon = async () => {
-        try {
-            const result = await window.electron.showOpenDialog({
-                title: "Select Signage Icon",
-                filters: [{ name: "Images", extensions: ["png"] }],
-                properties: ["openFile"],
-            })
-            if (result && result.length > 0) {
-                const filePath = result[0]
-                onStyleChange(styleId, "icon", filePath)
-                onStyleChange(styleId, "_stagedIconPath", filePath)
-                // Show preview immediately
-                window.package?.loadFile(filePath).then(setIconPreview).catch(() => {})
-            }
-        } catch (error) {
-            console.error("Failed to select icon:", error)
-        }
+// True when making `styleId` inherit from `targetId` would create a cycle
+const wouldCycle = (styles, styleId, targetId) => {
+    let cur = targetId
+    for (let i = 0; i < 6 && typeof cur === "string"; i++) {
+        if (cur === styleId) return true
+        cur = styles?.[cur]
     }
+    return false
+}
+
+// One style tile in the grid
+function StyleTile({
+    styleId,
+    styles,
+    stagedIcon,
+    onUpload,
+    onDropFile,
+    onInherit,
+    onClear,
+    onRemove,
+    onEditDesign,
+}) {
+    // Clean is BEE2's fallback anchor — always the default, not removable
+    const isDefault = styleId === "BEE2_CLEAN"
+    const theme = useTheme()
+    const gold = theme.palette.primary.main
+    const cfg = styles[styleId]
+    const exists = cfg !== undefined
+    const isInherit = typeof cfg === "string"
+    const effective = resolveStyleConfig(styles, styleId)
+    const [preview, setPreview] = useState(null)
+    const [menuAnchor, setMenuAnchor] = useState(null)
+    const [choiceOpen, setChoiceOpen] = useState(false)
+    const [inheritAnchor, setInheritAnchor] = useState(null)
+    const [dropHover, setDropHover] = useState(false)
+
+    useEffect(() => {
+        const icon = effective?.icon
+        if (icon && (icon.includes("/") || icon.includes("\\"))) {
+            window.package
+                ?.loadFile(icon)
+                .then(setPreview)
+                .catch(() => setPreview(null))
+        } else {
+            setPreview(null)
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cfg, styles])
+
+    const shown = stagedIcon || preview
+    const inheritTargets = Object.keys(styles).filter(
+        (id) => id !== styleId && !wouldCycle(styles, styleId, id),
+    )
 
     return (
-        <Paper
+        <Box
+            onDragOver={(e) => {
+                e.preventDefault()
+                setDropHover(true)
+            }}
+            onDragLeave={() => setDropHover(false)}
+            onDrop={(e) => {
+                e.preventDefault()
+                setDropHover(false)
+                const file = e.dataTransfer.files?.[0]
+                if (file && /\.png$/i.test(file.name)) {
+                    onDropFile(styleId, file.path)
+                }
+            }}
             sx={{
-                p: 2,
+                position: "relative",
+                border: "2px dashed",
+                borderColor: dropHover
+                    ? "primary.main"
+                    : isDefault
+                      ? "primary.dark"
+                      : exists
+                        ? "divider"
+                        : "action.disabledBackground",
+                borderStyle: exists ? "solid" : "dashed",
+                borderWidth: exists ? 1 : 2,
+                borderRadius: 2,
+                bgcolor: "background.paper",
+                p: 1.5,
+                pt: 2,
                 display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
-                gap: 2,
+                gap: 0.75,
+                minWidth: 0,
+                transition: "border-color .12s, transform .12s",
+                "&:hover": { borderColor: "text.secondary" },
             }}>
-            <Tooltip title="Click to change icon">
+            {/* tile menu */}
+            <IconButton
+                size="small"
+                onClick={(e) => setMenuAnchor(e.currentTarget)}
+                sx={{ position: "absolute", top: 2, right: 2, p: 0.25 }}>
+                <MoreVert sx={{ fontSize: 16 }} />
+            </IconButton>
+
+            {/* icon area — click = upload */}
+            <Tooltip
+                title={
+                    stagedIcon
+                        ? "New design pending — press Save to apply"
+                        : isInherit
+                          ? `Uses ${cfg}'s icon — click to give it its own`
+                          : shown
+                            ? "Click to change (or drop a PNG)"
+                            : "Click to set an image (or drop a PNG)"
+                }>
                 <Box
-                    onClick={handleSelectIcon}
+                    onClick={async () => {
+                        // Designer-capable styles honor the click preference
+                        // (ask / upload / designer); others upload directly
+                        if (!designerSupports(styleId) || !onEditDesign) {
+                            onUpload(styleId)
+                            return
+                        }
+                        let action = "ask"
+                        try {
+                            const r = await window.package?.getSetting?.(
+                                "signageIconClickAction",
+                            )
+                            if (r?.success && r.value) action = r.value
+                        } catch {
+                            /* default to asking */
+                        }
+                        if (action === "upload") onUpload(styleId)
+                        else if (action === "designer") onEditDesign(styleId)
+                        else setChoiceOpen(true)
+                    }}
                     sx={{
                         width: 96,
                         height: 96,
-                        border: "2px dashed",
-                        borderColor: "divider",
                         borderRadius: 1,
+                        bgcolor: "background.default",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        bgcolor: "background.default",
                         overflow: "hidden",
                         cursor: "pointer",
-                        flexShrink: 0,
-                        "&:hover": {
-                            borderColor: "primary.main",
-                            bgcolor: "action.hover",
-                        },
+                        "&:hover": { outline: "2px solid", outlineColor: "primary.main" },
                     }}>
-                    {iconPreview ? (
+                    {shown ? (
                         <img
-                            src={iconPreview}
-                            alt="Icon"
-                            style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "contain",
-                            }}
+                            src={shown}
+                            alt=""
+                            style={{ width: "100%", height: "100%", objectFit: "contain" }}
                         />
                     ) : (
-                        <ImageIcon sx={{ fontSize: 48, color: "text.disabled" }} />
+                        <Add sx={{ fontSize: 28, color: "text.disabled" }} />
                     )}
                 </Box>
             </Tooltip>
-            <Box sx={{ flex: 1 }}>
-                <Typography variant="subtitle1">{styleId}</Typography>
-                <Typography variant="caption" color="text.secondary">
-                    {styleConfig?.icon
-                        ? "Click image to change"
-                        : "No image — click to select"}
+
+            <Tooltip title={styleId}>
+                <Typography
+                    variant="body2"
+                    noWrap
+                    sx={{ maxWidth: "100%", fontWeight: 600, mt: 0.25 }}>
+                    {catalogLabel(styleId)}
                 </Typography>
-            </Box>
-            <Tooltip title="Remove style">
-                <IconButton color="error" onClick={() => onRemove(styleId)}>
-                    <Delete />
-                </IconButton>
             </Tooltip>
-        </Paper>
+
+            {/* state badge */}
+            {stagedIcon ? (
+                <Chip
+                    label="pending save"
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                    sx={{ height: 20, fontSize: 11 }}
+                />
+            ) : isDefault ? (
+                <Tooltip title="The default: styles without their own entry fall back to Clean's icon">
+                    <Chip
+                        label="default"
+                        size="small"
+                        color="primary"
+                        variant="outlined"
+                        sx={{ height: 20, fontSize: 11 }}
+                    />
+                </Tooltip>
+            ) : isInherit ? (
+                <Tooltip title={`Uses ${cfg}'s icon`}>
+                    <Chip
+                        icon={<LinkIcon sx={{ fontSize: 13 }} />}
+                        label={`Uses ${catalogLabel(cfg)}`}
+                        size="small"
+                        variant="outlined"
+                        sx={{ height: 20, fontSize: 11, maxWidth: "100%" }}
+                    />
+                </Tooltip>
+            ) : (
+                <Typography variant="caption" sx={{ color: "text.disabled" }}>
+                    {shown ? "own image" : "not set"}
+                </Typography>
+            )}
+
+            <Menu
+                anchorEl={menuAnchor}
+                open={!!menuAnchor}
+                onClose={() => setMenuAnchor(null)}>
+                <MenuItem
+                    onClick={() => {
+                        setMenuAnchor(null)
+                        onUpload(styleId)
+                    }}>
+                    <ListItemIcon>
+                        <Upload fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText>Upload image…</ListItemText>
+                </MenuItem>
+                {designerSupports(styleId) && onEditDesign && (
+                    <MenuItem
+                        onClick={() => {
+                            setMenuAnchor(null)
+                            onEditDesign(styleId)
+                        }}>
+                        <ListItemIcon>
+                            <Brush fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText>Edit in Designer</ListItemText>
+                    </MenuItem>
+                )}
+                {/* the default (Clean) must keep its own icon — it's what
+                    everything else falls back to */}
+                {!isDefault && (
+                    <MenuItem
+                        disabled={!inheritTargets.length}
+                        onClick={(e) => setInheritAnchor(e.currentTarget)}>
+                        <ListItemIcon>
+                            <LinkIcon fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText>Use another style's icon</ListItemText>
+                        <ChevronRight fontSize="small" />
+                    </MenuItem>
+                )}
+                {isInherit && (
+                    <MenuItem
+                        onClick={() => {
+                            setMenuAnchor(null)
+                            onClear(styleId)
+                        }}>
+                        <ListItemIcon>
+                            <LinkOff fontSize="small" />
+                        </ListItemIcon>
+                        <ListItemText>Stop inheriting</ListItemText>
+                    </MenuItem>
+                )}
+                {exists && !isDefault && [
+                    <Divider key="d" />,
+                    <MenuItem
+                        key="rm"
+                        onClick={() => {
+                            setMenuAnchor(null)
+                            onRemove(styleId)
+                        }}>
+                        <ListItemIcon>
+                            <Delete fontSize="small" color="error" />
+                        </ListItemIcon>
+                        <ListItemText sx={{ color: "error.main" }}>
+                            Remove from signage
+                        </ListItemText>
+                    </MenuItem>,
+                ]}
+            </Menu>
+            <Menu
+                anchorEl={inheritAnchor}
+                open={!!inheritAnchor}
+                onClose={() => setInheritAnchor(null)}
+                anchorOrigin={{ vertical: "top", horizontal: "right" }}>
+                {inheritTargets.map((id) => (
+                    <Tooltip key={id} title={id} placement="left">
+                        <MenuItem
+                            onClick={() => {
+                                setInheritAnchor(null)
+                                setMenuAnchor(null)
+                                onInherit(styleId, id)
+                            }}>
+                            {catalogLabel(id)}
+                        </MenuItem>
+                    </Tooltip>
+                ))}
+            </Menu>
+
+            {/* Upload vs Designer — same picker as the Add Signage flow */}
+            <Dialog
+                open={choiceOpen}
+                onClose={() => setChoiceOpen(false)}
+                maxWidth="sm"
+                fullWidth>
+                <DialogTitle>Change signage icon</DialogTitle>
+                <DialogContent>
+                    <Box sx={{ display: "flex", gap: 1.75, pt: 0.5 }}>
+                        <ChoiceCard
+                            title="Select existing"
+                            desc="Choose a PNG from your computer."
+                            icon={<Upload sx={{ color: gold, fontSize: 24 }} />}
+                            onClick={() => {
+                                setChoiceOpen(false)
+                                onUpload(styleId)
+                            }}
+                        />
+                        <ChoiceCard
+                            title="Edit in Designer"
+                            desc="Open the drag-and-drop designer to edit this icon."
+                            icon={<Brush sx={{ color: gold, fontSize: 24 }} />}
+                            onClick={() => {
+                                setChoiceOpen(false)
+                                onEditDesign(styleId)
+                            }}
+                        />
+                    </Box>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setChoiceOpen(false)}>Cancel</Button>
+                </DialogActions>
+            </Dialog>
+        </Box>
     )
 }
 
-function AddStyleDialog({ open, usedStyleIds, onAdd, onClose }) {
-    const [styleId, setStyleId] = useState("")
-    const [imagePath, setImagePath] = useState(null)
-    const [imagePreview, setImagePreview] = useState(null)
-
-    // Reset selections whenever the dialog opens
+// + tile dialog: pick a BEE2 style or type a custom ID
+function CustomStyleDialog({ open, usedStyleIds, onAdd, onClose }) {
+    const [input, setInput] = useState("")
     useEffect(() => {
-        if (open) {
-            setStyleId("")
-            setImagePath(null)
-            setImagePreview(null)
-        }
+        if (open) setInput("")
     }, [open])
 
-    const styleOptions = STYLE_CATALOG.filter(
-        ([id]) => !usedStyleIds.includes(id),
+    // Map the text back to a style ID: matches a catalog name or ID first
+    // ("clean original" -> BEE2_CLEAN_ORIGINAL), also the old "Name (ID)"
+    // label format, otherwise normalizes it as a custom ID.
+    const trimmed = input.trim().replace(/^(.+?)\s*\((BEE2_[A-Z0-9_]+)\)$/i, "$2")
+    const known = STYLE_CATALOG.find(
+        ([id, label]) =>
+            label.toLowerCase() === trimmed.toLowerCase() ||
+            id.toLowerCase() === trimmed.toLowerCase(),
     )
-
-    const handlePickImage = async () => {
-        try {
-            const result = await window.electron.showOpenDialog({
-                title: "Select Signage Picture",
-                filters: [{ name: "Images", extensions: ["png"] }],
-                properties: ["openFile"],
-            })
-            if (result && result.length > 0) {
-                const filePath = result[0]
-                setImagePath(filePath)
-                window.package
-                    ?.loadFile(filePath)
-                    .then(setImagePreview)
-                    .catch(() => setImagePreview(null))
-            }
-        } catch (error) {
-            console.error("Failed to select signage picture:", error)
-        }
-    }
+    const normalized = known
+        ? known[0]
+        : trimmed
+              .toUpperCase()
+              .replace(/[^A-Z0-9_]+/g, "_")
+              .replace(/^_+|_+$/g, "")
+    const alreadyUsed = usedStyleIds.includes(normalized)
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-            <DialogTitle>Add Signage Style</DialogTitle>
+            <DialogTitle>Add Style</DialogTitle>
             <DialogContent>
-                <Stack spacing={2}>
-                    <FormControl fullWidth size="small">
-                        <InputLabel>Style</InputLabel>
-                        <Select
-                            value={styleId}
-                            label="Style"
-                            onChange={(e) => setStyleId(e.target.value)}>
-                            {styleOptions.map(([id, label]) => (
-                                <MenuItem key={id} value={id}>
-                                    {label} ({id})
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-                    {styleOptions.length === 0 && (
-                        <Typography variant="caption" color="warning.main">
-                            All available styles have been added.
-                        </Typography>
-                    )}
-
-                    <Box>
-                        <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            sx={{ display: "block", mb: 0.5 }}>
-                            Signage picture
-                        </Typography>
-                        <Box
-                            onClick={handlePickImage}
-                            sx={{
-                                border: "2px dashed",
-                                borderColor: "divider",
-                                borderRadius: 1,
-                                height: 130,
-                                display: "flex",
-                                flexDirection: "column",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                gap: 1,
-                                bgcolor: "background.default",
-                                cursor: "pointer",
-                                overflow: "hidden",
-                                "&:hover": {
-                                    borderColor: "primary.main",
-                                    bgcolor: "action.hover",
-                                },
-                            }}>
-                            {imagePreview ? (
-                                <img
-                                    src={imagePreview}
-                                    alt="Preview"
-                                    style={{
-                                        width: "100%",
-                                        height: "100%",
-                                        objectFit: "contain",
-                                    }}
-                                />
-                            ) : (
-                                <>
-                                    <AddPhotoAlternate
-                                        sx={{ fontSize: 34, color: "text.disabled" }}
-                                    />
-                                    <Typography
-                                        variant="body2"
-                                        color="text.secondary">
-                                        Click to select a PNG
-                                    </Typography>
-                                </>
-                            )}
-                        </Box>
-                    </Box>
+                <Stack spacing={1.5} sx={{ pt: 0.5 }}>
+                    <Autocomplete
+                        freeSolo
+                        options={STYLE_CATALOG.map(([id]) => id).filter(
+                            (id) => !usedStyleIds.includes(id),
+                        )}
+                        getOptionLabel={(id) => styleDisplayName(id)}
+                        inputValue={input}
+                        onInputChange={(e, value) => setInput(value)}
+                        renderInput={(params) => (
+                            <TextField
+                                {...params}
+                                label="Style"
+                                size="small"
+                                autoFocus
+                                placeholder="Pick one, or type a custom ID"
+                                helperText={
+                                    alreadyUsed
+                                        ? "That style is already on this signage"
+                                        : normalized && !known
+                                          ? `Will be added as ${normalized}`
+                                          : " "
+                                }
+                                error={alreadyUsed}
+                            />
+                        )}
+                    />
                 </Stack>
             </DialogContent>
             <DialogActions>
@@ -256,8 +462,8 @@ function AddStyleDialog({ open, usedStyleIds, onAdd, onClose }) {
                 </Button>
                 <Button
                     variant="contained"
-                    disabled={!styleId}
-                    onClick={() => onAdd(styleId, imagePath)}
+                    disabled={!normalized || alreadyUsed}
+                    onClick={() => onAdd(normalized)}
                     sx={{ minWidth: 80 }}>
                     Add
                 </Button>
@@ -266,37 +472,95 @@ function AddStyleDialog({ open, usedStyleIds, onAdd, onClose }) {
     )
 }
 
-function SignageStyles({ formData, onUpdate }) {
+// Icons tab: a grid covering every BEE2 style (plus any custom ones on the
+// signage). Empty tiles are set with one click or a PNG drop — no add-dialog
+// dance. Designer work lives in the separate Designs tab.
+function SignageStyles({ formData, onUpdate, onEditDesign, stagedDesign }) {
     const styles = formData.styles || {}
-    const [addDialogOpen, setAddDialogOpen] = useState(false)
+    const [customDialogOpen, setCustomDialogOpen] = useState(false)
 
-    const handleStyleChange = (styleId, field, value) => {
-        const currentStyle = styles[styleId] || {}
+    // Repair IDs mangled by the old add dialog, where picking
+    // "Portal 1 (BEE2_PORTAL_1)" saved as PORTAL_1_BEE2_PORTAL_1 — an ID
+    // BEE2 would never match. Rename them to the embedded catalog ID.
+    useEffect(() => {
+        let changed = false
+        const next = {}
+        for (const [id, cfg] of Object.entries(styles)) {
+            const m = /^(.+)_(BEE2_[A-Z0-9_]+)$/.exec(id)
+            const target =
+                m &&
+                m[2] === `BEE2_${m[1]}` &&
+                STYLE_CATALOG.some(([cid]) => cid === m[2])
+                    ? m[2]
+                    : null
+            if (target && styles[target] === undefined) {
+                next[target] = cfg
+                changed = true
+            } else {
+                next[id] = cfg
+            }
+        }
+        if (changed) onUpdate("styles", next)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [styles])
+
+    const patchStyle = (styleId, patch) => {
+        const current = styles[styleId]
+        const currentStyle =
+            current && typeof current === "object" ? current : {}
         onUpdate("styles", {
             ...styles,
-            [styleId]: {
-                ...currentStyle,
-                [field]: value,
-            },
+            [styleId]: { ...currentStyle, ...patch },
         })
     }
 
-    const handleAddStyle = (styleId, imagePath) => {
-        onUpdate("styles", {
-            ...styles,
-            [styleId]: imagePath
-                ? { icon: imagePath, _stagedIconPath: imagePath }
-                : { icon: "" },
-        })
-        setAddDialogOpen(false)
+    const handleUpload = async (styleId) => {
+        try {
+            const result = await window.electron.showOpenDialog({
+                title: "Select Signage Icon",
+                filters: [{ name: "Images", extensions: ["png"] }],
+                properties: ["openFile"],
+            })
+            if (result && result.length > 0) {
+                patchStyle(styleId, {
+                    icon: result[0],
+                    _stagedIconPath: result[0],
+                })
+            }
+        } catch (error) {
+            console.error("Failed to select icon:", error)
+        }
     }
 
-    const handleRemoveStyle = (styleId) => {
-        const { [styleId]: removed, ...rest } = styles
+    const handleDropFile = (styleId, filePath) => {
+        if (!filePath) return
+        patchStyle(styleId, { icon: filePath, _stagedIconPath: filePath })
+    }
+
+    const handleInherit = (styleId, targetId) => {
+        onUpdate("styles", { ...styles, [styleId]: targetId })
+    }
+
+    const handleClear = (styleId) => {
+        onUpdate("styles", { ...styles, [styleId]: { icon: "" } })
+    }
+
+    const handleRemove = (styleId) => {
+        const { [styleId]: _removed, ...rest } = styles
         onUpdate("styles", rest)
     }
 
-    const styleEntries = Object.entries(styles)
+    // Only styles that exist on the signage (default: just Clean) —
+    // catalog order first, then custom entries. Others are added explicitly
+    // through the + tile.
+    const tileIds = [
+        ...STYLE_CATALOG.map(([id]) => id).filter(
+            (id) => styles[id] !== undefined,
+        ),
+        ...Object.keys(styles).filter(
+            (id) => !STYLE_CATALOG.some(([cid]) => cid === id),
+        ),
+    ]
 
     return (
         <Box>
@@ -308,40 +572,80 @@ function SignageStyles({ formData, onUpdate }) {
                     mb: 2,
                 }}>
                 <Typography variant="h6">Signage Icons</Typography>
-                <Button
-                    startIcon={<Add />}
-                    onClick={() => setAddDialogOpen(true)}
-                    variant="outlined"
-                    size="small">
-                    Add Style
-                </Button>
             </Box>
 
-            {styleEntries.length === 0 ? (
-                <Paper sx={{ p: 3, textAlign: "center" }}>
-                    <Typography color="text.secondary">
-                        No icons configured. Add a style and select an image.
-                    </Typography>
-                </Paper>
-            ) : (
-                <Stack spacing={1}>
-                    {styleEntries.map(([styleId, styleConfig]) => (
-                        <StyleCard
-                            key={styleId}
-                            styleId={styleId}
-                            styleConfig={styleConfig}
-                            onStyleChange={handleStyleChange}
-                            onRemove={handleRemoveStyle}
-                        />
-                    ))}
-                </Stack>
-            )}
+            <Box
+                sx={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))",
+                    gap: 2,
+                }}>
+                {tileIds.map((id) => (
+                    <StyleTile
+                        key={id}
+                        styleId={id}
+                        styles={styles}
+                        stagedIcon={
+                            stagedDesign &&
+                            (stagedDesign.styleId || "BEE2_CLEAN") === id
+                                ? stagedDesign.iconData
+                                : null
+                        }
+                        onUpload={handleUpload}
+                        onDropFile={handleDropFile}
+                        onInherit={handleInherit}
+                        onClear={handleClear}
+                        onRemove={handleRemove}
+                        onEditDesign={onEditDesign}
+                    />
+                ))}
 
-            <AddStyleDialog
-                open={addDialogOpen}
+                {/* + custom style tile */}
+                <Box
+                    onClick={() => setCustomDialogOpen(true)}
+                    sx={{
+                        border: "2px dashed",
+                        borderColor: "action.disabledBackground",
+                        borderRadius: 2,
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 0.75,
+                        p: 1.5,
+                        minHeight: 176,
+                        cursor: "pointer",
+                        color: "text.disabled",
+                        "&:hover": {
+                            borderColor: "primary.main",
+                            color: "primary.main",
+                        },
+                    }}>
+                    <Add sx={{ fontSize: 24 }} />
+                    <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                        Add style
+                    </Typography>
+                </Box>
+            </Box>
+
+            <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ display: "block", mt: 2 }}>
+                Clean is the default: styles you don't add fall back to its
+                icon in BEE2. Click a tile to set its image, or drop a PNG
+                onto it. The ⋮ menu links a style to another style's icon or
+                opens the designer (Clean-plate styles).
+            </Typography>
+
+            <CustomStyleDialog
+                open={customDialogOpen}
                 usedStyleIds={Object.keys(styles)}
-                onAdd={handleAddStyle}
-                onClose={() => setAddDialogOpen(false)}
+                onAdd={(id) => {
+                    handleClear(id) // creates the entry
+                    setCustomDialogOpen(false)
+                }}
+                onClose={() => setCustomDialogOpen(false)}
             />
         </Box>
     )

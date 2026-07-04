@@ -38,8 +38,14 @@ import {
     FolderZip,
     PowerSettingsNew,
     BugReport,
+    Brush,
 } from "@mui/icons-material"
 import { useState, useEffect } from "react"
+import {
+    SignagePreferencesForm,
+    SIGNAGE_PREF_DEFAULTS,
+    SIGNAGE_PREF_KEYS,
+} from "../components/signages/SignagePreferences"
 
 // Custom toggle button component for settings
 function SettingToggle({ name, description, checked, onChange, disabled, color = "primary" }) {
@@ -130,6 +136,7 @@ function SettingsPage() {
         devMode: false,
         showItemIds: false,
         verboseLogging: false,
+        ...SIGNAGE_PREF_DEFAULTS,
     })
     const [originalAppSettings, setOriginalAppSettings] = useState({})
     const [deleteConfigDialogOpen, setDeleteConfigDialogOpen] = useState(false)
@@ -165,12 +172,19 @@ function SettingsPage() {
                     "devMode",
                     "showItemIds",
                     "verboseLogging",
+                    ...SIGNAGE_PREF_KEYS,
                 ]
 
                 const loadedSettings = {}
                 for (const key of settingsToLoad) {
                     const result = await window.package.getSetting(key)
-                    if (result.success && result.value !== undefined) {
+                    // Unset settings come back as null — keep the default
+                    // instead of letting null blank out the field
+                    if (
+                        result.success &&
+                        result.value !== undefined &&
+                        result.value !== null
+                    ) {
                         loadedSettings[key] = result.value
                     }
                 }
@@ -360,6 +374,9 @@ function SettingsPage() {
                     </Tooltip>
                     <Tooltip title="Warnings" placement="right">
                         <Tab icon={<Warning />} />
+                    </Tooltip>
+                    <Tooltip title="Signage" placement="right">
+                        <Tab icon={<Brush />} />
                     </Tooltip>
                     <Tooltip title="Developer" placement="right">
                         <Tab icon={<BugReport />} />
@@ -628,8 +645,25 @@ function SettingsPage() {
                         </Stack>
                     </Box>
 
-                    {/* Developer Tab */}
+                    {/* Signage Tab */}
                     <Box sx={{ display: tabValue === 4 ? "block" : "none" }}>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                mb: 2,
+                            }}>
+                            <Typography variant="h6">Signage</Typography>
+                        </Box>
+                        <SignagePreferencesForm
+                            values={appSettings}
+                            onChange={updateAppSetting}
+                        />
+                    </Box>
+
+                    {/* Developer Tab */}
+                    <Box sx={{ display: tabValue === 5 ? "block" : "none" }}>
                         <Box
                             sx={{
                                 display: "flex",
@@ -665,7 +699,7 @@ function SettingsPage() {
                     </Box>
 
                     {/* Danger Zone Tab */}
-                    <Box sx={{ display: tabValue === 5 ? "block" : "none" }}>
+                    <Box sx={{ display: tabValue === 6 ? "block" : "none" }}>
                         <Box
                             sx={{
                                 display: "flex",

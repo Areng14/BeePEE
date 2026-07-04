@@ -16,6 +16,7 @@ import UpdateNotification from "./components/UpdateNotification"
 import CrashReportPage from "./pages/CrashReportPage"
 import BeePackagePage from "./pages/BeePackagePage"
 import SignageEditor from "./components/SignageEditor"
+import SignageDesignerPage from "./pages/SignageDesignerPage"
 import { ItemProvider } from "./contexts/ItemContext"
 import { SignageProvider } from "./contexts/SignageContext"
 import "./global.css"
@@ -33,6 +34,7 @@ function App() {
     const showCrashReport = routeParam === "crash-report"
     const showBeePackage = routeParam === "bee-package"
     const showSignageEditor = routeParam === "signage-editor"
+    const showSignageDesigner = routeParam === "signage-designer"
     const showSettings = routeParam === "settings"
     const showSetup = routeParam === "setup"
     const [packageLoaded, setPackageLoaded] = useState(false)
@@ -148,6 +150,9 @@ function App() {
                 <SignageProvider>
                     <SignageEditor />
                 </SignageProvider>
+            ) : showSignageDesigner ? (
+                // Show SignageDesignerPage directly for production windows
+                <SignageDesignerPage />
             ) : showSettings ? (
                 // Show SettingsPage directly for production windows
                 <SettingsPage />
@@ -224,6 +229,10 @@ function App() {
                                         <SignageEditor />
                                     </SignageProvider>
                                 }
+                            />
+                            <Route
+                                path="/signage-designer"
+                                element={<SignageDesignerPage />}
                             />
                             <Route
                                 path="/settings"

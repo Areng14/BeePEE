@@ -4,11 +4,17 @@ import {
     Tabs,
     Tab,
     Button,
+    IconButton,
     Stack,
     Alert,
     CircularProgress,
     Tooltip,
     Badge,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogContentText,
+    DialogActions,
 } from "@mui/material"
 import {
     Info as InfoIcon,
@@ -16,6 +22,9 @@ import {
     Save,
     Close,
     CheckCircle,
+    Undo,
+    Redo,
+    Delete,
 } from "@mui/icons-material"
 import { useSignageContext } from "../contexts/SignageContext"
 import SignageInfo from "./signages/Info"
@@ -37,6 +46,27 @@ function SignageEditor() {
     const [saveError, setSaveError] = useState(null)
     const [showSaveSuccess, setShowSaveSuccess] = useState(false)
     const [hasChanges, setHasChanges] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+    const [discardDialogOpen, setDiscardDialogOpen] = useState(false)
+    const [skipDeleteConfirmations, setSkipDeleteConfirmations] =
+        useState(false)
+    // Form-level undo/redo (snapshots of formData)
+    const [undoStack, setUndoStack] = useState([])
+    const [redoStack, setRedoStack] = useState([])
+    // The editable design source, present only for BeePEE-designed signage
+    const [design, setDesign] = useState(null)
+    // A designer save waiting for THIS editor's Save button to commit it
+    const [stagedDesign, setStagedDesign] = useState(null)
+
+    useEffect(() => {
+        window.package.onSignageDesignStaged?.((payload) => {
+            if (!payload) return
+            setStagedDesign(payload)
+            setSaveError(null)
+        })
+        return () => window.package.onSignageDesignStaged?.(null)
+    }, [])
 
     // Fetch available signages for dropdown
     useEffect(() => {
@@ -64,6 +94,16 @@ function SignageEditor() {
             }
         }
         loadShowIdsSetting()
+
+        // Same global setting the item editor honors
+        window.package
+            .getSetting("skipDeleteConfirmations")
+            .then((result) => {
+                if (result.success && result.value !== undefined) {
+                    setSkipDeleteConfirmations(result.value)
+                }
+            })
+            .catch(() => {})
     }, [])
 
     // Initialize form from signage
@@ -78,8 +118,50 @@ function SignageEditor() {
                 styles: signage.styles || {},
             })
             setHasChanges(false)
+
+            // Check whether this signage was made with the BeePEE designer
+            window.package
+                ?.getSignageDesign?.(signage.id)
+                .then((result) => {
+                    setDesign(result?.success ? result.design : null)
+                })
+                .catch(() => setDesign(null))
         }
     }, [signage])
+
+    // Open the designer for a specific style's icon. Non-Clean styles use
+    // their own saved design when one exists, otherwise they start from the
+    // Clean design as a base. The styleId rides along so saving writes back
+    // to the right style instead of clobbering Clean.
+    const handleEditDesign = async (styleId) => {
+        const style = styleId || "BEE2_CLEAN"
+        let styleDesign = design
+        // An uncommitted staged design for this style is the latest version
+        if (
+            stagedDesign &&
+            (stagedDesign.styleId || "BEE2_CLEAN") === style
+        ) {
+            styleDesign = stagedDesign.design
+        } else if (style !== "BEE2_CLEAN") {
+            try {
+                const result = await window.package.getSignageDesign(
+                    signage.id,
+                    style,
+                )
+                if (result?.success && result.design) {
+                    styleDesign = result.design
+                }
+            } catch {
+                /* fall back to the Clean design */
+            }
+        }
+        window.package.openSignageDesigner({
+            editId: signage.id,
+            name: formData.name,
+            design: styleDesign,
+            styleId: style,
+        })
+    }
 
     // Add class to body to hide scrollbars (matching ItemEditor)
     useEffect(() => {
@@ -94,9 +176,49 @@ function SignageEditor() {
     }
 
     const handleUpdate = (field, value) => {
+        // Snapshot the pre-change form so this edit can be undone
+        setUndoStack((prev) => [...prev, formData].slice(-50))
+        setRedoStack([])
         setFormData((prev) => ({ ...prev, [field]: value }))
         setHasChanges(true)
         setSaveError(null)
+    }
+
+    const performUndo = () => {
+        if (!undoStack.length) return
+        setRedoStack((r) => [...r, formData])
+        setFormData(undoStack[undoStack.length - 1])
+        setUndoStack((u) => u.slice(0, -1))
+        setHasChanges(true)
+        setSaveError(null)
+    }
+
+    const performRedo = () => {
+        if (!redoStack.length) return
+        setUndoStack((u) => [...u, formData])
+        setFormData(redoStack[redoStack.length - 1])
+        setRedoStack((r) => r.slice(0, -1))
+        setHasChanges(true)
+        setSaveError(null)
+    }
+
+    const handleDelete = async () => {
+        if (!signage) return
+        setIsDeleting(true)
+        setSaveError(null)
+        try {
+            const result = await window.package.deleteSignage(signage.id)
+            if (result.success) {
+                window.close()
+            } else {
+                setSaveError(result.error || "Failed to delete signage")
+                setIsDeleting(false)
+            }
+        } catch (error) {
+            console.error("Failed to delete signage:", error)
+            setSaveError(error.message || "Failed to delete signage")
+            setIsDeleting(false)
+        }
     }
 
     const handleSave = async () => {
@@ -111,13 +233,37 @@ function SignageEditor() {
                 originalId: signage.id,
             })
 
-            if (result.success) {
-                setShowSaveSuccess(true)
-                setHasChanges(false)
-                setTimeout(() => setShowSaveSuccess(false), 2000)
-            } else {
+            if (!result.success) {
                 setSaveError(result.error || "Failed to save signage")
+                return
             }
+
+            // Commit a staged designer save (icon, materials, .bpsign) —
+            // done AFTER the form save so create-signage's per-style merge
+            // isn't clobbered by save-signage rewriting Styles
+            if (stagedDesign) {
+                const staged = await window.package.createSignage({
+                    ...stagedDesign,
+                    editId: signage.id,
+                })
+                if (!staged.success) {
+                    setSaveError(
+                        staged.error || "Failed to apply the designed icon",
+                    )
+                    return
+                }
+                if (
+                    !stagedDesign.styleId ||
+                    stagedDesign.styleId === "BEE2_CLEAN"
+                ) {
+                    setDesign(stagedDesign.design)
+                }
+                setStagedDesign(null)
+            }
+
+            setShowSaveSuccess(true)
+            setHasChanges(false)
+            setTimeout(() => setShowSaveSuccess(false), 2000)
         } catch (error) {
             console.error("Failed to save signage:", error)
             setSaveError(error.message || "Failed to save signage")
@@ -127,8 +273,16 @@ function SignageEditor() {
     }
 
     const handleClose = () => {
-        window.close()
+        // Unsaved form edits or a staged designer save: confirm the discard
+        if (hasChanges || stagedDesign) {
+            setDiscardDialogOpen(true)
+        } else {
+            window.close()
+        }
     }
+
+    // Unsaved work: form edits or an uncommitted designer save
+    const hasPending = hasChanges || !!stagedDesign
 
     if (!signage) {
         return (
@@ -194,7 +348,7 @@ function SignageEditor() {
                         />
                     </Tooltip>
                     <Tooltip
-                        title="Styles - Configure how signage appears in different BEE2 styles"
+                        title="Icons - Which image each BEE2 style shows"
                         placement="right">
                         <Tab
                             icon={
@@ -220,45 +374,82 @@ function SignageEditor() {
                         />
                     </Box>
                     <Box sx={{ display: tabValue === 1 ? "block" : "none" }}>
-                        <SignageStyles formData={formData} onUpdate={handleUpdate} />
+                        <SignageStyles
+                            formData={formData}
+                            onUpdate={handleUpdate}
+                            onEditDesign={handleEditDesign}
+                            stagedDesign={stagedDesign}
+                        />
                     </Box>
                 </Box>
             </Box>
 
-            {/* Footer with Save/Close Buttons */}
+            {/* Footer — mirrors the item editor: undo/redo, Save, Close, Delete */}
             <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
                 <Stack direction="row" spacing={1}>
                     <Tooltip
                         title={
-                            hasChanges
-                                ? "Save changes to signage"
-                                : "No unsaved changes"
+                            undoStack.length
+                                ? "Undo"
+                                : "Nothing to undo"
                         }>
-                        <Button
-                            variant="contained"
-                            startIcon={
-                                isSaving ? (
-                                    <CircularProgress size={20} color="inherit" />
-                                ) : showSaveSuccess ? (
-                                    <CheckCircle />
-                                ) : (
-                                    <Save />
-                                )
-                            }
-                            onClick={handleSave}
-                            color={showSaveSuccess ? "success" : "primary"}
-                            disabled={!hasChanges || isSaving}
-                            sx={{ flex: 1 }}>
-                            {isSaving
-                                ? "Saving..."
-                                : showSaveSuccess
-                                  ? "Saved!"
-                                  : "Save"}
-                        </Button>
+                        <span>
+                            <IconButton
+                                onClick={performUndo}
+                                disabled={!undoStack.length}
+                                size="small">
+                                <Undo />
+                            </IconButton>
+                        </span>
                     </Tooltip>
                     <Tooltip
                         title={
-                            hasChanges
+                            redoStack.length ? "Redo" : "Nothing to redo"
+                        }>
+                        <span>
+                            <IconButton
+                                onClick={performRedo}
+                                disabled={!redoStack.length}
+                                size="small">
+                                <Redo />
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                    <Tooltip
+                        title={
+                            hasPending
+                                ? stagedDesign
+                                    ? "Save changes (includes the new designed icon)"
+                                    : "Save changes to signage"
+                                : "No unsaved changes"
+                        }>
+                        <span style={{ flex: 1, display: "flex" }}>
+                            <Button
+                                variant="contained"
+                                startIcon={
+                                    isSaving ? (
+                                        <CircularProgress size={20} color="inherit" />
+                                    ) : showSaveSuccess ? (
+                                        <CheckCircle />
+                                    ) : (
+                                        <Save />
+                                    )
+                                }
+                                onClick={handleSave}
+                                color={showSaveSuccess ? "success" : "primary"}
+                                disabled={(!hasChanges && !stagedDesign) || isSaving}
+                                sx={{ flex: 1 }}>
+                                {isSaving
+                                    ? "Saving..."
+                                    : showSaveSuccess
+                                      ? "Saved!"
+                                      : "Save"}
+                            </Button>
+                        </span>
+                    </Tooltip>
+                    <Tooltip
+                        title={
+                            hasPending
                                 ? "Close editor (unsaved changes will be lost)"
                                 : "Close editor"
                         }>
@@ -266,10 +457,32 @@ function SignageEditor() {
                             variant="outlined"
                             startIcon={<Close />}
                             onClick={handleClose}
-                            color={hasChanges ? "error" : "primary"}
+                            color={hasPending ? "error" : "primary"}
                             sx={{ flex: 1 }}>
-                            {hasChanges ? "Discard" : "Close"}
+                            {hasPending ? "Discard" : "Close"}
                         </Button>
+                    </Tooltip>
+                    <Box sx={{ flex: 1 }} />
+                    <Tooltip
+                        title={
+                            skipDeleteConfirmations
+                                ? "Delete this signage permanently (confirmation skipped)"
+                                : "Delete this signage permanently"
+                        }>
+                        <span>
+                            <Button
+                                variant="outlined"
+                                startIcon={<Delete />}
+                                onClick={() =>
+                                    skipDeleteConfirmations
+                                        ? handleDelete()
+                                        : setDeleteDialogOpen(true)
+                                }
+                                color="error"
+                                disabled={isDeleting}>
+                                Delete
+                            </Button>
+                        </span>
                     </Tooltip>
                 </Stack>
                 {saveError && (
@@ -278,6 +491,64 @@ function SignageEditor() {
                     </Alert>
                 )}
             </Box>
+
+            {/* Discard confirmation */}
+            <Dialog
+                open={discardDialogOpen}
+                onClose={() => setDiscardDialogOpen(false)}>
+                <DialogTitle>Discard changes?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        {stagedDesign
+                            ? "You have unsaved changes, including a designed icon waiting to be applied. Close and discard them?"
+                            : "You have unsaved changes. Close and discard them?"}
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDiscardDialogOpen(false)}>
+                        Keep editing
+                    </Button>
+                    <Button
+                        color="error"
+                        variant="contained"
+                        onClick={() => window.close()}>
+                        Discard
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Delete confirmation */}
+            <Dialog
+                open={deleteDialogOpen}
+                onClose={() => setDeleteDialogOpen(false)}>
+                <DialogTitle>Delete signage?</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>
+                        This permanently removes “{formData.name || signage.id}”
+                        from the package, including its generated icon, material,
+                        and designer source. This cannot be undone.
+                    </DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteDialogOpen(false)}>
+                        Cancel
+                    </Button>
+                    <Button
+                        color="error"
+                        variant="contained"
+                        startIcon={
+                            isDeleting ? (
+                                <CircularProgress size={18} color="inherit" />
+                            ) : (
+                                <Delete />
+                            )
+                        }
+                        disabled={isDeleting}
+                        onClick={handleDelete}>
+                        {isDeleting ? "Deleting..." : "Delete"}
+                    </Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     )
 }
