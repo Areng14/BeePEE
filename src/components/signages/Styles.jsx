@@ -18,6 +18,8 @@ import {
     ListItemIcon,
     ListItemText,
     Divider,
+    FormControlLabel,
+    Checkbox,
 } from "@mui/material"
 import { useTheme } from "@mui/material/styles"
 import { ChoiceCard } from "./AddSignageDialog"
@@ -107,6 +109,7 @@ function StyleTile({
     const [preview, setPreview] = useState(null)
     const [menuAnchor, setMenuAnchor] = useState(null)
     const [choiceOpen, setChoiceOpen] = useState(false)
+    const [rememberChoice, setRememberChoice] = useState(false)
     const [inheritAnchor, setInheritAnchor] = useState(null)
     const [dropHover, setDropHover] = useState(false)
 
@@ -376,6 +379,13 @@ function StyleTile({
                             desc="Choose a PNG from your computer."
                             icon={<Upload sx={{ color: gold, fontSize: 24 }} />}
                             onClick={() => {
+                                if (rememberChoice)
+                                    window.package
+                                        ?.setSetting?.(
+                                            "signageIconClickAction",
+                                            "upload",
+                                        )
+                                        .catch?.(() => {})
                                 setChoiceOpen(false)
                                 onUpload(styleId)
                             }}
@@ -385,11 +395,36 @@ function StyleTile({
                             desc="Open the drag-and-drop designer to edit this icon."
                             icon={<Brush sx={{ color: gold, fontSize: 24 }} />}
                             onClick={() => {
+                                if (rememberChoice)
+                                    window.package
+                                        ?.setSetting?.(
+                                            "signageIconClickAction",
+                                            "designer",
+                                        )
+                                        .catch?.(() => {})
                                 setChoiceOpen(false)
                                 onEditDesign(styleId)
                             }}
                         />
                     </Box>
+                    <FormControlLabel
+                        sx={{ mt: 1.5 }}
+                        control={
+                            <Checkbox
+                                size="small"
+                                checked={rememberChoice}
+                                onChange={(e) =>
+                                    setRememberChoice(e.target.checked)
+                                }
+                            />
+                        }
+                        label={
+                            <Typography variant="caption" color="text.secondary">
+                                Remember my choice (change it later in
+                                Settings &gt; Signage)
+                            </Typography>
+                        }
+                    />
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setChoiceOpen(false)}>Cancel</Button>
