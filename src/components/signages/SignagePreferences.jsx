@@ -18,7 +18,7 @@ import {
     CircularProgress,
     Tooltip,
 } from "@mui/material"
-import { Check, FolderOpen } from "@mui/icons-material"
+import { Check, FolderOpen, RestartAlt } from "@mui/icons-material"
 
 // All signage preferences with their defaults. Shared by the main Settings
 // window (Signage tab) and the designer's File > Preferences dialog — both
@@ -489,6 +489,22 @@ export function SignagePreferencesDialog({ open, onClose, onSaved }) {
                 )}
             </DialogContent>
             <DialogActions>
+                <Tooltip title="Set every signage preference back to its default (applied on Save)">
+                    <span>
+                        <Button
+                            startIcon={<RestartAlt />}
+                            onClick={() =>
+                                setValues((prev) => ({
+                                    ...prev,
+                                    ...SIGNAGE_PREF_DEFAULTS,
+                                }))
+                            }
+                            disabled={!values || saving}>
+                            Reset to defaults
+                        </Button>
+                    </span>
+                </Tooltip>
+                <Box sx={{ flex: 1 }} />
                 <Button variant="outlined" onClick={onClose} disabled={saving}>
                     Cancel
                 </Button>

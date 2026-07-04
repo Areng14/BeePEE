@@ -39,6 +39,7 @@ import {
     PowerSettingsNew,
     BugReport,
     Brush,
+    RestartAlt,
 } from "@mui/icons-material"
 import { useState, useEffect } from "react"
 import {
@@ -655,6 +656,19 @@ function SettingsPage() {
                                 mb: 2,
                             }}>
                             <Typography variant="h6">Signage</Typography>
+                            <Tooltip title="Set every signage preference back to its default (applied on Save)">
+                                <Button
+                                    size="small"
+                                    startIcon={<RestartAlt />}
+                                    onClick={() =>
+                                        setAppSettings((prev) => ({
+                                            ...prev,
+                                            ...SIGNAGE_PREF_DEFAULTS,
+                                        }))
+                                    }>
+                                    Reset to defaults
+                                </Button>
+                            </Tooltip>
                         </Box>
                         <SignagePreferencesForm
                             values={appSettings}
