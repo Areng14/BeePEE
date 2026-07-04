@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react"
-import { Box, IconButton, Tooltip, Typography } from "@mui/material"
+import { Box, IconButton, Tooltip, Snackbar, Alert } from "@mui/material"
 import {
     Inventory2 as ItemsIcon,
     Image as SignagesIcon,
-    Warning as WarningIcon,
 } from "@mui/icons-material"
 import ItemBrowser from "./ItemBrowser"
 import SignageBrowser from "./SignageBrowser"
@@ -100,30 +99,25 @@ function MainTabs() {
 
             {/* Content */}
             <Box sx={{ flex: 1, overflow: "auto", position: "relative" }}>
-                {packageEmpty && (
-                    <Box
-                        sx={{
-                            position: "absolute",
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            p: 2,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            gap: 1,
-                            backgroundColor: "warning.dark",
-                            color: "warning.contrastText",
-                            zIndex: 10,
-                        }}>
-                        <WarningIcon />
-                        <Typography>
-                            This package has no items or signages!
-                        </Typography>
-                    </Box>
-                )}
                 {ActiveComponent && <ActiveComponent />}
             </Box>
+
+            {/* Empty-package notice — floating toast, not a banner */}
+            <Snackbar
+                open={packageEmpty}
+                autoHideDuration={6000}
+                onClose={(e, reason) => {
+                    if (reason !== "clickaway") setPackageEmpty(false)
+                }}
+                anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+                <Alert
+                    severity="warning"
+                    variant="filled"
+                    onClose={() => setPackageEmpty(false)}
+                    sx={{ boxShadow: 4 }}>
+                    This package has no items or signages!
+                </Alert>
+            </Snackbar>
         </Box>
     )
 }

@@ -268,6 +268,67 @@ function createMainMenu(mainWindow) {
                         }
                     },
                 },
+                {
+                    label: "Restore Backup...",
+                    click: async () => {
+                        // Pre-export snapshots live in userData/backups
+                        // (newest 10 kept) — open the picker right there
+                        const backupsDir = path.join(
+                            app.getPath("userData"),
+                            "backups",
+                        )
+                        try {
+                            fs.mkdirSync(backupsDir, { recursive: true })
+                        } catch {
+                            /* picker still opens at its default location */
+                        }
+                        const result = await dialog.showOpenDialog(mainWindow, {
+                            title: "Restore Package Backup",
+                            defaultPath: backupsDir,
+                            properties: ["openFile"],
+                            filters: [
+                                { name: "BeePEE Package", extensions: ["bpee"] },
+                            ],
+                        })
+                        if (result.canceled || !result.filePaths.length) return
+                        const backupPath = result.filePaths[0]
+
+                        // Ask where the restored copy should live: working
+                        // directly out of the backups folder would make the
+                        // next Save overwrite the backup itself
+                        const baseName = path
+                            .basename(backupPath, ".bpee")
+                            // strip the -<ISO timestamp> suffix backups carry
+                            .replace(/-\d{4}-\d{2}-\d{2}T[\d-]+Z$/, "")
+                        const saveTo = await dialog.showSaveDialog(mainWindow, {
+                            title: "Save Restored Package As",
+                            defaultPath: path.join(
+                                app.getPath("documents"),
+                                `${baseName} (restored).bpee`,
+                            ),
+                            filters: [
+                                { name: "BeePEE Package", extensions: ["bpee"] },
+                            ],
+                        })
+                        if (saveTo.canceled || !saveTo.filePath) return
+                        try {
+                            fs.copyFileSync(backupPath, saveTo.filePath)
+                            ensurePackagesDir()
+                            const pkg = await loadPackage(saveTo.filePath)
+                            // Future saves target the restored copy
+                            lastSavedBpeePath = saveTo.filePath
+                            mainWindow.webContents.send("package:loaded", {
+                                items: pkg.items,
+                                signages: pkg.signages,
+                            })
+                        } catch (error) {
+                            dialog.showErrorBox(
+                                "Restore Failed",
+                                `Failed to restore backup: ${error.message}`,
+                            )
+                        }
+                    },
+                },
                 { type: "separator" },
                 {
                     id: "close-package",
@@ -532,7 +593,10 @@ function createMainMenu(mainWindow) {
                                 })
                             }
                         } catch (err) {
-                            dialog.showErrorBox("Export Failed", err.message)
+                            // The in-app export progress dialog already
+                            // reported this failure — a native error box on
+                            // top of it is just noise
+                            console.error("Export failed:", err.message)
                         }
                     },
                 },
@@ -607,7 +671,7 @@ function createMainMenu(mainWindow) {
                     label: "GitHub Repository",
                     click: () => {
                         shell.openExternal(
-                            "https://github.com/Areng14/BeePEE",
+                            "https://github.com/BeemodTools/BeePEE",
                         )
                     },
                 },
@@ -615,7 +679,7 @@ function createMainMenu(mainWindow) {
                     label: "Tutorial",
                     click: () => {
                         shell.openExternal(
-                            "https://github.com/Areng14/BeePEE/wiki",
+                            "https://github.com/BeemodTools/BeePEE/wiki",
                         )
                     },
                 },

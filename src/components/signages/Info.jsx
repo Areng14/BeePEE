@@ -41,7 +41,7 @@ function SignageInfo({
                         label="ID"
                         value={formData.id}
                         disabled
-                        helperText="Fixed identifier — cannot be changed"
+                        helperText="Fixed identifier, cannot be changed"
                         fullWidth
                         InputProps={{
                             endAdornment: (
