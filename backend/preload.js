@@ -106,6 +106,46 @@ contextBridge.exposeInMainWorld("package", {
     },
     saveSignage: (signageData) => ipcRenderer.invoke("save-signage", signageData),
     createSignage: (data) => ipcRenderer.invoke("create-signage", data),
+    deleteSignage: (signageId) =>
+        ipcRenderer.invoke("delete-signage", { signageId }),
+    stageSignageDesign: (payload) =>
+        ipcRenderer.invoke("stage-signage-design", payload),
+    onSignageDesignStaged: (callback) => {
+        ipcRenderer.removeAllListeners("signage-design-staged")
+        if (callback) {
+            ipcRenderer.on("signage-design-staged", (event, payload) =>
+                callback(payload),
+            )
+        }
+    },
+    listSignageSvgFolder: () => ipcRenderer.invoke("list-signage-svg-folder"),
+    browseSignageSvgFolder: () =>
+        ipcRenderer.invoke("browse-signage-svg-folder"),
+    openSignageSvgFolder: () => ipcRenderer.invoke("open-signage-svg-folder"),
+    getSignageSvgFolder: () => ipcRenderer.invoke("get-signage-svg-folder"),
+    openSignageDesigner: (payload) =>
+        ipcRenderer.invoke("open-signage-designer-window", payload),
+    getSignageDesign: (signageId, styleId) =>
+        ipcRenderer.invoke("get-signage-design", signageId, styleId),
+    saveFileDialog: (options) =>
+        ipcRenderer.invoke("save-file-dialog", options),
+    loadBpsignDialog: () => ipcRenderer.invoke("load-bpsign-dialog"),
+    onLoadSignageDesign: (callback) => {
+        ipcRenderer.removeAllListeners("load-signage-design")
+        if (callback) {
+            ipcRenderer.on("load-signage-design", (event, payload) =>
+                callback(payload),
+            )
+        }
+    },
+    onSignageDesignerMenu: (callback) => {
+        ipcRenderer.removeAllListeners("signage-designer-menu")
+        if (callback) {
+            ipcRenderer.on("signage-designer-menu", (event, action) =>
+                callback(action),
+            )
+        }
+    },
     onSignageUpdated: (callback) => {
         ipcRenderer.removeAllListeners("signage-updated")
         if (callback) {

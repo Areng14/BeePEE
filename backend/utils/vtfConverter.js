@@ -113,7 +113,7 @@ async function convertImageToVTF(imagePath, outputPath, options = {}) {
 
                 // Use spawn instead of exec to have better process control
                 const { spawn } = require("child_process")
-                maretfProcess = spawn(maretfPath, [
+                const maretfArgs = [
                     "create",
                     processedImagePath,
                     "-o",
@@ -124,9 +124,12 @@ async function convertImageToVTF(imagePath, outputPath, options = {}) {
                     version,
                     "--filter",
                     "BOX",
-                    "--no-mips",
                     "--quiet",
-                ])
+                ]
+                // Mipmaps are skipped by default (editor-icon textures);
+                // pass mips: true for in-game textures viewed at a distance.
+                if (!options.mips) maretfArgs.splice(maretfArgs.length - 1, 0, "--no-mips")
+                maretfProcess = spawn(maretfPath, maretfArgs)
 
                 // Set up timeout to kill process if it takes too long
                 timeout = setTimeout(() => {

@@ -3,13 +3,73 @@ const openSignageEditors = new Map() // Track signage editor windows
 const openModelPreviewWindows = new Map() // Track model preview windows
 let createItemWindow = null // Track the create item window
 let createPackageWindow = null // Track the create package window
+let signageDesignerWindow = null // Track the signage designer window
 let packageInformationWindow = null // Track the package information window
 let changelogWindow = null // Track the changelog window
 let crashReportWindow = null // Track the crash report window
 let beePackageWindow = null // Track the bee-package.json editor window
 let setupWindow = null // Track the setup window
 let settingsWindow = null // Track the settings window
-const { BrowserWindow, app } = require("electron")
+const { BrowserWindow, app, Menu } = require("electron")
+
+// Native File/Edit menu for the signage designer window. Items forward an
+// action name to the window's renderer, which performs it (the designer's
+// state — layers, undo stack, etc. — lives there). Accelerators use
+// `registerAccelerator: false` so the shortcut is DISPLAYED (right-aligned,
+// native) but NOT bound — the designer's own keydown handler keeps owning the
+// real shortcuts (with its input-field guard) and nothing double-fires.
+function buildSignageDesignerMenu(win) {
+    const send = (action) => () => {
+        if (win && !win.isDestroyed()) {
+            win.webContents.send("signage-designer-menu", action)
+        }
+    }
+    // Show the accelerator hint natively without binding it.
+    const item = (label, action, accelerator) => ({
+        label,
+        click: send(action),
+        ...(accelerator ? { accelerator, registerAccelerator: false } : {}),
+    })
+    return Menu.buildFromTemplate([
+        {
+            label: "File",
+            submenu: [
+                item("Load Design…", "load"),
+                { type: "separator" },
+                item("Export as PNG…", "exportPng"),
+                item("Export as .bpsign…", "exportBpsign"),
+                { type: "separator" },
+                item("Save Signage", "save"),
+                { type: "separator" },
+                item("Preferences…", "preferences"),
+                item("Close", "close"),
+            ],
+        },
+        {
+            label: "Edit",
+            submenu: [
+                item("Undo", "undo", "CmdOrCtrl+Z"),
+                item("Redo", "redo", "CmdOrCtrl+Y"),
+                { type: "separator" },
+                item("Cut", "cut", "CmdOrCtrl+X"),
+                item("Copy", "copy", "CmdOrCtrl+C"),
+                item("Paste", "paste", "CmdOrCtrl+V"),
+                item("Duplicate", "duplicate", "CmdOrCtrl+D"),
+                item("Delete", "delete", "Delete"),
+                { type: "separator" },
+                item("Select All", "selectAll", "CmdOrCtrl+A"),
+            ],
+        },
+        {
+            label: "View",
+            submenu: [
+                item("Zoom In", "zoomIn", "CmdOrCtrl+="),
+                item("Zoom Out", "zoomOut", "CmdOrCtrl+-"),
+                item("Reset Zoom", "zoomReset", "CmdOrCtrl+0"),
+            ],
+        },
+    ])
+}
 const path = require("path")
 const { isDev } = require("../utils/isDev.js")
 
@@ -137,6 +197,19 @@ function sendSignageUpdateToEditor(signageId, updatedSignage) {
     }
 }
 
+// Delivers a staged (uncommitted) designer save to the signage's editor
+// window — the editor previews it and its Save button performs the real
+// commit. Returns false when that editor isn't open.
+function sendStagedDesignToEditor(signageId, payload) {
+    const editorWindow = openSignageEditors.get(signageId)
+    if (editorWindow && !editorWindow.isDestroyed()) {
+        editorWindow.webContents.send("signage-design-staged", payload)
+        editorWindow.focus()
+        return true
+    }
+    return false
+}
+
 function createItemCreationWindow(mainWindow) {
     // If window already exists, focus it
     if (createItemWindow && !createItemWindow.isDestroyed()) {
@@ -176,6 +249,71 @@ function createItemCreationWindow(mainWindow) {
     }
 
     createItemWindow.setMenuBarVisibility(false)
+}
+
+function createSignageDesignerWindow(mainWindow, editPayload = null) {
+    // If window already exists, focus it (and load a design if one was asked)
+    if (signageDesignerWindow && !signageDesignerWindow.isDestroyed()) {
+        signageDesignerWindow.focus()
+        if (editPayload) {
+            signageDesignerWindow.webContents.send(
+                "load-signage-design",
+                editPayload,
+            )
+        }
+        return
+    }
+
+    signageDesignerWindow = new BrowserWindow({
+        width: 960,
+        height: 680,
+        minWidth: 960,
+        minHeight: 640,
+        title: "BeePEE - Signage Designer",
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, "..", "preload.js"),
+        },
+        devTools: isDev,
+        skipTaskbar: false,
+        minimizable: true,
+        maximizable: true,
+        resizable: true,
+        autoHideMenuBar: false,
+    })
+
+    // Give the designer its own native File/Edit menu bar
+    signageDesignerWindow.setMenu(buildSignageDesignerMenu(signageDesignerWindow))
+
+    signageDesignerWindow.on("closed", () => {
+        signageDesignerWindow = null
+    })
+
+    // Deliver an edit payload once the page is ready to receive it
+    if (editPayload) {
+        signageDesignerWindow.webContents.once("did-finish-load", () => {
+            signageDesignerWindow.webContents.send(
+                "load-signage-design",
+                editPayload,
+            )
+        })
+    }
+
+    if (isDev) {
+        signageDesignerWindow.loadURL(
+            `http://localhost:5173/?route=signage-designer`,
+        )
+    } else {
+        // Use app.getAppPath() for reliable path resolution in packaged app
+        const appPath = app.getAppPath()
+        signageDesignerWindow.loadFile(
+            path.join(appPath, "dist", "index.html"),
+            {
+                query: { route: "signage-designer" },
+            },
+        )
+    }
 }
 
 function createPackageCreationWindow(mainWindow) {
@@ -737,9 +875,12 @@ module.exports = {
     openEditors,
     createSignageEditor,
     sendSignageUpdateToEditor,
+    sendStagedDesignToEditor,
     openSignageEditors,
     createItemCreationWindow,
     getCreateItemWindow: () => createItemWindow,
+    createSignageDesignerWindow,
+    getSignageDesignerWindow: () => signageDesignerWindow,
     createPackageCreationWindow,
     getCreatePackageWindow: () => createPackageWindow,
     createPackageInformationWindow,
