@@ -1,6 +1,29 @@
 {
     "versions": [
         {
+            "version": "1.1",
+            "date": "2026-7-4",
+            "changes": {
+                "added": [
+                    "Signage designer with drag and drop from glyphs, primitives, a built-in sign library, and your own SVG imports",
+                    "Designer styling",
+                    "Designer editing tools",
+                    "Native File/Edit menu bar in the designer window",
+                    "Export signage as PNG or as a .bpsign design file, and load a .bpsign back in to keep editing",
+                    "Automatic alpha mask generation to allow for designer generated signages to glow ingame.",
+                    "Edit in Designer button on BeePEE-made signage",
+                    "Signages per style support",
+                    "Signage Editing similar to item editing",
+                    "App preferences"
+                ],
+                "fixed": [
+                    "Malformed item meta.json (instanceNames contains \"NaN\") prevents Item Editor tabs from opening",
+                    "Saving a package corrupts export and causes BEEmod to freeze on launch",
+                    "Unhandled ENOSPC (no space left on device) during package extraction causes crash"
+                ]
+            }
+        },
+        {
             "version": "1.0.5",
             "date": "2026-1-28",
             "notes": [

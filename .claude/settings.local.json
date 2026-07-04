@@ -26,10 +26,29 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"$\\(cat <<''EOF''\nMove model preview to React component and fix file handle issues\n\n- Migrate 900+ line inline model preview template from shared.js to \n  proper React component \\(ModelPreviewPage.jsx\\) using React Three Fiber\n- Add route handling in App.jsx for model-preview window\n- Add createModelPreviewWindow\\(\\) and closeAllModelPreviewWindows\\(\\) in \n  itemEditor.js following existing window patterns\n- Fix EPERM file handle issues:\n  - Replace net.fetch with fs.promises.readFile in beep:// protocol\n  - Add session.clearCache\\(\\) before closing preview windows\n  - Add clearAllWindowCaches\\(\\) in packageManager before directory deletion\n  - Implement rename-then-delete strategy for locked directories\n  - Add cleanupDeletedDirectories\\(\\) on app startup\n- Add mkdirWithRetry\\(\\) helper with exponential backoff for EPERM/EBUSY\n- Fix grid rendering in model preview using THREE.GridHelper\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(git commit:*)",
-      "Bash(del \"c:\\\\Users\\\\ADMIN\\\\Dropbox\\\\My PC \\(DESKTOP-FBEPBG2\\)\\\\Documents\\\\projects\\\\BeePEE\\\\src\\\\components\\\\CrashReportDialog.jsx\")"
+      "Bash(del \"c:\\\\Users\\\\ADMIN\\\\Dropbox\\\\My PC \\(DESKTOP-FBEPBG2\\)\\\\Documents\\\\projects\\\\BeePEE\\\\src\\\\components\\\\CrashReportDialog.jsx\")",
+      "Bash(tail -50 \"c:\\\\Users\\\\ADMIN\\\\Dropbox\\\\My PC \\(DESKTOP-FBEPBG2\\)\\\\Documents\\\\projects\\\\BeePEE\\\\backend\\\\preload.js\")",
+      "Bash(tail -100 \"c:\\\\Users\\\\ADMIN\\\\Dropbox\\\\My PC \\(DESKTOP-FBEPBG2\\)\\\\Documents\\\\projects\\\\BeePEE\\\\backend\\\\items\\\\itemEditor.js\")",
+      "PowerShell(npm test 2>$null)",
+      "PowerShell(npx jest instanceNaming vbspAutoRegistration package.test 2>&1)",
+      "PowerShell($scratch = \"C:\\\\Users\\\\ADMIN\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-ADMIN-Dropbox-My-PC--DESKTOP-FBEPBG2--Documents-projects-BeePEE\\\\affaa802-7717-46b1-acd6-6c9b6b205c46\\\\scratchpad\\\\backup\"; New-Item -ItemType Directory -Force $scratch | Out-Null; Copy-Item \"backend\\\\models\\\\items.js\" \"$scratch\\\\items.js\"; Copy-Item \"backend\\\\packageManager.js\" \"$scratch\\\\packageManager.js\"; Copy-Item \"backend\\\\saveItem.js\" \"$scratch\\\\saveItem.js\"; Copy-Item \"src\\\\components\\\\ItemEditor.jsx\" \"$scratch\\\\ItemEditor.jsx\"; git stash push -m \"beepee-bugfix-wip\" -- backend/models/items.js backend/packageManager.js backend/saveItem.js src/components/ItemEditor.jsx)",
+      "PowerShell(npx jest 2>&1)",
+      "PowerShell(npx jest 2>&1 | Select-String -Pattern \"^\\\\s+\\(●|✕\\)\" | ForEach-Object { $_.Line.Trim\\(\\) } | Sort-Object -Unique | Out-File -Encoding utf8 \"C:\\\\Users\\\\ADMIN\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-ADMIN-Dropbox-My-PC--DESKTOP-FBEPBG2--Documents-projects-BeePEE\\\\affaa802-7717-46b1-acd6-6c9b6b205c46\\\\scratchpad\\\\baseline-failures.txt\"; git stash pop)",
+      "PowerShell($scratch = \"C:\\\\Users\\\\ADMIN\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-ADMIN-Dropbox-My-PC--DESKTOP-FBEPBG2--Documents-projects-BeePEE\\\\affaa802-7717-46b1-acd6-6c9b6b205c46\\\\scratchpad\"; \\(Get-Content \"$scratch\\\\baseline-failures.txt\"\\).Count; \\(Get-Content \"$scratch\\\\current-failures.txt\"\\).Count; npx jest 2>&1 | Select-Object -Last 5)",
+      "PowerShell(node -e \"new \\(require\\('vm'\\).Script\\)\\(require\\('fs'\\).readFileSync\\('backend/models/items.js','utf8'\\)\\); new \\(require\\('vm'\\).Script\\)\\(require\\('fs'\\).readFileSync\\('backend/packageManager.js','utf8'\\)\\); new \\(require\\('vm'\\).Script\\)\\(require\\('fs'\\).readFileSync\\('backend/saveItem.js','utf8'\\)\\); console.log\\('backend syntax OK'\\)\")",
+      "PowerShell(npx esbuild src/components/ItemEditor.jsx --loader:.jsx=jsx --outfile=NUL 2>&1)",
+      "Bash(npm i *)",
+      "Bash(npx jest *)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"5199: %{http_code}\\\\n\" http://localhost:5199/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5199/)",
+      "Bash(sleep 7 && echo \"=== verifyout.txt ===\" && cat \"/c/Users/ADMIN/AppData/Local/Temp/claude/C--Users-ADMIN-Dropbox-My-PC--DESKTOP-FBEPBG2--Documents-projects-BeePEE/dee5a7cc-f74d-4487-aa3a-5028737cae6c/scratchpad/verifyout.txt\" 2>/dev/null | grep -v \"DeprecationWarning\\\\|trace-deprecation\\\\|console-message\\\\|Autofill\" | head -60)",
+      "Bash(./backend/libs/maretf/maretf.exe create *)",
+      "Bash(grep -iA2 \"format\\\\|dxt\")"
     ],
     "deny": [],
     "ask": [],
     "includeCoAuthoredBy": false
-  }
+  },
+  "outputStyle": "default"
 }
