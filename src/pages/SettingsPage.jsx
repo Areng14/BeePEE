@@ -110,8 +110,15 @@ function SettingToggle({ name, description, checked, onChange, disabled, color =
     )
 }
 
+// Tab order in the sidebar; ?tab=signage opens straight to that tab (used
+// by the designer's File > Preferences)
+const TAB_INDEX = { signage: 4 }
+
 function SettingsPage() {
-    const [tabValue, setTabValue] = useState(0)
+    const [tabValue, setTabValue] = useState(() => {
+        const tab = new URLSearchParams(window.location.search).get("tab")
+        return TAB_INDEX[tab] ?? 0
+    })
     const [portal2Path, setPortal2Path] = useState("")
     const [beemodPath, setBeemodPath] = useState("")
     const [portal2AutoDetected, setPortal2AutoDetected] = useState(false)

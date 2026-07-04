@@ -45,7 +45,6 @@ import {
     rasterizeLayers,
 } from "./glyphs"
 import {
-    SignagePreferencesDialog,
     loadSignagePrefs,
     SIGNAGE_PREF_DEFAULTS,
 } from "./SignagePreferences"
@@ -214,7 +213,6 @@ function SignageDesigner({
     const [prefs, setPrefs] = useState(SIGNAGE_PREF_DEFAULTS)
     const prefsRef = useRef(prefs)
     prefsRef.current = prefs
-    const [prefsOpen, setPrefsOpen] = useState(false)
     const [recentGlyphs, setRecentGlyphs] = useState([])
     const [confirmCloseOpen, setConfirmCloseOpen] = useState(false)
 
@@ -276,6 +274,15 @@ function SignageDesigner({
             alive = false
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    // Preferences are edited in the separate settings window — re-read them
+    // when this window regains focus so saves there apply here. Session
+    // defaults (snap, grid) are deliberately left alone mid-session.
+    useEffect(() => {
+        const refresh = () => loadSignagePrefs().then(setPrefs)
+        window.addEventListener("focus", refresh)
+        return () => window.removeEventListener("focus", refresh)
     }, [])
 
     // ---- Zoom -------------------------------------------------------
@@ -1101,7 +1108,6 @@ function SignageDesigner({
         exportBpsign,
         save: () => canSave && onSave({ layers }),
         close: requestClose,
-        preferences: () => setPrefsOpen(true),
         zoomIn: () => zoomBy(1.2),
         zoomOut: () => zoomBy(1 / 1.2),
         zoomReset,
@@ -1224,8 +1230,7 @@ function SignageDesigner({
                         </Box>
                         <Box sx={{ flex: 1, overflowY: "auto" }}>
                             {[
-                                ...(prefs.signageRecentGlyphs &&
-                                recentGlyphs.some((g) => SHAPES[g])
+                                ...(recentGlyphs.some((g) => SHAPES[g])
                                     ? [
                                           {
                                               id: "recent",
@@ -2693,13 +2698,6 @@ function SignageDesigner({
                     </Button>
                 </Stack>
             </Box>
-
-            {/* File > Preferences */}
-            <SignagePreferencesDialog
-                open={prefsOpen}
-                onClose={() => setPrefsOpen(false)}
-                onSaved={(values) => setPrefs(values)}
-            />
 
             {/* Confirm discarding unsaved edits */}
             <Dialog

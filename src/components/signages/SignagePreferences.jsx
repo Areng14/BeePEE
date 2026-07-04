@@ -11,18 +11,13 @@ import {
     InputLabel,
     Slider,
     Button,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    CircularProgress,
     Tooltip,
 } from "@mui/material"
-import { Check, FolderOpen, RestartAlt } from "@mui/icons-material"
+import { Check, FolderOpen } from "@mui/icons-material"
 
-// All signage preferences with their defaults. Shared by the main Settings
-// window (Signage tab) and the designer's File > Preferences dialog — both
-// read/write the same flat settings keys.
+// All signage preferences with their defaults. The form lives in the main
+// Settings window (Signage tab); the designer's File > Preferences opens
+// that same window.
 export const SIGNAGE_PREF_DEFAULTS = {
     // Designer defaults
     signageDefaultColor: "#000000",
@@ -38,7 +33,6 @@ export const SIGNAGE_PREF_DEFAULTS = {
     // The 50% stock plate mask is baked into the texture alpha, so 100%
     // here = stock signage brightness (tint written only when lower)
     signageGlowIntensity: 100,
-    signageGenerateMaterials: true,
     // In-game texture size in px (the VTF). Stock signs are 128; higher is
     // crisper up close but a bigger file.
     signageTextureSize: 512,
@@ -50,7 +44,6 @@ export const SIGNAGE_PREF_DEFAULTS = {
     // Palette & library
     signageSvgFolder: "",
     signageOpenSections: "none", // none | all
-    signageRecentGlyphs: true,
     // Naming
     signageIdPrefix: "SIGN_BPEE",
     signageAutoName: true,
@@ -287,12 +280,6 @@ export function SignagePreferencesForm({ values, onChange }) {
                         }
                     />
                 </Box>
-                <PrefToggle
-                    name="Generate in-game materials on save"
-                    description="Create the VTF/VMT texture files when saving a design (turn off for faster saves if you only need the editor icon)"
-                    checked={v("signageGenerateMaterials")}
-                    onChange={(val) => onChange("signageGenerateMaterials", val)}
-                />
                 <Box sx={{ px: 1 }}>
                     <Typography variant="caption" color="text.secondary">
                         Texture resolution · {v("signageTextureSize")} px (stock
@@ -308,7 +295,6 @@ export function SignagePreferencesForm({ values, onChange }) {
                             value: n,
                             label: `${n}`,
                         }))}
-                        disabled={!v("signageGenerateMaterials")}
                         onChange={(e, val) => onChange("signageTextureSize", val)}
                     />
                 </Box>
@@ -405,12 +391,6 @@ export function SignagePreferencesForm({ values, onChange }) {
                         <MenuItem value="all">All expanded</MenuItem>
                     </Select>
                 </FormControl>
-                <PrefToggle
-                    name="Recently used glyphs"
-                    description="Show a Recent section at the top of the palette"
-                    checked={v("signageRecentGlyphs")}
-                    onChange={(val) => onChange("signageRecentGlyphs", val)}
-                />
             </Section>
 
             <Section title="Naming">
@@ -437,87 +417,3 @@ export function SignagePreferencesForm({ values, onChange }) {
     )
 }
 
-// Self-contained dialog for the designer's File > Preferences. Loads current
-// settings on open, saves changed keys on Save, and hands the saved values
-// back so the designer can apply them live.
-export function SignagePreferencesDialog({ open, onClose, onSaved }) {
-    const [values, setValues] = useState(null)
-    const [original, setOriginal] = useState(null)
-    const [saving, setSaving] = useState(false)
-
-    useEffect(() => {
-        if (!open) return
-        setValues(null)
-        loadSignagePrefs().then((prefs) => {
-            setValues(prefs)
-            setOriginal(prefs)
-        })
-    }, [open])
-
-    const handleSave = async () => {
-        setSaving(true)
-        try {
-            for (const key of SIGNAGE_PREF_KEYS) {
-                if (values[key] !== original[key]) {
-                    await window.package.setSetting(key, values[key])
-                }
-            }
-            onSaved?.(values)
-            onClose()
-        } catch (err) {
-            console.error("Failed to save signage preferences:", err)
-        } finally {
-            setSaving(false)
-        }
-    }
-
-    return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Signage Preferences</DialogTitle>
-            <DialogContent dividers sx={{ maxHeight: "65vh" }}>
-                {values ? (
-                    <SignagePreferencesForm
-                        values={values}
-                        onChange={(key, val) =>
-                            setValues((prev) => ({ ...prev, [key]: val }))
-                        }
-                    />
-                ) : (
-                    <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
-                        <CircularProgress size={28} />
-                    </Box>
-                )}
-            </DialogContent>
-            <DialogActions>
-                <Tooltip title="Set every signage preference back to its default (applied on Save)">
-                    <span>
-                        <Button
-                            startIcon={<RestartAlt />}
-                            onClick={() =>
-                                setValues((prev) => ({
-                                    ...prev,
-                                    ...SIGNAGE_PREF_DEFAULTS,
-                                }))
-                            }
-                            disabled={!values || saving}>
-                            Reset to defaults
-                        </Button>
-                    </span>
-                </Tooltip>
-                <Box sx={{ flex: 1 }} />
-                <Button variant="outlined" onClick={onClose} disabled={saving}>
-                    Cancel
-                </Button>
-                <Button
-                    variant="contained"
-                    onClick={handleSave}
-                    disabled={!values || saving}
-                    startIcon={
-                        saving ? <CircularProgress size={16} color="inherit" /> : null
-                    }>
-                    {saving ? "Saving..." : "Save"}
-                </Button>
-            </DialogActions>
-        </Dialog>
-    )
-}

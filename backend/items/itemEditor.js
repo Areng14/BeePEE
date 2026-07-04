@@ -41,7 +41,12 @@ function buildSignageDesignerMenu(win) {
                 { type: "separator" },
                 item("Save Signage", "save"),
                 { type: "separator" },
-                item("Preferences…", "preferences"),
+                // Preferences live in the shared settings window, opened
+                // straight to the Signage tab
+                {
+                    label: "Preferences…",
+                    click: () => createSettingsWindow(null, "signage"),
+                },
                 item("Close", "close"),
             ],
         },
@@ -820,8 +825,9 @@ function closeSetupWindow() {
 /**
  * Create the settings/preferences window
  * @param {BrowserWindow} mainWindow - The main window reference
+ * @param {string} [initialTab] - Tab to open on ("signage")
  */
-function createSettingsWindow(mainWindow) {
+function createSettingsWindow(mainWindow, initialTab) {
     // If window already exists, focus it
     if (settingsWindow && !settingsWindow.isDestroyed()) {
         settingsWindow.focus()
@@ -850,12 +856,18 @@ function createSettingsWindow(mainWindow) {
         settingsWindow = null
     })
 
+    const tabQuery = initialTab ? `&tab=${initialTab}` : ""
     if (isDev) {
-        settingsWindow.loadURL(`http://localhost:5173/?route=settings`)
+        settingsWindow.loadURL(
+            `http://localhost:5173/?route=settings${tabQuery}`,
+        )
     } else {
         const appPath = app.getAppPath()
         settingsWindow.loadFile(path.join(appPath, "dist", "index.html"), {
-            query: { route: "settings" },
+            query: {
+                route: "settings",
+                ...(initialTab ? { tab: initialTab } : {}),
+            },
         })
     }
 }

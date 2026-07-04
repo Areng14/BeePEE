@@ -104,19 +104,14 @@ function SignageDesignerPage() {
         try {
             const prefs = await loadSignagePrefs()
             const iconData = await rasterizeLayers(layers)
-            let materialData
-            let maskData
-            let hasGlow = false
-            if (prefs.signageGenerateMaterials) {
-                const tex = await rasterizeSignageTextures(
-                    layers,
-                    prefs.signageTextureSize || 512,
-                    { glowMode: prefs.signageGlowMode },
-                )
-                materialData = tex.base
-                maskData = tex.mask
-                hasGlow = tex.hasGlow
-            }
+            const tex = await rasterizeSignageTextures(
+                layers,
+                prefs.signageTextureSize || 512,
+                { glowMode: prefs.signageGlowMode },
+            )
+            const materialData = tex.base
+            const maskData = tex.mask
+            const hasGlow = tex.hasGlow
             const payload = {
                 name: name.trim(),
                 iconData,
