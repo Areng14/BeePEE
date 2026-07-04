@@ -347,19 +347,30 @@ app.whenReady().then(async () => {
 
     const window = createWindow()
 
-    // Auto-open the last package on startup if enabled (skipped when a
-    // file association is already loading a package)
+    // A settings reset saves the open package and leaves a one-shot pointer
+    // to reopen it after the user runs through setup again
+    const { loadSettings, saveSettings } = require("./utils/settings.js")
+    const pendingReopen = getSetting("pendingReopenPackage", null)
+    if (pendingReopen) {
+        const s = loadSettings()
+        delete s.pendingReopenPackage
+        saveSettings(s)
+    }
+
+    // Auto-open the pending-reopen package (post-reset) or the last package
+    // if enabled (skipped when a file association is already loading one)
     const openLast = getSetting("openLastPackageOnStartup", false)
     const lastPackagePath = getSetting("lastPackagePath", null)
-    if (
-        !isLoadingFileOnStartup &&
-        openLast &&
-        lastPackagePath &&
-        fs.existsSync(lastPackagePath)
-    ) {
-        logger.info(`Opening last package on startup: ${lastPackagePath}`)
+    const startupPackage =
+        pendingReopen && fs.existsSync(pendingReopen)
+            ? pendingReopen
+            : openLast && lastPackagePath && fs.existsSync(lastPackagePath)
+              ? lastPackagePath
+              : null
+    if (!isLoadingFileOnStartup && startupPackage) {
+        logger.info(`Opening package on startup: ${startupPackage}`)
         window.webContents.once("did-finish-load", () => {
-            setTimeout(() => handleFileOpen(lastPackagePath), 500)
+            setTimeout(() => handleFileOpen(startupPackage), 500)
         })
     }
 

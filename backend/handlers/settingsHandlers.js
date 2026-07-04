@@ -293,10 +293,63 @@ function register(ipcMain, mainWindow) {
         }
     })
 
-    // Delete all settings
+    // Delete all settings. Wiping settings clears setupComplete, so the app
+    // restarts into the setup page. An open package is saved first (to the
+    // .bpee it came from / was last saved to, or one the user picks) and
+    // reopened automatically once setup finishes.
     ipcMain.handle("delete-all-settings", async () => {
         try {
+            const { app, BrowserWindow } = require("electron")
+            // Lazy require: packageManager pulls in other modules at load time
+            const {
+                getCurrentPackageDir,
+                getCurrentPackageSourcePath,
+                savePackageAsBpee,
+            } = require("../packageManager")
+            const { getLastSavedBpeePath } = require("./shared")
+
+            let reopenPath = null
+            const currentPackageDir = getCurrentPackageDir()
+            if (currentPackageDir) {
+                let target =
+                    getLastSavedBpeePath() || getCurrentPackageSourcePath()
+                // Imported/zip sources can't be written back as a .bpee
+                if (target && !/\.bpee$/i.test(target)) target = null
+                if (!target) {
+                    const { canceled, filePath } = await dialog.showSaveDialog(
+                        BrowserWindow.getFocusedWindow(),
+                        {
+                            title: "Save Package Before Reset",
+                            defaultPath: path.join(
+                                app.getPath("documents"),
+                                "package.bpee",
+                            ),
+                            filters: [
+                                { name: "BeePEE Package", extensions: ["bpee"] },
+                            ],
+                        },
+                    )
+                    if (!canceled && filePath) target = filePath
+                }
+                if (target) {
+                    await savePackageAsBpee(currentPackageDir, target)
+                    reopenPath = target
+                }
+            }
+
             const result = deleteAllSettings()
+            if (result && reopenPath) {
+                // Recreate settings.json with just the reopen pointer —
+                // setupComplete stays absent, so setup still shows
+                setSetting("pendingReopenPackage", reopenPath)
+            }
+            if (result) {
+                // Give the IPC reply a moment to reach the renderer
+                setTimeout(() => {
+                    app.relaunch()
+                    app.exit(0)
+                }, 400)
+            }
             return { success: result }
         } catch (error) {
             return { success: false, error: error.message }

@@ -306,14 +306,19 @@ function SettingsPage() {
     const handleDeleteConfig = async () => {
         setIsDeleting(true)
         try {
-            await window.package.deleteAllSettings()
-            setDeleteConfigDialogOpen(false)
-            // Reload the page to reflect changes
-            window.location.reload()
+            // On success the backend saves any open package, restarts the
+            // app into setup, and reopens the package afterwards — this
+            // window is about to go away, so just keep the spinner up
+            const result = await window.package.deleteAllSettings()
+            if (result && result.success === false) {
+                setError("Failed to delete settings: " + (result.error || ""))
+                setIsDeleting(false)
+                setDeleteConfigDialogOpen(false)
+            }
         } catch (err) {
             setError("Failed to delete settings: " + err.message)
-        } finally {
             setIsDeleting(false)
+            setDeleteConfigDialogOpen(false)
         }
     }
 
@@ -808,7 +813,9 @@ function SettingsPage() {
                         </ul>
                     </Alert>
                     <DialogContentText sx={{ mt: 2 }}>
-                        You will need to run through setup again after this.
+                        BeePEE will restart and take you through setup again.
+                        If a package is open it will be saved first and
+                        reopened after setup.
                     </DialogContentText>
                 </DialogContent>
                 <DialogActions>

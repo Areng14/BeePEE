@@ -69,6 +69,7 @@ let mainWindow = null
 // Track current package directory and last saved path
 let currentPackageDir = null
 let lastSavedBpeePath = null
+let currentPackageSourcePath = null // .bpee/.zip the package was opened from
 
 // Helper function to send progress updates
 function sendProgressUpdate(progress, message, error = null) {
@@ -1196,6 +1197,7 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
 
             // Set the current package directory
             currentPackageDir = pkg.packageDir
+            currentPackageSourcePath = pathToPackage
             notifyPackageStateChanged()
 
             // Remember the last opened package (for "Open last package on startup")
@@ -1519,6 +1521,7 @@ const closePackage = async () => {
     // Clear the current package directory so package-dependent
     // features (save/export menu items, etc.) know nothing is loaded
     currentPackageDir = null
+    currentPackageSourcePath = null
     notifyPackageStateChanged()
 
     // Clear window title
@@ -1547,6 +1550,9 @@ const setMainWindow = (window) => {
 // Getter for currentPackageDir
 const getCurrentPackageDir = () => currentPackageDir
 
+// Where the loaded package was opened from (.bpee/.zip), if anywhere
+const getCurrentPackageSourcePath = () => currentPackageSourcePath
+
 module.exports = {
     reg_loadPackagePopup,
     loadPackage,
@@ -1560,6 +1566,7 @@ module.exports = {
     closePackage,
     setMainWindow,
     getCurrentPackageDir,
+    getCurrentPackageSourcePath,
     convertJsonToVdf,
     cleanupDeletedDirectories,
 }
