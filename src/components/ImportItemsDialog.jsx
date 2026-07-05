@@ -7,8 +7,6 @@ import {
     Button,
     Box,
     Typography,
-    Checkbox,
-    Chip,
     Stack,
     CircularProgress,
     Alert,
@@ -20,94 +18,98 @@ import {
     Inventory2 as ItemsIcon,
     Image as SignagesIcon,
     Download,
+    Check,
 } from "@mui/icons-material"
 
-// One selectable row (item or signage) with icon + name + id
-function ImportRow({ entry, checked, onToggle }) {
+// One selectable tile, styled like the item/signage browser icons
+// (96px square, name in the tooltip, hover overlay)
+function ImportTile({ entry, checked, onToggle }) {
     return (
-        <Box
-            onClick={() => !entry.exists && onToggle(entry.id)}
-            sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                p: 0.5,
-                pr: 1,
-                borderRadius: 1,
-                cursor: entry.exists ? "default" : "pointer",
-                opacity: entry.exists ? 0.5 : 1,
-                "&:hover": entry.exists
-                    ? {}
-                    : { bgcolor: "action.hover" },
-            }}>
-            <Checkbox
-                size="small"
-                checked={checked}
-                disabled={entry.exists}
-                sx={{ p: 0.5 }}
-            />
+        <Tooltip
+            title={
+                entry.exists
+                    ? `${entry.name} — already in this package`
+                    : entry.name
+            }
+            placement="top"
+            arrow>
             <Box
+                onClick={() => !entry.exists && onToggle(entry.id)}
                 sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 0.75,
+                    width: 96,
+                    height: 96,
+                    minWidth: 96,
+                    border: checked
+                        ? "2px solid"
+                        : "1px solid #444",
+                    borderColor: checked ? "primary.main" : "#444",
+                    borderRadius: 1,
+                    boxSizing: "border-box",
+                    overflow: "hidden",
+                    position: "relative",
+                    cursor: entry.exists ? "default" : "pointer",
+                    opacity: entry.exists ? 0.35 : 1,
                     bgcolor: "background.default",
-                    border: 1,
-                    borderColor: "divider",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    overflow: "hidden",
-                    flexShrink: 0,
+                    "&:hover": entry.exists
+                        ? {}
+                        : {
+                              "& img": { filter: "brightness(0.5)" },
+                              borderColor: "primary.main",
+                          },
                 }}>
                 {entry.icon ? (
                     <img
                         src={entry.icon}
-                        alt=""
+                        alt={entry.name}
                         style={{
                             width: "100%",
                             height: "100%",
-                            objectFit: "contain",
+                            objectFit: "cover",
+                            transition: "filter 0.2s ease",
                         }}
                     />
                 ) : (
-                    <ItemsIcon
-                        sx={{ fontSize: 18, color: "text.disabled" }}
-                    />
+                    <ItemsIcon sx={{ fontSize: 32, color: "text.disabled" }} />
+                )}
+
+                {/* selection badge */}
+                {checked && (
+                    <Box
+                        sx={{
+                            position: "absolute",
+                            top: 4,
+                            right: 4,
+                            bgcolor: "primary.main",
+                            borderRadius: "50%",
+                            width: 20,
+                            height: 20,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+                        }}>
+                        <Check
+                            sx={{
+                                color: "background.default",
+                                fontSize: 14,
+                            }}
+                        />
+                    </Box>
                 )}
             </Box>
-            <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Typography variant="body2" fontWeight={600} noWrap>
-                    {entry.name}
-                </Typography>
-                <Typography
-                    variant="caption"
-                    color="text.disabled"
-                    noWrap
-                    sx={{ display: "block", fontFamily: "ui-monospace, Consolas, monospace" }}>
-                    {entry.id}
-                </Typography>
-            </Box>
-            {entry.exists && (
-                <Tooltip title="This ID already exists in the current package">
-                    <Chip
-                        label="already here"
-                        size="small"
-                        variant="outlined"
-                        sx={{ height: 20, fontSize: 11 }}
-                    />
-                </Tooltip>
-            )}
-        </Box>
+        </Tooltip>
     )
 }
 
 function ImportSection({ title, icon, entries, selected, setSelected }) {
     if (!entries.length) return null
     const selectable = entries.filter((e) => !e.exists)
+    const selectedHere = selectable.filter((e) => selected.has(e.id)).length
     const allSelected =
-        selectable.length > 0 &&
-        selectable.every((e) => selected.has(e.id))
+        selectable.length > 0 && selectedHere === selectable.length
 
     const toggle = (id) =>
         setSelected((prev) => {
@@ -132,39 +134,34 @@ function ImportSection({ title, icon, entries, selected, setSelected }) {
                     display: "flex",
                     alignItems: "center",
                     gap: 1,
-                    mb: 0.5,
+                    mb: 1,
                 }}>
-                <Checkbox
-                    size="small"
-                    checked={allSelected}
-                    indeterminate={
-                        !allSelected &&
-                        selectable.some((e) => selected.has(e.id))
-                    }
-                    disabled={!selectable.length}
-                    onChange={toggleAll}
-                    sx={{ p: 0.5 }}
-                />
                 {icon}
                 <Typography variant="subtitle2" fontWeight={600}>
                     {title}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                     {selectable.length
-                        ? `${[...selected].filter((id) => entries.some((e) => e.id === id)).length}/${selectable.length} selected`
+                        ? `${selectedHere}/${selectable.length} selected`
                         : "all already in this package"}
                 </Typography>
+                <Box sx={{ flex: 1 }} />
+                {selectable.length > 0 && (
+                    <Button size="small" onClick={toggleAll}>
+                        {allSelected ? "Select none" : "Select all"}
+                    </Button>
+                )}
             </Box>
-            <Stack spacing={0.25} sx={{ pl: 1 }}>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
                 {entries.map((e) => (
-                    <ImportRow
+                    <ImportTile
                         key={e.id}
                         entry={e}
                         checked={selected.has(e.id)}
                         onToggle={toggle}
                     />
                 ))}
-            </Stack>
+            </Box>
         </Box>
     )
 }
@@ -256,7 +253,7 @@ function ImportItemsDialog() {
             <Dialog
                 open={open}
                 onClose={handleClose}
-                maxWidth="sm"
+                maxWidth="md"
                 fullWidth>
                 <DialogTitle>
                     Import from Package
