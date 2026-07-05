@@ -60,12 +60,12 @@ function SignageEditor() {
     const [stagedDesign, setStagedDesign] = useState(null)
 
     useEffect(() => {
-        window.package.onSignageDesignStaged?.((payload) => {
+        window.package?.onSignageDesignStaged?.((payload) => {
             if (!payload) return
             setStagedDesign(payload)
             setSaveError(null)
         })
-        return () => window.package.onSignageDesignStaged?.(null)
+        return () => window.package?.onSignageDesignStaged?.(null)
     }, [])
 
     // Fetch available signages for dropdown
@@ -97,7 +97,7 @@ function SignageEditor() {
 
         // Same global setting the item editor honors
         window.package
-            .getSetting("skipDeleteConfirmations")
+            ?.getSetting("skipDeleteConfirmations")
             .then((result) => {
                 if (result.success && result.value !== undefined) {
                     setSkipDeleteConfirmations(result.value)
