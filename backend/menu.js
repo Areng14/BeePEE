@@ -55,6 +55,7 @@ const PACKAGE_MENU_IDS = [
     "export-package",
     "package-information",
     "beepm-package-info",
+    "import-items",
 ]
 
 // Enable/disable package-dependent menu items based on whether a package is loaded
@@ -266,6 +267,15 @@ function createMainMenu(mainWindow) {
                             // Error is already sent to frontend via progress update
                             // No need for additional dialog since we show it in the loading popup
                         }
+                    },
+                },
+                {
+                    id: "import-items",
+                    label: "Import from Package...",
+                    click: () => {
+                        // Renderer opens the importer dialog (it drives the
+                        // file pick + selection UI)
+                        mainWindow.webContents.send("import-items:open")
                     },
                 },
                 {

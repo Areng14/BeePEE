@@ -314,6 +314,20 @@ contextBridge.exposeInMainWorld("package", {
     reloadPackage: () => ipcRenderer.invoke("reload-package"),
 
     // ========================================
+    // ITEM IMPORTER (File > Import from Package...)
+    // ========================================
+    importItemsBrowse: () => ipcRenderer.invoke("import-items-browse"),
+    importItemsExecute: (selection) =>
+        ipcRenderer.invoke("import-items-execute", selection),
+    importItemsCancel: () => ipcRenderer.invoke("import-items-cancel"),
+    onOpenImportItems: (callback) => {
+        ipcRenderer.removeAllListeners("import-items:open")
+        if (callback) {
+            ipcRenderer.on("import-items:open", () => callback())
+        }
+    },
+
+    // ========================================
     // PACKAGE LOADING PROGRESS
     // ========================================
     onPackageLoadingProgress: (callback) =>

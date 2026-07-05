@@ -6,6 +6,7 @@ import {
 } from "@mui/icons-material"
 import ItemBrowser from "./ItemBrowser"
 import SignageBrowser from "./SignageBrowser"
+import ImportItemsDialog from "./ImportItemsDialog"
 
 // Tab configuration - add new tabs here
 const TAB_CONFIG = [
@@ -101,6 +102,9 @@ function MainTabs() {
             <Box sx={{ flex: 1, overflow: "auto", position: "relative" }}>
                 {ActiveComponent && <ActiveComponent />}
             </Box>
+
+            {/* File > Import from Package... */}
+            <ImportItemsDialog />
 
             {/* Empty-package notice — floating toast, not a banner */}
             <Snackbar

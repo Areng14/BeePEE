@@ -1568,5 +1568,7 @@ module.exports = {
     getCurrentPackageDir,
     getCurrentPackageSourcePath,
     convertJsonToVdf,
+    extractPackage,
+    processVdfFiles,
     cleanupDeletedDirectories,
 }
