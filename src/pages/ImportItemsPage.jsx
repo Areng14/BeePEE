@@ -101,6 +101,11 @@ const TABS = [
     { id: "signages", label: "Signages", icon: SignagesIcon },
 ]
 
+// StrictMode runs mount effects twice in dev — without this guard the file
+// picker would open twice. Module-level so it survives the simulated
+// remount; a real window load re-evaluates the module and resets it.
+let browseStarted = false
+
 function ImportItemsPage() {
     const [phase, setPhase] = useState("loading") // loading | pick | importing
     const [manifest, setManifest] = useState(null)
@@ -114,6 +119,8 @@ function ImportItemsPage() {
 
         // File picker comes up right away; cancelling it closes the window
         const browse = async () => {
+            if (browseStarted) return
+            browseStarted = true
             try {
                 const r = await window.package.importItemsBrowse()
                 if (r?.canceled) {
