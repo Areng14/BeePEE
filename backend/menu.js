@@ -35,7 +35,6 @@ const {
     createCrashReportWindow,
     createBeePackageWindow,
     createSettingsWindow,
-    createImportItemsWindow,
 } = require("./items/itemEditor")
 const { isDev } = require("./utils/isDev.js")
 const { ensurePackagesDir } = require("./utils/packagesDir")
@@ -668,7 +667,13 @@ function createMainMenu(mainWindow) {
                 {
                     id: "import-items",
                     label: "Import from Package...",
-                    click: () => createImportItemsWindow(mainWindow),
+                    // File picker first; the importer window opens once the
+                    // chosen package is extracted (lazy require avoids a
+                    // menu <-> handlers import cycle)
+                    click: () =>
+                        require("./handlers/importHandlers").startImportFlow(
+                            mainWindow,
+                        ),
                 },
             ],
         },

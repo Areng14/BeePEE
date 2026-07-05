@@ -2,20 +2,22 @@
  * Item Importer: pick another .bpee and copy selected items/signages
  * into the currently loaded package.
  *
- * Flow: import-items-browse extracts the chosen .bpee into a temp staging
- * dir and returns a manifest (items + signages with names/icons/collision
- * flags). import-items-execute copies the selected entries' files into the
- * current package, merges info.json, reloads the package in memory and
- * refreshes the UI. Entries whose ID already exists are skipped.
+ * Flow: the Edit menu calls startImportFlow, which shows the file picker
+ * over the MAIN window, extracts the chosen .bpee into a temp staging dir,
+ * builds a manifest (items + signages with names/icons/collision flags) and
+ * only then opens the importer window; the window fetches the manifest via
+ * import-items-manifest. import-items-execute copies the selected entries'
+ * files into the current package, merges info.json, reloads the package in
+ * memory and refreshes the UI. Entries whose ID already exists are skipped.
  */
 
 const fs = require("fs")
 const path = require("path")
 const os = require("os")
-const { dialog, BrowserWindow } = require("electron")
+const { dialog } = require("electron")
 
 // One import session at a time
-let staging = null // { dir, info, sourceName }
+let staging = null // { dir, info, sourceName, manifest }
 
 function readJson(p) {
     try {
@@ -122,104 +124,113 @@ function cleanupStaging() {
     staging = null
 }
 
-function register(ipcMain, mainWindow) {
+// Menu entry point: file picker over the main window first, then extract
+// and open the importer window with the manifest ready.
+async function startImportFlow(mainWindow) {
     const {
-        packages,
         getCurrentPackageDir,
         extractPackage,
         processVdfFiles,
     } = require("../packageManager")
+    try {
+        const targetDir = getCurrentPackageDir()
+        if (!targetDir) return
 
-    // Pick a .bpee, extract it, and return what's inside
-    ipcMain.handle("import-items-browse", async (event) => {
-        try {
-            const targetDir = getCurrentPackageDir()
-            if (!targetDir) {
-                return { success: false, error: "No package is loaded" }
-            }
+        const result = await dialog.showOpenDialog(mainWindow, {
+            title: "Import from Package",
+            properties: ["openFile"],
+            filters: [{ name: "BeePEE Package", extensions: ["bpee"] }],
+        })
+        if (result.canceled || !result.filePaths?.length) return
+        const sourcePath = result.filePaths[0]
 
-            // Parent the picker to the importer window, not the main one
-            const owner =
-                BrowserWindow.fromWebContents(event.sender) || mainWindow
-            const result = await dialog.showOpenDialog(owner, {
-                title: "Import from Package",
-                properties: ["openFile"],
-                filters: [{ name: "BeePEE Package", extensions: ["bpee"] }],
-            })
-            if (result.canceled || !result.filePaths?.length) {
-                return { success: true, canceled: true }
-            }
-            const sourcePath = result.filePaths[0]
+        cleanupStaging()
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bpee-import-"))
+        await extractPackage(sourcePath, dir)
+        processVdfFiles(dir)
 
-            cleanupStaging()
-            const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bpee-import-"))
-            await extractPackage(sourcePath, dir)
-            processVdfFiles(dir)
-
-            const info = readJson(path.join(dir, "info.json"))
-            if (!info) {
-                fs.rmSync(dir, { recursive: true, force: true })
-                return {
-                    success: false,
-                    error: "That file doesn't look like a BeePEE package (no info.json)",
-                }
-            }
-            const sourceName =
-                info.Name || info.ID || path.basename(sourcePath, ".bpee")
-            staging = { dir, info, sourceName }
-
-            const targetInfo =
-                readJson(path.join(targetDir, "info.json")) || {}
-            const existingItemIds = new Set(
-                toArray(targetInfo.Item).map((i) => i.ID),
+        const info = readJson(path.join(dir, "info.json"))
+        if (!info) {
+            fs.rmSync(dir, { recursive: true, force: true })
+            dialog.showErrorBox(
+                "Import Failed",
+                "That file doesn't look like a BeePEE package (no info.json).",
             )
-            const existingSignageIds = new Set(
-                toArray(targetInfo.Signage).map((s) => s.ID),
-            )
-
-            const items = toArray(info.Item)
-                .filter((e) => e && e.ID)
-                .map((entry) => {
-                    const folders = entryFolders(entry)
-                    const display = folders.length
-                        ? itemDisplayInfo(dir, folders[0], entry)
-                        : { name: entry.ID, iconAbs: null }
-                    return {
-                        id: entry.ID,
-                        name: display.name,
-                        icon: fileToDataUrl(display.iconAbs),
-                        exists: existingItemIds.has(entry.ID),
-                    }
-                })
-
-            const signages = toArray(info.Signage)
-                .filter((s) => s && typeof s === "object" && s.ID)
-                .map((sig) => {
-                    // Prefer the Clean icon, else the first style with one
-                    let icon = null
-                    const styles = sig.Styles || {}
-                    const cfgs = [
-                        styles.BEE2_CLEAN,
-                        ...Object.values(styles),
-                    ].filter((v) => v && typeof v === "object")
-                    for (const cfg of cfgs) {
-                        icon = fileToDataUrl(signageIconAbs(dir, cfg.icon))
-                        if (icon) break
-                    }
-                    return {
-                        id: sig.ID,
-                        name: sig.Name || sig.ID,
-                        icon,
-                        exists: existingSignageIds.has(sig.ID),
-                    }
-                })
-
-            return { success: true, sourceName, items, signages }
-        } catch (error) {
-            console.error("Failed to browse import package:", error)
-            cleanupStaging()
-            return { success: false, error: error.message }
+            return
         }
+        const sourceName =
+            info.Name || info.ID || path.basename(sourcePath, ".bpee")
+
+        const targetInfo = readJson(path.join(targetDir, "info.json")) || {}
+        const existingItemIds = new Set(
+            toArray(targetInfo.Item).map((i) => i.ID),
+        )
+        const existingSignageIds = new Set(
+            toArray(targetInfo.Signage).map((s) => s.ID),
+        )
+
+        const items = toArray(info.Item)
+            .filter((e) => e && e.ID)
+            .map((entry) => {
+                const folders = entryFolders(entry)
+                const display = folders.length
+                    ? itemDisplayInfo(dir, folders[0], entry)
+                    : { name: entry.ID, iconAbs: null }
+                return {
+                    id: entry.ID,
+                    name: display.name,
+                    icon: fileToDataUrl(display.iconAbs),
+                    exists: existingItemIds.has(entry.ID),
+                }
+            })
+
+        const signages = toArray(info.Signage)
+            .filter((s) => s && typeof s === "object" && s.ID)
+            .map((sig) => {
+                // Prefer the Clean icon, else the first style with one
+                let icon = null
+                const styles = sig.Styles || {}
+                const cfgs = [
+                    styles.BEE2_CLEAN,
+                    ...Object.values(styles),
+                ].filter((v) => v && typeof v === "object")
+                for (const cfg of cfgs) {
+                    icon = fileToDataUrl(signageIconAbs(dir, cfg.icon))
+                    if (icon) break
+                }
+                return {
+                    id: sig.ID,
+                    name: sig.Name || sig.ID,
+                    icon,
+                    exists: existingSignageIds.has(sig.ID),
+                }
+            })
+
+        staging = {
+            dir,
+            info,
+            sourceName,
+            manifest: { success: true, sourceName, items, signages },
+        }
+
+        // Everything's ready — now show the window
+        require("../items/itemEditor").createImportItemsWindow(mainWindow)
+    } catch (error) {
+        console.error("Failed to start import:", error)
+        cleanupStaging()
+        dialog.showErrorBox("Import Failed", error.message)
+    }
+}
+
+function register(ipcMain, mainWindow) {
+    const { packages, getCurrentPackageDir } = require("../packageManager")
+
+    // The importer window asks for the manifest prepared by startImportFlow
+    ipcMain.handle("import-items-manifest", async () => {
+        if (!staging?.manifest) {
+            return { success: false, error: "No import in progress" }
+        }
+        return staging.manifest
     })
 
     // Copy the selected entries into the current package
@@ -511,8 +522,9 @@ function register(ipcMain, mainWindow) {
                     global.titleManager.setUnsavedChanges(true)
                 }
 
-                // Success toast lives in the main window; the importer
-                // window closes itself
+                // Success toast lives in the main window; close the importer
+                // and hand focus back explicitly (otherwise Windows can
+                // minimize the whole app when the child window goes away)
                 mainWindow.webContents.send("import-items:done", {
                     imported,
                     skipped,
@@ -521,6 +533,9 @@ function register(ipcMain, mainWindow) {
                     require("../items/itemEditor").closeImportItemsWindow()
                 } catch {
                     /* window may already be gone */
+                }
+                if (mainWindow && !mainWindow.isDestroyed()) {
+                    mainWindow.focus()
                 }
 
                 cleanupStaging()
@@ -539,4 +554,4 @@ function register(ipcMain, mainWindow) {
     })
 }
 
-module.exports = { register }
+module.exports = { register, startImportFlow }

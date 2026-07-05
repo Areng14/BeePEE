@@ -101,10 +101,6 @@ const TABS = [
     { id: "signages", label: "Signages", icon: SignagesIcon },
 ]
 
-// StrictMode runs mount effects twice in dev — without this guard the file
-// picker would open twice. Module-level so it survives the simulated
-// remount; a real window load re-evaluates the module and resets it.
-let browseStarted = false
 
 function ImportItemsPage() {
     const [phase, setPhase] = useState("loading") // loading | pick | importing
@@ -117,16 +113,12 @@ function ImportItemsPage() {
     useEffect(() => {
         document.title = "BeePEE - Import from Package"
 
-        // File picker comes up right away; cancelling it closes the window
-        const browse = async () => {
-            if (browseStarted) return
-            browseStarted = true
+        // The backend already picked + extracted the package before opening
+        // this window — just fetch the prepared manifest (idempotent, so
+        // StrictMode's double mount is harmless)
+        const fetchManifest = async () => {
             try {
-                const r = await window.package.importItemsBrowse()
-                if (r?.canceled) {
-                    window.close()
-                    return
-                }
+                const r = await window.package.importItemsGetManifest()
                 if (!r?.success) {
                     setError(r?.error || "Failed to read that package")
                     setPhase("pick")
@@ -143,7 +135,7 @@ function ImportItemsPage() {
                 setPhase("pick")
             }
         }
-        browse()
+        fetchManifest()
 
         // Dropping the window (X) discards the staged extraction
         const cancel = () => window.package.importItemsCancel?.()

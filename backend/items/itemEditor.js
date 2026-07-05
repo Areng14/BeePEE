@@ -892,11 +892,24 @@ function createImportItemsWindow(mainWindow) {
         return
     }
 
+    // Match the main window's size. No parent relationship — closing a
+    // parented child can minimize the whole app on Windows.
+    let width = 900
+    let height = 700
+    try {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+            const bounds = mainWindow.getBounds()
+            width = bounds.width
+            height = bounds.height
+        }
+    } catch {
+        /* fall back to defaults */
+    }
+
     importItemsWindow = new BrowserWindow({
-        width: 900,
-        height: 700,
+        width,
+        height,
         title: "BeePEE - Import from Package",
-        parent: mainWindow || undefined,
         resizable: true,
         minimizable: true,
         maximizable: true,

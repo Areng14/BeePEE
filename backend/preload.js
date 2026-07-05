@@ -316,7 +316,7 @@ contextBridge.exposeInMainWorld("package", {
     // ========================================
     // ITEM IMPORTER (File > Import from Package...)
     // ========================================
-    importItemsBrowse: () => ipcRenderer.invoke("import-items-browse"),
+    importItemsGetManifest: () => ipcRenderer.invoke("import-items-manifest"),
     importItemsExecute: (selection) =>
         ipcRenderer.invoke("import-items-execute", selection),
     importItemsCancel: () => ipcRenderer.invoke("import-items-cancel"),
