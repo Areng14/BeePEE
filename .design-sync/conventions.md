@@ -1,6 +1,6 @@
 # BeePEE - usage conventions
 
-BeePEE is an Electron app for editing Portal 2 Puzzle Editor packages. This bundle ships its **signage editor** surface: `SignageEditor` (a complete editor window), `SignageInfo` and `SignageStyles` (its two tab panels), plus the wrappers needed to render them.
+BeePEE is an Electron app for editing Portal 2 Puzzle Editor packages. This bundle ships its **signage editor** surface: `SignageEditor` (a complete editor window), `SignageInfo` and `SignageStyles` (its two tab panels), `AddSignageDialog` (the ChoiceCard-based add flow) and `SignageDesigner` (the drag-and-drop icon designer), plus the wrappers needed to render them. `guidelines/` carries feature briefs (e.g. music-support) describing screens not yet built — design them by composing these components and the conventions below.
 
 ## Wrapping and setup (required)
 

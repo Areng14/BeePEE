@@ -9,6 +9,20 @@
 
 - `.design-sync/templates/` holds hand-authored `.dc.html` design templates uploaded to the project's `templates/` tree OUTSIDE the converter (needs its own `finalize_plan` with `templates/**` writes - the standard plan globs don't cover it). `support.js`/`ds-base.js` are copies of the app-generated runtime from `templates/signage-editor/`.
 
+- **Render-path guard convention**: every mount-path `window.package.*` /
+  `window.electron.*` call site MUST guard the base (`window.package?.foo?.()`),
+  not just the method. A 2026-07 re-sync failed `[RENDER]` on SignageEditor
+  because two newly added effects accessed `window.package.onSignageDesignStaged`
+  / `.getSetting` on an undefined base - fixed in app source. Check new effects
+  for this before any re-sync.
+- `guidelinesGlob` does not copy files out of dot-directories; design briefs
+  live in `docs/guides/*.md` (covered by the default glob, no config needed).
+  Current: `docs/guides/music-support.md` -> uploads as
+  `guidelines/docs/guides/music-support.md`.
+- Anchored diffs can report a component "unchanged" (sourceKeys) while its
+  render actually changed - the driver's canary catches it (`render_churn`).
+  Widespread churn -> rerun with `--force` and re-confirm all sheets.
+
 ## Known render warns
 
 - `[FONT_MISSING] "Avenir"` - Avenir appears only as a fallback member of the `system-ui` font stack in global.css. It is Apple-proprietary, never ships, and never renders (system-ui always resolves first, including in the real app). Accepted; do not bundle a substitute.
