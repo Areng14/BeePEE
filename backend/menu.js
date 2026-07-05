@@ -271,11 +271,6 @@ function createMainMenu(mainWindow) {
                     },
                 },
                 {
-                    id: "import-items",
-                    label: "Import from Package...",
-                    click: () => createImportItemsWindow(mainWindow),
-                },
-                {
                     label: "Restore Backup...",
                     click: async () => {
                         // Pre-export snapshots live in userData/backups
@@ -668,6 +663,12 @@ function createMainMenu(mainWindow) {
                         }
                         createBeePackageWindow(mainWindow)
                     },
+                },
+                { type: "separator" },
+                {
+                    id: "import-items",
+                    label: "Import from Package...",
+                    click: () => createImportItemsWindow(mainWindow),
                 },
             ],
         },
