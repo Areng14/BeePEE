@@ -17,6 +17,7 @@ import CrashReportPage from "./pages/CrashReportPage"
 import BeePackagePage from "./pages/BeePackagePage"
 import SignageEditor from "./components/SignageEditor"
 import SignageDesignerPage from "./pages/SignageDesignerPage"
+import ImportItemsPage from "./pages/ImportItemsPage"
 import { ItemProvider } from "./contexts/ItemContext"
 import { SignageProvider } from "./contexts/SignageContext"
 import "./global.css"
@@ -35,6 +36,7 @@ function App() {
     const showBeePackage = routeParam === "bee-package"
     const showSignageEditor = routeParam === "signage-editor"
     const showSignageDesigner = routeParam === "signage-designer"
+    const showImportItems = routeParam === "import-items"
     const showSettings = routeParam === "settings"
     const showSetup = routeParam === "setup"
     const [packageLoaded, setPackageLoaded] = useState(false)
@@ -153,6 +155,9 @@ function App() {
             ) : showSignageDesigner ? (
                 // Show SignageDesignerPage directly for production windows
                 <SignageDesignerPage />
+            ) : showImportItems ? (
+                // Item Importer window (File > Import from Package...)
+                <ImportItemsPage />
             ) : showSettings ? (
                 // Show SettingsPage directly for production windows
                 <SettingsPage />
@@ -233,6 +238,10 @@ function App() {
                             <Route
                                 path="/signage-designer"
                                 element={<SignageDesignerPage />}
+                            />
+                            <Route
+                                path="/import-items"
+                                element={<ImportItemsPage />}
                             />
                             <Route
                                 path="/settings"

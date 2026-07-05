@@ -35,6 +35,7 @@ const {
     createCrashReportWindow,
     createBeePackageWindow,
     createSettingsWindow,
+    createImportItemsWindow,
 } = require("./items/itemEditor")
 const { isDev } = require("./utils/isDev.js")
 const { ensurePackagesDir } = require("./utils/packagesDir")
@@ -272,11 +273,7 @@ function createMainMenu(mainWindow) {
                 {
                     id: "import-items",
                     label: "Import from Package...",
-                    click: () => {
-                        // Renderer opens the importer dialog (it drives the
-                        // file pick + selection UI)
-                        mainWindow.webContents.send("import-items:open")
-                    },
+                    click: () => createImportItemsWindow(mainWindow),
                 },
                 {
                     label: "Restore Backup...",

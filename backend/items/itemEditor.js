@@ -881,6 +881,58 @@ function closeSettingsWindow() {
     }
 }
 
+let importItemsWindow = null
+
+/**
+ * Create the Item Importer window (File > Import from Package...)
+ */
+function createImportItemsWindow(mainWindow) {
+    if (importItemsWindow && !importItemsWindow.isDestroyed()) {
+        importItemsWindow.focus()
+        return
+    }
+
+    importItemsWindow = new BrowserWindow({
+        width: 900,
+        height: 700,
+        title: "BeePEE - Import from Package",
+        parent: mainWindow || undefined,
+        resizable: true,
+        minimizable: true,
+        maximizable: true,
+        webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            preload: path.join(__dirname, "..", "preload.js"),
+        },
+        devTools: isDev,
+        autoHideMenuBar: true,
+    })
+
+    importItemsWindow.setMenuBarVisibility(false)
+
+    importItemsWindow.on("closed", () => {
+        importItemsWindow = null
+    })
+
+    if (isDev) {
+        importItemsWindow.loadURL(
+            `http://localhost:5173/?route=import-items`,
+        )
+    } else {
+        const appPath = app.getAppPath()
+        importItemsWindow.loadFile(path.join(appPath, "dist", "index.html"), {
+            query: { route: "import-items" },
+        })
+    }
+}
+
+function closeImportItemsWindow() {
+    if (importItemsWindow && !importItemsWindow.isDestroyed()) {
+        importItemsWindow.close()
+    }
+}
+
 module.exports = {
     createItemEditor,
     sendItemUpdateToEditor,
@@ -914,4 +966,6 @@ module.exports = {
     createSettingsWindow,
     closeSettingsWindow,
     getSettingsWindow: () => settingsWindow,
+    createImportItemsWindow,
+    closeImportItemsWindow,
 }

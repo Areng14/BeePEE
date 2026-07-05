@@ -320,10 +320,13 @@ contextBridge.exposeInMainWorld("package", {
     importItemsExecute: (selection) =>
         ipcRenderer.invoke("import-items-execute", selection),
     importItemsCancel: () => ipcRenderer.invoke("import-items-cancel"),
-    onOpenImportItems: (callback) => {
-        ipcRenderer.removeAllListeners("import-items:open")
+    // Fired at the MAIN window when an import finishes (for the toast)
+    onImportItemsDone: (callback) => {
+        ipcRenderer.removeAllListeners("import-items:done")
         if (callback) {
-            ipcRenderer.on("import-items:open", () => callback())
+            ipcRenderer.on("import-items:done", (event, data) =>
+                callback(data),
+            )
         }
     },
 

@@ -6,7 +6,6 @@ import {
 } from "@mui/icons-material"
 import ItemBrowser from "./ItemBrowser"
 import SignageBrowser from "./SignageBrowser"
-import ImportItemsDialog from "./ImportItemsDialog"
 
 // Tab configuration - add new tabs here
 const TAB_CONFIG = [
@@ -27,6 +26,31 @@ const TAB_CONFIG = [
 function MainTabs() {
     const [activeTab, setActiveTab] = useState(0)
     const [packageEmpty, setPackageEmpty] = useState(false)
+    const [importToast, setImportToast] = useState(null)
+
+    // Toast when the Item Importer window finishes an import
+    useEffect(() => {
+        window.package.onImportItemsDone?.((data) => {
+            const parts = []
+            if (data?.imported?.items)
+                parts.push(
+                    `${data.imported.items} item${data.imported.items === 1 ? "" : "s"}`,
+                )
+            if (data?.imported?.signages)
+                parts.push(
+                    `${data.imported.signages} signage${data.imported.signages === 1 ? "" : "s"}`,
+                )
+            const skippedCount =
+                (data?.skipped?.items?.length || 0) +
+                (data?.skipped?.signages?.length || 0)
+            let msg = parts.length
+                ? `Imported ${parts.join(" and ")}`
+                : "Nothing imported"
+            if (skippedCount) msg += ` (${skippedCount} already existed)`
+            setImportToast(msg)
+        })
+        return () => window.package.onImportItemsDone?.(null)
+    }, [])
 
     useEffect(() => {
         const handlePackageLoaded = (data) => {
@@ -103,8 +127,22 @@ function MainTabs() {
                 {ActiveComponent && <ActiveComponent />}
             </Box>
 
-            {/* File > Import from Package... */}
-            <ImportItemsDialog />
+            {/* Item Importer result toast */}
+            <Snackbar
+                open={!!importToast}
+                autoHideDuration={5000}
+                onClose={(e, reason) => {
+                    if (reason !== "clickaway") setImportToast(null)
+                }}
+                anchorOrigin={{ vertical: "top", horizontal: "center" }}>
+                <Alert
+                    severity="success"
+                    variant="filled"
+                    onClose={() => setImportToast(null)}
+                    sx={{ boxShadow: 4 }}>
+                    {importToast}
+                </Alert>
+            </Snackbar>
 
             {/* Empty-package notice — floating toast, not a banner */}
             <Snackbar

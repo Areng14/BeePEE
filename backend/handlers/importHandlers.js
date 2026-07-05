@@ -12,7 +12,7 @@
 const fs = require("fs")
 const path = require("path")
 const os = require("os")
-const { dialog } = require("electron")
+const { dialog, BrowserWindow } = require("electron")
 
 // One import session at a time
 let staging = null // { dir, info, sourceName }
@@ -131,14 +131,17 @@ function register(ipcMain, mainWindow) {
     } = require("../packageManager")
 
     // Pick a .bpee, extract it, and return what's inside
-    ipcMain.handle("import-items-browse", async () => {
+    ipcMain.handle("import-items-browse", async (event) => {
         try {
             const targetDir = getCurrentPackageDir()
             if (!targetDir) {
                 return { success: false, error: "No package is loaded" }
             }
 
-            const result = await dialog.showOpenDialog(mainWindow, {
+            // Parent the picker to the importer window, not the main one
+            const owner =
+                BrowserWindow.fromWebContents(event.sender) || mainWindow
+            const result = await dialog.showOpenDialog(owner, {
                 title: "Import from Package",
                 properties: ["openFile"],
                 filters: [{ name: "BeePEE Package", extensions: ["bpee"] }],
@@ -506,6 +509,18 @@ function register(ipcMain, mainWindow) {
 
                 if (global.titleManager) {
                     global.titleManager.setUnsavedChanges(true)
+                }
+
+                // Success toast lives in the main window; the importer
+                // window closes itself
+                mainWindow.webContents.send("import-items:done", {
+                    imported,
+                    skipped,
+                })
+                try {
+                    require("../items/itemEditor").closeImportItemsWindow()
+                } catch {
+                    /* window may already be gone */
                 }
 
                 cleanupStaging()
