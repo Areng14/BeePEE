@@ -6,14 +6,13 @@
             "changes": {
                 "added": [
                     "Signage designer with drag and drop from glyphs, primitives, a built-in sign library, and your own SVG imports",
-                    "Designer styling",
-                    "Designer editing tools",
-                    "Native File/Edit menu bar in the designer window",
                     "Export signage as PNG or as a .bpsign design file, and load a .bpsign back in to keep editing",
                     "Automatic alpha mask generation to allow for designer generated signages to glow ingame.",
                     "Edit in Designer button on BeePEE-made signage",
                     "Signages per style support",
                     "Signage Editing similar to item editing",
+                    "Import items/signages from other .bpee packages",
+                    "Warning when closing BeePEE with a unsaved package",
                     "App preferences"
                 ],
                 "fixed": [
