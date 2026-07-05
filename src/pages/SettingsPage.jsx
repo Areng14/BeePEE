@@ -223,6 +223,11 @@ function SettingsPage() {
         setHasChanges(pathsChanged || appSettingsChanged)
     }, [portal2Path, beemodPath, originalPortal2Path, originalBeemodPath, appSettings, originalAppSettings])
 
+    // "*" in the window title while there are unsaved changes
+    useEffect(() => {
+        document.title = `${hasChanges ? "*" : ""}BeePEE - Preferences`
+    }, [hasChanges])
+
     const handleBrowsePortal2 = async () => {
         try {
             setPortal2Error(null)

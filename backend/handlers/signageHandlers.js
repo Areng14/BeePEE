@@ -394,6 +394,9 @@ function register(ipcMain, mainWindow) {
                 }
             }
 
+            // Package changed on disk (working dir) but not the .bpee
+            global.titleManager?.setUnsavedChanges(true)
+
             // Refresh browser UI
             mainWindow.webContents.send("package:loaded", {
                 items: packages
@@ -534,6 +537,9 @@ function register(ipcMain, mainWindow) {
             if (pkg && pkg.signages) {
                 pkg.signages = pkg.signages.filter((s) => s.id !== signageId)
             }
+
+            // Package changed on disk (working dir) but not the .bpee
+            global.titleManager?.setUnsavedChanges(true)
 
             // Refresh browser UI
             mainWindow.webContents.send("package:loaded", {
@@ -771,6 +777,9 @@ function register(ipcMain, mainWindow) {
                             signageData.originalId,
                             pkg.signages[memSignageIndex]
                         )
+
+                        // Package changed but the .bpee wasn't rewritten
+                        global.titleManager?.setUnsavedChanges(true)
 
                         // Also update browser
                         mainWindow.webContents.send("package:loaded", {

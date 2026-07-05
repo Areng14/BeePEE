@@ -291,6 +291,9 @@ function register(ipcMain, mainWindow) {
                     console.warn(`Package not found for path: ${packagePath}`)
                 }
 
+                // Package changed on disk (working dir) but not the .bpee
+                global.titleManager?.setUnsavedChanges(true)
+
                 // Send package loaded event to refresh UI
                 mainWindow.webContents.send("package:loaded", {
                     items: packages
@@ -432,6 +435,9 @@ function register(ipcMain, mainWindow) {
                     console.warn(`Package not found for path: ${packagePath}`)
                 }
 
+                // Package changed on disk (working dir) but not the .bpee
+                global.titleManager?.setUnsavedChanges(true)
+
                 // Send update
                 mainWindow.webContents.send("package:loaded", {
                     items: packages
@@ -541,6 +547,9 @@ function register(ipcMain, mainWindow) {
                     (i) => i.id !== itemId,
                 )
             }
+
+            // Package changed on disk (working dir) but not the .bpee
+            global.titleManager?.setUnsavedChanges(true)
 
             // Send update
             mainWindow.webContents.send("package:loaded", {

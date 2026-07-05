@@ -106,6 +106,14 @@ function SignageEditor() {
             .catch(() => {})
     }, [])
 
+    // "*" in the window title while there are unsaved changes (form edits
+    // or a staged designer save)
+    useEffect(() => {
+        if (!signage) return
+        const dirty = hasChanges || !!stagedDesign
+        document.title = `${dirty ? "*" : ""}Edit Signage: ${signage.name || signage.id}`
+    }, [signage, hasChanges, stagedDesign])
+
     // Initialize form from signage
     useEffect(() => {
         if (signage) {

@@ -7,6 +7,7 @@ const {
     clearPackagesDirectory,
     closePackage,
     getCurrentPackageDir,
+    getCurrentPackageSourcePath,
 } = require("./packageManager")
 const { app, dialog, BrowserWindow } = require("electron")
 const path = require("path")
@@ -96,6 +97,33 @@ function getCurrentPackageName() {
         return path.basename(currentPackageDir)
     }
     return "package"
+}
+
+// Save the working package to its .bpee. Falls back to the file the
+// package was opened from, and only asks for a location when neither is
+// known. Returns true when the file was actually written.
+async function saveCurrentPackage(win) {
+    const currentPackageDir = getCurrentPackageDir()
+    if (!currentPackageDir) return false
+    if (!lastSavedBpeePath) {
+        const source = getCurrentPackageSourcePath?.()
+        if (source && /\.bpee$/i.test(source)) {
+            lastSavedBpeePath = source
+        }
+    }
+    if (!lastSavedBpeePath) {
+        const { canceled, filePath } = await dialog.showSaveDialog(win, {
+            title: "Save Package As",
+            defaultPath: getCurrentPackageName() + ".bpee",
+            filters: [{ name: "BeePEE Package", extensions: ["bpee"] }],
+        })
+        if (canceled || !filePath) return false
+        lastSavedBpeePath = filePath
+    }
+    await savePackageAsBpee(currentPackageDir, lastSavedBpeePath)
+    // The .bpee now matches the working package
+    global.titleManager?.setUnsavedChanges(false)
+    return true
 }
 
 function createMainMenu(mainWindow) {
@@ -336,6 +364,41 @@ function createMainMenu(mainWindow) {
                     label: "Close Package",
                     accelerator: "Ctrl+W",
                     click: async () => {
+                        // Same guard as quitting: don't silently drop
+                        // changes that were never written to the .bpee
+                        if (global.titleManager?.hasUnsavedChanges) {
+                            const choice = dialog.showMessageBoxSync(
+                                mainWindow,
+                                {
+                                    type: "warning",
+                                    buttons: [
+                                        "Cancel",
+                                        "Close Without Saving",
+                                        "Save",
+                                    ],
+                                    defaultId: 2,
+                                    cancelId: 0,
+                                    title: "Unsaved Changes",
+                                    message:
+                                        "Your package has unsaved changes.",
+                                    detail: "Save writes them to the .bpee file before closing.",
+                                },
+                            )
+                            if (choice === 0) return
+                            if (choice === 2) {
+                                try {
+                                    const saved =
+                                        await saveCurrentPackage(mainWindow)
+                                    if (!saved) return // Save As cancelled
+                                } catch (err) {
+                                    dialog.showErrorBox(
+                                        "Save Failed",
+                                        err.message,
+                                    )
+                                    return
+                                }
+                            }
+                        }
                         try {
                             await closePackage()
                             // currentPackageDir is now managed in packageManager.js
@@ -356,34 +419,13 @@ function createMainMenu(mainWindow) {
                     accelerator: "Ctrl+S",
                     click: async () => {
                         try {
-                            const currentPackageDir = getCurrentPackageDir()
-                            if (!currentPackageDir)
-                                throw new Error("No package loaded")
-                            if (!lastSavedBpeePath) {
-                                // Prompt for path if not previously saved
-                                const { canceled, filePath } =
-                                    await dialog.showSaveDialog(mainWindow, {
-                                        title: "Save Package As",
-                                        defaultPath:
-                                            getCurrentPackageName() + ".bpee",
-                                        filters: [
-                                            {
-                                                name: "BeePEE Package",
-                                                extensions: ["bpee"],
-                                            },
-                                        ],
-                                    })
-                                if (canceled || !filePath) return
-                                lastSavedBpeePath = filePath
+                            const saved = await saveCurrentPackage(mainWindow)
+                            if (saved) {
+                                dialog.showMessageBox(mainWindow, {
+                                    message: `Package saved to: ${lastSavedBpeePath}`,
+                                    type: "info",
+                                })
                             }
-                            await savePackageAsBpee(
-                                currentPackageDir,
-                                lastSavedBpeePath,
-                            )
-                            dialog.showMessageBox(mainWindow, {
-                                message: `Package saved to: ${lastSavedBpeePath}`,
-                                type: "info",
-                            })
                         } catch (err) {
                             dialog.showErrorBox("Save Failed", err.message)
                         }
@@ -413,6 +455,8 @@ function createMainMenu(mainWindow) {
                             if (canceled || !filePath) return
                             await savePackageAsBpee(currentPackageDir, filePath)
                             lastSavedBpeePath = filePath
+                            // The .bpee now matches the working package
+                            global.titleManager?.setUnsavedChanges(false)
                             dialog.showMessageBox(mainWindow, {
                                 message: `Package saved to: ${filePath}`,
                                 type: "info",
@@ -806,4 +850,9 @@ function createMainMenu(mainWindow) {
     return menu
 }
 
-module.exports = { createMainMenu, updateMenuState, rebuildMenu }
+module.exports = {
+    createMainMenu,
+    updateMenuState,
+    rebuildMenu,
+    saveCurrentPackage,
+}

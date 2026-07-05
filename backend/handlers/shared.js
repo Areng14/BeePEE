@@ -212,9 +212,11 @@ async function handleItemSave(item, event, mainWindow) {
         // Also notify the editor window through the dedicated function
         sendItemUpdateToEditor(item.id, updatedItem)
 
-        // Clear unsaved changes indicator
+        // The item is saved into the WORKING package, which now differs
+        // from the .bpee on disk — the main window stays starred until
+        // File > Save Package writes the actual file
         if (global.titleManager) {
-            global.titleManager.setUnsavedChanges(false)
+            global.titleManager.setUnsavedChanges(true)
         }
 
         return { success: true }

@@ -200,6 +200,15 @@ function ItemEditor() {
         },
     })
 
+    // "*" in the window title while there are unsaved changes
+    useEffect(() => {
+        if (!item) return
+        const dirty =
+            Object.values(formData._modified || {}).some(Boolean) ||
+            !!stagedEditorItems
+        document.title = `${dirty ? "*" : ""}Edit ${item.name}`
+    }, [item, formData._modified, stagedEditorItems])
+
     useEffect(() => {
         // Initialize form data when item changes
         if (item) {
@@ -318,9 +327,6 @@ function ItemEditor() {
             }
 
             loadData()
-
-            // Clear unsaved changes indicator when loading a new item
-            window.package?.setUnsavedChanges?.(false)
         }
     }, [item])
 
@@ -354,7 +360,6 @@ function ItemEditor() {
                     other: true,
                 },
             }))
-            window.package?.setUnsavedChanges?.(true)
         }
     }
 
@@ -409,14 +414,6 @@ function ItemEditor() {
                 },
             }
 
-            // Check if any section has changes
-            const hasChanges = Object.values(newData._modified).some(
-                (modified) => modified,
-            )
-
-            // Update window title with unsaved changes indicator
-            window.package?.setUnsavedChanges?.(hasChanges)
-
             return newData
         })
     }
@@ -434,7 +431,6 @@ function ItemEditor() {
                 inputs: true,
             },
         }))
-        window.package?.setUnsavedChanges?.(true)
     }
 
     const updateOutputsData = (outputs) => {
@@ -449,7 +445,6 @@ function ItemEditor() {
                 outputs: true,
             },
         }))
-        window.package?.setUnsavedChanges?.(true)
     }
 
     const updateInstancesData = (instances) => {
@@ -464,7 +459,6 @@ function ItemEditor() {
                 instances: true,
             },
         }))
-        window.package?.setUnsavedChanges?.(true)
     }
 
     const updateVariablesData = (variables) => {
@@ -479,7 +473,6 @@ function ItemEditor() {
                 variables: true,
             },
         }))
-        window.package?.setUnsavedChanges?.(true)
     }
 
     const updateConditionsData = (blocks) => {
@@ -494,7 +487,6 @@ function ItemEditor() {
                 conditions: true,
             },
         }))
-        window.package?.setUnsavedChanges?.(true)
     }
 
     const importConditionsData = (blocks) => {
@@ -541,7 +533,6 @@ function ItemEditor() {
                 other: true,
             },
         }))
-        window.package?.setUnsavedChanges?.(true)
     }
 
     const handleSave = async () => {
@@ -896,9 +887,6 @@ function ItemEditor() {
 
                 // Clear staged editoritems from model generation
                 setStagedEditorItems(null)
-
-                // Clear unsaved changes indicator
-                window.package?.setUnsavedChanges?.(false)
 
                 // Trigger reload to get fresh data from backend
                 reloadItem(item.id)

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, protocol } = require("electron")
+const { app, BrowserWindow, ipcMain, protocol, dialog } = require("electron")
 const path = require("path")
 const { createMainMenu } = require("./menu.js")
 const fs = require("fs")
@@ -60,6 +60,36 @@ const createWindow = () => {
     // Initialize window title manager
     const titleManager = new WindowTitleManager(win)
     global.titleManager = titleManager
+
+    // Confirm quitting while the package has changes not yet written to
+    // its .bpee (the "*" in the title). Save writes the file and quits;
+    // a cancelled Save As aborts the quit.
+    win.on("close", (e) => {
+        if (!global.titleManager?.hasUnsavedChanges) return
+        const choice = dialog.showMessageBoxSync(win, {
+            type: "warning",
+            buttons: ["Cancel", "Quit Without Saving", "Save"],
+            defaultId: 2,
+            cancelId: 0,
+            title: "Unsaved Changes",
+            message: "Your package has unsaved changes.",
+            detail: "Save writes them to the .bpee file before quitting.",
+        })
+        if (choice === 0) {
+            e.preventDefault()
+        } else if (choice === 2) {
+            e.preventDefault()
+            const { saveCurrentPackage } = require("./menu.js")
+            saveCurrentPackage(win)
+                .then((saved) => {
+                    // Star is cleared now, so this close sails through
+                    if (saved) win.close()
+                })
+                .catch((err) =>
+                    dialog.showErrorBox("Save Failed", err.message),
+                )
+        }
+    })
 
     // Set main window reference for progress updates
     setMainWindow(win)

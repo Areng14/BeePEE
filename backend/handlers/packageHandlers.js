@@ -401,6 +401,9 @@ function register(ipcMain, mainWindow) {
 
             fs.writeFileSync(beePackagePath, JSON.stringify(beePackage, null, 2))
 
+            // Written to the working package, not the .bpee
+            global.titleManager?.setUnsavedChanges(true)
+
             return { success: true }
         } catch (error) {
             return { success: false, error: error.message }

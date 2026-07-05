@@ -322,6 +322,14 @@ function SignageDesigner({
     const layersRef = useRef(layers)
     layersRef.current = layers
     const undoStack = useRef([])
+
+    // "*" in the window title while the design has unsaved edits. The base
+    // title is owned by the page (it changes per loaded design), so only
+    // the prefix is toggled here.
+    useEffect(() => {
+        const base = document.title.replace(/^\*/, "")
+        document.title = (undoStack.current.length > 0 ? "*" : "") + base
+    }, [layers])
     const redoStack = useRef([])
     const lastPush = useRef({ tag: null, time: 0 })
 
