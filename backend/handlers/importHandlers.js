@@ -213,7 +213,7 @@ async function startImportFlow(mainWindow) {
             manifest: { success: true, sourceName, items, signages },
         }
 
-        // Everything's ready — now show the window
+        // Everything's ready - now show the window
         require("../items/itemEditor").createImportItemsWindow(mainWindow)
     } catch (error) {
         console.error("Failed to start import:", error)
@@ -547,7 +547,7 @@ function register(ipcMain, mainWindow) {
         },
     )
 
-    // Dialog dismissed — drop the staging dir
+    // Dialog dismissed - drop the staging dir
     ipcMain.handle("import-items-cancel", async () => {
         cleanupStaging()
         return { success: true }

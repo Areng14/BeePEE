@@ -14,9 +14,9 @@ const { BrowserWindow, app, Menu } = require("electron")
 
 // Native File/Edit menu for the signage designer window. Items forward an
 // action name to the window's renderer, which performs it (the designer's
-// state — layers, undo stack, etc. — lives there). Accelerators use
+// state - layers, undo stack, etc. - lives there). Accelerators use
 // `registerAccelerator: false` so the shortcut is DISPLAYED (right-aligned,
-// native) but NOT bound — the designer's own keydown handler keeps owning the
+// native) but NOT bound - the designer's own keydown handler keeps owning the
 // real shortcuts (with its input-field guard) and nothing double-fires.
 function buildSignageDesignerMenu(win) {
     const send = (action) => () => {
@@ -203,7 +203,7 @@ function sendSignageUpdateToEditor(signageId, updatedSignage) {
 }
 
 // Delivers a staged (uncommitted) designer save to the signage's editor
-// window — the editor previews it and its Save button performs the real
+// window - the editor previews it and its Save button performs the real
 // commit. Returns false when that editor isn't open.
 function sendStagedDesignToEditor(signageId, payload) {
     const editorWindow = openSignageEditors.get(signageId)
@@ -892,7 +892,7 @@ function createImportItemsWindow(mainWindow) {
         return
     }
 
-    // Match the main window's size. No parent relationship — closing a
+    // Match the main window's size. No parent relationship - closing a
     // parented child can minimize the whole app on Windows.
     let width = 900
     let height = 700

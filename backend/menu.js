@@ -273,7 +273,7 @@ function createMainMenu(mainWindow) {
                     label: "Restore Backup...",
                     click: async () => {
                         // Pre-export snapshots live in userData/backups
-                        // (newest 10 kept) — open the picker right there
+                        // (newest 10 kept) - open the picker right there
                         const backupsDir = path.join(
                             app.getPath("userData"),
                             "backups",
@@ -442,7 +442,7 @@ function createMainMenu(mainWindow) {
 
                             if (launchBeemod && !beemodPath) {
                                 console.warn(
-                                    "Launch BEEMod after export is on, but no BEEMod path is set — falling back to a save dialog.",
+                                    "Launch BEEMod after export is on, but no BEEMod path is set - falling back to a save dialog.",
                                 )
                             }
 
@@ -595,7 +595,7 @@ function createMainMenu(mainWindow) {
                             }
                         } catch (err) {
                             // The in-app export progress dialog already
-                            // reported this failure — a native error box on
+                            // reported this failure - a native error box on
                             // top of it is just noise
                             console.error("Export failed:", err.message)
                         }

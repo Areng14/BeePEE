@@ -186,7 +186,7 @@ function SettingsPage() {
                 const loadedSettings = {}
                 for (const key of settingsToLoad) {
                     const result = await window.package.getSetting(key)
-                    // Unset settings come back as null — keep the default
+                    // Unset settings come back as null - keep the default
                     // instead of letting null blank out the field
                     if (
                         result.success &&
@@ -307,7 +307,7 @@ function SettingsPage() {
         setIsDeleting(true)
         try {
             // On success the backend saves any open package, restarts the
-            // app into setup, and reopens the package afterwards — this
+            // app into setup, and reopens the package afterwards - this
             // window is about to go away, so just keep the spinner up
             const result = await window.package.deleteAllSettings()
             if (result && result.success === false) {

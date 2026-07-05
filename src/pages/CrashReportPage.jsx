@@ -30,7 +30,7 @@ export default function CrashReportPage() {
             setErrorDetails(data.errorDetails)
             setIsManual(data.isManual)
         })
-        // Check if the app needs an update — block reports on outdated versions
+        // Check if the app needs an update - block reports on outdated versions
         window.package.isUpdateAvailable?.().then((result) => {
             if (result?.updateAvailable) {
                 setUpdateInfo(result)
@@ -180,7 +180,7 @@ export default function CrashReportPage() {
                         }}
                     >
                         A newer version ({updateInfo.latestVersion}) is available.
-                        Please update BeePEE before submitting a report — your
+                        Please update BeePEE before submitting a report - your
                         issue may already be fixed.
                     </Alert>
                 )}

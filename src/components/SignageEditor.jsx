@@ -238,7 +238,7 @@ function SignageEditor() {
                 return
             }
 
-            // Commit a staged designer save (icon, materials, .bpsign) —
+            // Commit a staged designer save (icon, materials, .bpsign) -
             // done AFTER the form save so create-signage's per-style merge
             // isn't clobbered by save-signage rewriting Styles
             if (stagedDesign) {
@@ -384,7 +384,7 @@ function SignageEditor() {
                 </Box>
             </Box>
 
-            {/* Footer — mirrors the item editor: undo/redo, Save, Close, Delete */}
+            {/* Footer - mirrors the item editor: undo/redo, Save, Close, Delete */}
             <Box sx={{ p: 2, borderTop: 1, borderColor: "divider" }}>
                 <Stack direction="row" spacing={1}>
                     <Tooltip

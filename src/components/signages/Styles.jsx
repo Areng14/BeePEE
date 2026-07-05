@@ -63,7 +63,7 @@ export const styleDisplayName = (id) => {
 const catalogLabel = styleDisplayName
 
 // The designer composes on the CLEAN backplate, which also fits Clean
-// Original and Portal 1 — other styles use uploaded images.
+// Original and Portal 1 - other styles use uploaded images.
 const DESIGNER_STYLES = ["BEE2_CLEAN", "BEE2_CLEAN_ORIGINAL", "BEE2_PORTAL_1"]
 const designerSupports = (id) => DESIGNER_STYLES.includes(id)
 
@@ -98,7 +98,7 @@ function StyleTile({
     onRemove,
     onEditDesign,
 }) {
-    // Clean is BEE2's fallback anchor — always the default, not removable
+    // Clean is BEE2's fallback anchor - always the default, not removable
     const isDefault = styleId === "BEE2_CLEAN"
     const theme = useTheme()
     const gold = theme.palette.primary.main
@@ -178,13 +178,13 @@ function StyleTile({
                 <MoreVert sx={{ fontSize: 16 }} />
             </IconButton>
 
-            {/* icon area — click = upload */}
+            {/* icon area - click = upload */}
             <Tooltip
                 title={
                     stagedIcon
-                        ? "New design pending — press Save to apply"
+                        ? "New design pending - press Save to apply"
                         : isInherit
-                          ? `Uses ${cfg}'s icon — click to give it its own`
+                          ? `Uses ${cfg}'s icon - click to give it its own`
                           : shown
                             ? "Click to change (or drop a PNG)"
                             : "Click to set an image (or drop a PNG)"
@@ -304,7 +304,7 @@ function StyleTile({
                         <ListItemText>Edit in Designer</ListItemText>
                     </MenuItem>
                 )}
-                {/* the default (Clean) must keep its own icon — it's what
+                {/* the default (Clean) must keep its own icon - it's what
                     everything else falls back to */}
                 {!isDefault && (
                     <MenuItem
@@ -365,7 +365,7 @@ function StyleTile({
                 ))}
             </Menu>
 
-            {/* Upload vs Designer — same picker as the Add Signage flow */}
+            {/* Upload vs Designer - same picker as the Add Signage flow */}
             <Dialog
                 open={choiceOpen}
                 onClose={() => setChoiceOpen(false)}
@@ -508,14 +508,14 @@ function CustomStyleDialog({ open, usedStyleIds, onAdd, onClose }) {
 }
 
 // Icons tab: a grid covering every BEE2 style (plus any custom ones on the
-// signage). Empty tiles are set with one click or a PNG drop — no add-dialog
+// signage). Empty tiles are set with one click or a PNG drop - no add-dialog
 // dance. Designer work lives in the separate Designs tab.
 function SignageStyles({ formData, onUpdate, onEditDesign, stagedDesign }) {
     const styles = formData.styles || {}
     const [customDialogOpen, setCustomDialogOpen] = useState(false)
 
     // Repair IDs mangled by the old add dialog, where picking
-    // "Portal 1 (BEE2_PORTAL_1)" saved as PORTAL_1_BEE2_PORTAL_1 — an ID
+    // "Portal 1 (BEE2_PORTAL_1)" saved as PORTAL_1_BEE2_PORTAL_1 - an ID
     // BEE2 would never match. Rename them to the embedded catalog ID.
     useEffect(() => {
         let changed = false
@@ -585,7 +585,7 @@ function SignageStyles({ formData, onUpdate, onEditDesign, stagedDesign }) {
         onUpdate("styles", rest)
     }
 
-    // Only styles that exist on the signage (default: just Clean) —
+    // Only styles that exist on the signage (default: just Clean) -
     // catalog order first, then custom entries. Others are added explicitly
     // through the + tile.
     const tileIds = [

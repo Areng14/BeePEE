@@ -27,7 +27,7 @@ function ImportTile({ entry, checked, onToggle }) {
         <Tooltip
             title={
                 entry.exists
-                    ? `${entry.name} — already in this package`
+                    ? `${entry.name} - already in this package`
                     : entry.name
             }
             placement="top"
@@ -114,7 +114,7 @@ function ImportItemsPage() {
         document.title = "BeePEE - Import from Package"
 
         // The backend already picked + extracted the package before opening
-        // this window — just fetch the prepared manifest (idempotent, so
+        // this window - just fetch the prepared manifest (idempotent, so
         // StrictMode's double mount is harmless)
         const fetchManifest = async () => {
             try {
@@ -236,7 +236,7 @@ function ImportItemsPage() {
                 overflow: "hidden",
             }}>
             <Box sx={{ display: "flex", flex: 1, overflow: "hidden" }}>
-                {/* Sidebar — same look as the main window */}
+                {/* Sidebar - same look as the main window */}
                 <Box
                     sx={{
                         width: 56,

@@ -62,7 +62,7 @@ export async function loadSignagePrefs() {
                 prefs[key] = all[key]
             }
         }
-        // Not a signage pref (never saved by the dialog) — carried along so
+        // Not a signage pref (never saved by the dialog) - carried along so
         // the form can gate developer-only fields
         prefs.devMode = !!all.devMode
         return prefs
@@ -141,7 +141,7 @@ export function SignagePreferencesForm({ values, onChange }) {
     const fieldSx = { "& .MuiInputBase-root": { height: 66 } }
 
     // The backend resolves (and creates) a default folder under the app's
-    // user-data dir when none is set — show that path instead of a blank.
+    // user-data dir when none is set - show that path instead of a blank.
     const [defaultSvgFolder, setDefaultSvgFolder] = useState("")
     useEffect(() => {
         window.package

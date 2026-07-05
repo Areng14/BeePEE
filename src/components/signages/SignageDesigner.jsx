@@ -51,7 +51,7 @@ import {
 
 // On the interactive canvas, transparent (eraser) parts render as a
 // checkerboard ghost while painted parts keep their color (true erasing
-// needs the whole stack composited — see the preview thumbs and the
+// needs the whole stack composited - see the preview thumbs and the
 // exported PNG for the real result).
 const eraserGhostSvg = (l, uid) => {
     const pat = `url(#${uid}-ck)`
@@ -73,7 +73,7 @@ const eraserGhostSvg = (l, uid) => {
     )
 }
 
-// Palette sections — extensible: add a new entry to show another category.
+// Palette sections - extensible: add a new entry to show another category.
 const PALETTE_SECTIONS = [
     { id: "glyphs", label: "Glyphs", icon: "star", ids: Object.keys(GLYPHS) },
     { id: "prims", label: "Primitives", icon: "square", ids: Object.keys(PRIMS) },
@@ -86,14 +86,14 @@ const MAX_LAYER = 2048 // layers may extend well past the 512 canvas
 // A per-module-load random token keeps new-layer ids unique even if this file
 // is hot-reloaded (HMR) while React preserves layers created before the reload.
 // Without it, a reset counter re-mints an id an existing layer already holds,
-// and two layers sharing an id become "linked" — selected and moved together,
+// and two layers sharing an id become "linked" - selected and moved together,
 // impossible to separate.
 const _sess = Math.random().toString(36).slice(2, 8)
 let _lid = 0
 const nextId = () => `L${_sess}_${++_lid}`
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
-// Black or white, whichever contrasts with the given fill color — so a
+// Black or white, whichever contrasts with the given fill color - so a
 // freshly enabled outline is never invisible (e.g. black-on-black)
 const contrastFor = (hex) => {
     if (!hex || hex[0] !== "#" || hex.length < 7) return "#ffffff"
@@ -133,8 +133,8 @@ function AlignIcon({ type, gold, bar }) {
 // Numeric field that lets you type a full value before it's clamped. The
 // parent clamps/snaps in onChange, so committing per keystroke makes a digit
 // like "1" jump to the min (24) before you can finish typing "1024". Instead
-// we hold an uncommitted draft string while focused and only commit — firing
-// onChange — on blur or Enter. Escape cancels back to the current value.
+// we hold an uncommitted draft string while focused and only commit - firing
+// onChange - on blur or Enter. Escape cancels back to the current value.
 function NumField({ label, value, min, max, onChange }) {
     const [draft, setDraft] = useState(null)
     const commit = () => {
@@ -276,7 +276,7 @@ function SignageDesigner({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
-    // Preferences are edited in the separate settings window — re-read them
+    // Preferences are edited in the separate settings window - re-read them
     // when this window regains focus so saves there apply here. Session
     // defaults (snap, grid) are deliberately left alone mid-session.
     useEffect(() => {
@@ -388,7 +388,7 @@ function SignageDesigner({
 
     const cell = gridN > 0 ? CANVAS_SIZE / gridN : 0
     const selSet = new Set(selIds)
-    // Single-selection layer — the full transform panel needs exactly one
+    // Single-selection layer - the full transform panel needs exactly one
     const selLayer =
         selIds.length === 1
             ? layers.find((l) => l.id === selIds[0]) || null
@@ -533,7 +533,7 @@ function SignageDesigner({
         }
     }
 
-    // Bounding box of the multi-selection (canvas units) — carries the
+    // Bounding box of the multi-selection (canvas units) - carries the
     // group transform handles
     const groupBox =
         selIds.length > 1
@@ -600,7 +600,7 @@ function SignageDesigner({
                 ? selIds.filter((id) => id !== l.id)
                 : [...selIds, l.id]
             setSelIds(ids)
-            if (!ids.includes(l.id)) return // toggled off — no drag
+            if (!ids.includes(l.id)) return // toggled off - no drag
         } else if (e.shiftKey) {
             ids = selSet.has(l.id) ? selIds : [...selIds, l.id]
             setSelIds(ids)
@@ -664,7 +664,7 @@ function SignageDesigner({
             if (!o) return
             if (e.buttons === 0) {
                 // The mouse was released outside the window (mouseup never
-                // fired) — abort the gesture instead of leaving it armed,
+                // fired) - abort the gesture instead of leaving it armed,
                 // otherwise the next unrelated click finalizes a giant
                 // stale marquee and multi-selects everything under it
                 op.current = null
@@ -805,7 +805,7 @@ function SignageDesigner({
                     if (o.type === "resize") {
                         const { sx, sy, cos, sin } = o
                         // Pointer relative to the fixed anchor, rotated back
-                        // into the box's local (unrotated) frame — R(-θ).
+                        // into the box's local (unrotated) frame - R(-θ).
                         const rx = p.x - o.ax
                         const ry = p.y - o.ay
                         const lx = rx * cos + ry * sin
@@ -1195,7 +1195,7 @@ function SignageDesigner({
             }}>
             {/* Main Content Area */}
             <Box sx={{ flex: 1, display: "flex", minHeight: 0 }}>
-                {/* Palette — vertical scroll with collapsible sections */}
+                {/* Palette - vertical scroll with collapsible sections */}
                 {paletteOpen ? (
                     <Box
                         sx={{
@@ -1304,7 +1304,7 @@ function SignageDesigner({
                                             </Typography>
                                             {section.id === "custom" && (
                                                 <Tooltip title="Import an SVG file as a glyph">
-                                                    {/* span, not button — the header itself is a <button> */}
+                                                    {/* span, not button - the header itself is a <button> */}
                                                     <Box
                                                         component="span"
                                                         onClick={(e) => {
@@ -1423,7 +1423,7 @@ function SignageDesigner({
                     />
                 )}
 
-                {/* Canvas column — bgProps: drag-marquee / click-deselect /
+                {/* Canvas column - bgProps: drag-marquee / click-deselect /
                     drop-to-center on its backdrop */}
                 <Box
                     {...bgProps}
@@ -1479,7 +1479,7 @@ function SignageDesigner({
                             {alignBtn("bottom", "Align bottom")}
                         </Box>
                         <Box sx={{ flex: 1 }} />
-                        {/* Zoom controls — Ctrl+scroll on the canvas also zooms */}
+                        {/* Zoom controls - Ctrl+scroll on the canvas also zooms */}
                         <Box
                             sx={{
                                 display: "flex",
@@ -1549,7 +1549,7 @@ function SignageDesigner({
                                 </Box>
                             </Tooltip>
                         </Box>
-                        {/* Snap split-button — main toggles, arrow opens density */}
+                        {/* Snap split-button - main toggles, arrow opens density */}
                         <Box sx={{ position: "relative", display: "flex" }}>
                             <Button
                                 size="small"
@@ -1637,7 +1637,7 @@ function SignageDesigner({
                         </Box>
                     </Box>
 
-                    {/* Zoom viewport — scrolls when the zoomed canvas outgrows
+                    {/* Zoom viewport - scrolls when the zoomed canvas outgrows
                         it; margin:auto centers a smaller canvas. Ctrl+scroll
                         zooms (native listener on scrollWrapRef). */}
                     <Box
@@ -1910,7 +1910,7 @@ function SignageDesigner({
                             })()}
                     </Box>
 
-                    {/* Marquee — drawn at viewport level (not clipped by the
+                    {/* Marquee - drawn at viewport level (not clipped by the
                         canvas) so it stays visible when dragging over the bg,
                         and it scrolls with the zoomed canvas. The visual rect
                         is clamped to the existing scroll extents: an absolute
@@ -2062,7 +2062,7 @@ function SignageDesigner({
                                 const outlineOn =
                                     mode === "outline" || mode === "both"
                                 const setStyle = (fill, outline) => {
-                                    // a layer must render something — turning
+                                    // a layer must render something - turning
                                     // the last one off flips to the other
                                     if (!fill && !outline) {
                                         fill = !fillOn
@@ -2077,7 +2077,7 @@ function SignageDesigner({
                                                   : "fill"
                                         const next = { ...l, styleMode }
                                         // Outline over a same-colored fill is
-                                        // invisible — auto-pick a contrasting
+                                        // invisible - auto-pick a contrasting
                                         // color unless the user set one
                                         if (styleMode === "both") {
                                             const oc = l.outlineColor
@@ -2623,7 +2623,7 @@ function SignageDesigner({
                         <Typography variant="caption" color="text.disabled" sx={{ lineHeight: 1.6 }}>
                             No layer selected. Drag a glyph from the palette,
                             then use the handles to move, resize and rotate
-                            it. Drag on empty canvas to select multiple —
+                            it. Drag on empty canvas to select multiple -
                             Ctrl-click toggles, Shift-click adds.
                         </Typography>
                     )}

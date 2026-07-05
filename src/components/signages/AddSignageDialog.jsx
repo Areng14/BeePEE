@@ -334,7 +334,7 @@ export function AddSignageFlow({ onClose, onCreated }) {
     )
 }
 
-// Dialog wrapper — used by the design system previews and anywhere the
+// Dialog wrapper - used by the design system previews and anywhere the
 // flow should appear as an in-window modal rather than its own window.
 function AddSignageDialog({ open, onClose, onCreated }) {
     // Remount the flow (resetting its state) each time the dialog opens

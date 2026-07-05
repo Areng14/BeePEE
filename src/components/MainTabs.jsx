@@ -144,7 +144,7 @@ function MainTabs() {
                 </Alert>
             </Snackbar>
 
-            {/* Empty-package notice — floating toast, not a banner */}
+            {/* Empty-package notice - floating toast, not a banner */}
             <Snackbar
                 open={packageEmpty}
                 autoHideDuration={6000}

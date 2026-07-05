@@ -165,7 +165,7 @@ function register(ipcMain, mainWindow) {
             if (!editId) throw new Error("stage-signage-design needs editId")
 
             if (!sendStagedDesignToEditor(editId, payload)) {
-                // Editor window is closed — open it, then deliver once it's up
+                // Editor window is closed - open it, then deliver once it's up
                 const sig = packages
                     .flatMap((p) => p.signages || [])
                     .find((s) => s.id === editId)
@@ -179,7 +179,7 @@ function register(ipcMain, mainWindow) {
                 setTimeout(attempt, 400)
             }
 
-            // The designer's work is staged — close its window
+            // The designer's work is staged - close its window
             const designerWindow = getSignageDesignerWindow()
             if (designerWindow && !designerWindow.isDestroyed()) {
                 designerWindow.close()
@@ -274,7 +274,7 @@ function register(ipcMain, mainWindow) {
                 : { ID: signageId, Name: name.trim() }
             const resolvedStyles = {}
 
-            // Optional starting icon — stored on the Clean style, written
+            // Optional starting icon - stored on the Clean style, written
             // into resources/BEE2 the same way save-signage stages icons.
             // Either a picked file (iconPath) or a designer-rasterized PNG
             // (iconData, a data URL).
@@ -456,7 +456,7 @@ function register(ipcMain, mainWindow) {
 
             // Delete the assets the entry's Styles actually declare (icons
             // live under resources/BEE2/, overlays under resources/materials/
-            // as .vmt + .vtf) — imported packages keep these at arbitrary
+            // as .vmt + .vtf) - imported packages keep these at arbitrary
             // nested paths, not our id-named convention. Assets still
             // referenced by another signage (shared art, Secondary pairs)
             // are kept.

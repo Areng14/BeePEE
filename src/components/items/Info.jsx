@@ -144,7 +144,7 @@ function Info({ item, formData, onUpdate, hideWarnings = false, showId = false }
                         label="ID"
                         value={item?.id || ""}
                         disabled
-                        helperText="Fixed identifier — cannot be changed"
+                        helperText="Fixed identifier - cannot be changed"
                         fullWidth
                         variant="outlined"
                         InputProps={{

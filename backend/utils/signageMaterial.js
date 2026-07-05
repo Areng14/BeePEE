@@ -1,7 +1,7 @@
 // Generates the in-game Source material for a designer-made signage: one VTF
 // and a VMT in resources/materials/signage/, in the exact format stock BEE2
 // signage uses. The texture is opaque (white backplate + artwork); its ALPHA
-// channel is the self-illum mask — Source's $selfillum without an explicit
+// channel is the self-illum mask - Source's $selfillum without an explicit
 // $selfillummask glows wherever the base texture's alpha is bright, which is
 // how the stock signs get their lit white plate with dark artwork.
 const fs = require("fs")
@@ -53,9 +53,9 @@ function buildSignageVMT(signageId, hasGlow, opts = {}) {
  * @param {string} args.baseData    data-URL PNG: the sign image (opaque)
  * @param {string} [args.maskData]  data-URL PNG: grayscale glow mask, joined
  *                                  in as the texture's alpha channel (sent
- *                                  separately because canvas premultiplies —
+ *                                  separately because canvas premultiplies -
  *                                  alpha 0 would black out the RGB)
- * @param {object} [args.options]   { glowIntensity, glow } — glow: false
+ * @param {object} [args.options]   { glowIntensity, glow } - glow: false
  *                                  omits $selfillum from the VMT
  * @returns {Promise<{vtf:string, vmt:string, hasGlow:boolean}>}
  */
@@ -75,7 +75,7 @@ async function generateSignageMaterial({
     const baseTmp = path.join(tmpDir, `${id}_base.png`)
     writeDataUrlPng(baseData, baseTmp)
 
-    // Join the grayscale mask into the alpha channel (straight alpha —
+    // Join the grayscale mask into the alpha channel (straight alpha -
     // sharp keeps the RGB intact where the mask is 0)
     if (maskData) {
         const maskTmp = path.join(tmpDir, `${id}_mask.png`)
@@ -88,7 +88,7 @@ async function generateSignageMaterial({
             .raw()
             .toBuffer()
         // Two separate pipelines: sharp applies ops in ITS order, not call
-        // order — removeAlpha + joinChannel in one pipeline strips the
+        // order - removeAlpha + joinChannel in one pipeline strips the
         // joined mask again
         const rgb = await sharp(baseTmp).removeAlpha().png().toBuffer()
         const combined = await sharp(rgb)

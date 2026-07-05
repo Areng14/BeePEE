@@ -16,7 +16,7 @@ function applySettingSideEffects(key, value) {
         if (key === "verboseLogging") {
             require("../utils/logger").logger.setVerbose(value)
         } else if (key === "devMode") {
-            // Dev menu is part of the menu template — rebuild it
+            // Dev menu is part of the menu template - rebuild it
             require("../menu").rebuildMenu()
         }
     } catch (err) {
@@ -339,7 +339,7 @@ function register(ipcMain, mainWindow) {
 
             const result = deleteAllSettings()
             if (result && reopenPath) {
-                // Recreate settings.json with just the reopen pointer —
+                // Recreate settings.json with just the reopen pointer -
                 // setupComplete stays absent, so setup still shows
                 setSetting("pendingReopenPackage", reopenPath)
             }

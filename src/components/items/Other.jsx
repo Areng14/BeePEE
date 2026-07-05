@@ -292,7 +292,7 @@ function Other({ item, formData, onUpdate, onUpdateOther, onModelGenerationStart
 
         const segments = segmentsResult.segments
         const firstSegment = segments[0]
-        const title = `${getInstanceDisplayName() || "Instance"} — ${item?.name || "Model"}`
+        const title = `${getInstanceDisplayName() || "Instance"} - ${item?.name || "Model"}`
 
         try {
             // Pass first segment's path and all segments for dropdown switching

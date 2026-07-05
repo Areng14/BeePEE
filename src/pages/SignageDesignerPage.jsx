@@ -28,7 +28,7 @@ import { styleDisplayName } from "../components/signages/Styles"
 // Opens blank for a new signage, or loaded with an existing design when
 // launched via "Edit in Designer" (load-signage-design event). The name is
 // asked only on save; Create/Save rasterizes to a 512x512 PNG and creates
-// or updates the signage — on success the backend closes this window.
+// or updates the signage - on success the backend closes this window.
 function SignageDesignerPage() {
     const [pendingLayers, setPendingLayers] = useState(null)
     const [name, setName] = useState("")
@@ -72,7 +72,7 @@ function SignageDesignerPage() {
 
     const handleSave = async ({ layers }) => {
         setError(null)
-        // Editing an existing signage — the name is already known, so save
+        // Editing an existing signage - the name is already known, so save
         // straight away instead of redundantly re-prompting for it.
         if (editId && name.trim()) {
             handleCreate(layers)
@@ -125,7 +125,7 @@ function SignageDesignerPage() {
                 editId: editId || undefined,
                 styleId: (editId && editStyle) || undefined,
             }
-            // Edits are STAGED into the signage editor window — its Save
+            // Edits are STAGED into the signage editor window - its Save
             // button performs the real commit. Only brand-new signage is
             // created directly (there's no editor to stage into yet).
             const result = editId
@@ -161,7 +161,7 @@ function SignageDesignerPage() {
                 isSaving={isCreating || !!pendingLayers}
             />
 
-            {/* Name prompt — asked when the design is saved */}
+            {/* Name prompt - asked when the design is saved */}
             <Dialog
                 open={!!pendingLayers}
                 onClose={() => !isCreating && setPendingLayers(null)}

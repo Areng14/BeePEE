@@ -4,7 +4,7 @@
 import { useId } from "react"
 import signBg from "../../assets/signage/sign_bg.png"
 
-// The standard signage backplate — the designer canvas backdrop, and baked
+// The standard signage backplate - the designer canvas backdrop, and baked
 // into every exported signage PNG.
 export const SIGN_BG = signBg
 
@@ -70,7 +70,7 @@ export const GLYPHS = {
     },
 }
 
-// Basic geometric primitives — full-bleed on the viewBox (edges touch the
+// Basic geometric primitives - full-bleed on the viewBox (edges touch the
 // layer bounds), so a grid-snapped layer puts the shape exactly on the grid.
 export const PRIMS = {
     square: { label: "Square", paths: ["M0 0h24v24H0z"] },
@@ -114,7 +114,7 @@ const makeShapeEntry = (label, paths, vbString, fillRule) => {
 }
 
 // A glyph's paths array holds plain "d" strings (filled subpaths) or
-// { d, sw } objects (stroke-only subpaths from imported SVGs — sw is the
+// { d, sw } objects (stroke-only subpaths from imported SVGs - sw is the
 // stroke width in the glyph's own viewBox units). Normalize for consumers.
 export const pathEntries = (g) =>
     g.paths.map((p) => (typeof p === "string" ? { d: p, sw: 0 } : p))
@@ -195,7 +195,7 @@ export function rehydrateDesign(design) {
 // and <ellipse> become path data. Fill-only elements become filled subpaths;
 // stroke-only elements (fill="none" + stroke, e.g. a drawn smile line)
 // become { d, sw } stroke subpaths so they aren't wrongly filled solid.
-// Per-element COLORS are still ignored — glyphs are single-color by design.
+// Per-element COLORS are still ignored - glyphs are single-color by design.
 //
 // opts.importHeuristics (used for user imports, not the built-in library):
 // when the SVG has several filled elements, use the even-odd fill rule so
@@ -231,7 +231,7 @@ export function parseSvgToGlyph(svgText, opts = {}) {
             paths.push(d)
             fillCount++
         }
-        // fill:none without a stroke draws nothing — skip it
+        // fill:none without a stroke draws nothing - skip it
     }
     for (const p of svg.querySelectorAll("path")) {
         const d = p.getAttribute("d")
@@ -280,7 +280,7 @@ export function parseSvgToGlyph(svgText, opts = {}) {
 
     // Imports: shrink the viewBox to the drawn content's measured bounds.
     // Documents often have big margins around the art (e.g. a 680×340 page
-    // with a centered round face) — keeping the document box would stretch
+    // with a centered round face) - keeping the document box would stretch
     // the glyph to the wrong shape when it fills a layer.
     if (opts.importHeuristics && typeof document !== "undefined") {
         try {
@@ -299,7 +299,7 @@ export function parseSvgToGlyph(svgText, opts = {}) {
             const bb = meas.getBBox()
             document.body.removeChild(meas)
             if (bb.width > 0 && bb.height > 0) {
-                // getBBox ignores stroke extents — pad by the widest half-
+                // getBBox ignores stroke extents - pad by the widest half-
                 // stroke, plus a hair of breathing room
                 const pad =
                     maxSw / 2 + Math.max(bb.width, bb.height) * 0.02
@@ -310,7 +310,7 @@ export function parseSvgToGlyph(svgText, opts = {}) {
         }
     }
     // Exported SVGs often carve holes with the evenodd fill rule (attribute
-    // or CSS class) — losing it would fill the holes solid
+    // or CSS class) - losing it would fill the holes solid
     const evenodd =
         /evenodd/i.test(svgText) || (!!opts.importHeuristics && fillCount > 1)
     return { paths, vb, evenodd }
@@ -362,7 +362,7 @@ for (const [file, text] of Object.entries(_signFiles)) {
 }
 SIGN_SECTIONS.sort((a, b) => a.label.localeCompare(b.label))
 
-// Hand-picked section header icons (sign ids) and display sizes —
+// Hand-picked section header icons (sign ids) and display sizes -
 // sign SVGs have internal margins, so some render a bit larger
 const SECTION_META = {
     "signs-elements": { icon: "sign_elements_Cube", iconSize: 16 },
@@ -402,7 +402,7 @@ export function ShapeSvg({ id, color, w, h }) {
                 const fills = entries.filter((p) => !p.sw)
                 const strokes = entries.filter((p) => p.sw > 0)
                 // Single-color glyph: strokes lying on a fill engrave it
-                // (see layerInnerSvg) — mirror that in the thumbnail
+                // (see layerInnerSvg) - mirror that in the thumbnail
                 const engrave = strokes.length > 0 && fills.length > 0
                 const maskAttr = engrave ? { mask: `url(#${uid}-en)` } : {}
                 // evenodd only carves holes within a single path element
@@ -481,7 +481,7 @@ export const CANVAS_SIZE = 512
 
 // The special color "transparent" makes a part an eraser: it punches that
 // part's shape out of every layer below it, revealing the plate. Fill and
-// outline are independent — e.g. a painted fill can carry a transparent
+// outline are independent - e.g. a painted fill can carry a transparent
 // outer outline that erases a band around the shape without touching the
 // fill itself.
 export const isEraser = (l) => l.color === "transparent"
@@ -527,7 +527,7 @@ export function layerInnerSvg(l, uid, opts = {}) {
         ? ' stroke-linejoin="round" stroke-linecap="round"'
         : ' stroke-linejoin="miter" stroke-miterlimit="10"'
 
-    // Custom SVGs have their own coordinate space — scale strokes to match
+    // Custom SVGs have their own coordinate space - scale strokes to match
     const sc = g.strokeScale || 1
     const bx = g.vbX ?? 0
     const by = g.vbY ?? 0
@@ -538,7 +538,7 @@ export function layerInnerSvg(l, uid, opts = {}) {
     const entries = pathEntries(g)
     // Fill subpaths and stroke subpaths ({d, sw} imports) render differently.
     // With the evenodd rule, ALL fill subpaths must merge into ONE compound
-    // path — the rule only carves holes within a single path element.
+    // path - the rule only carves holes within a single path element.
     const fillDs = entries.filter((e) => !e.sw).map((e) => e.d)
     const strokeEs = entries.filter((e) => e.sw > 0)
     const fillPaths = (color, extra = "", perPath = "") =>
@@ -568,7 +568,7 @@ export function layerInnerSvg(l, uid, opts = {}) {
             ? ` stroke="${c}" stroke-width="${3 * sc}"${join}`
             : ""
         // A glyph is single-color, so stroke subpaths lying ON a fill would
-        // be invisible — engrave them instead (cut the stroke band out of
+        // be invisible - engrave them instead (cut the stroke band out of
         // the fill), like line art on a stencil. Not inside eraser masks
         // (nested masks are unreliable in Chromium; there the solid shape
         // is the right cut anyway).
@@ -601,7 +601,7 @@ export function layerInnerSvg(l, uid, opts = {}) {
                 // cut elements themselves, so an exact inner band can't be
                 // expressed here. This path is only reached when the fill is
                 // ALSO being cut (see layersSvgMarkup, which handles the
-                // outline-only inner cut with a repaint pass) — and the fill
+                // outline-only inner cut with a repaint pass) - and the fill
                 // cut already covers the entire inner band, so emit nothing.
                 return ""
             }
@@ -613,7 +613,7 @@ export function layerInnerSvg(l, uid, opts = {}) {
                 strokes(w * 2, ` mask="url(#${uid}-in)"`)
             )
         }
-        // outer — mask the shape's interior out of a double-width stroke.
+        // outer - mask the shape's interior out of a double-width stroke.
         // Explicit region: the default (-10%..110% of the shape's bbox)
         // clips thick strokes into a square
         const cutout = solid("#000")
@@ -625,7 +625,7 @@ export function layerInnerSvg(l, uid, opts = {}) {
 
     if (mode === "fill") return fillMarkup()
     if (mode === "outline") return outlineMarkup(c)
-    // both — fill first, then the outline (its own color) on top
+    // both - fill first, then the outline (its own color) on top
     return fillMarkup() + outlineMarkup(l.outlineColor || "#000000")
 }
 
@@ -676,7 +676,7 @@ export function layersSvgMarkup(layers, uidPrefix) {
         }
         if (cutSpec) {
             const before = acc
-            // Black hides in a mask — the cut erases the stack so far
+            // Black hides in a mask - the cut erases the stack so far
             const cut = wrap(
                 l,
                 layerInnerSvg(cutSpec, `${uid}e`, { maskContext: true }),
@@ -688,7 +688,7 @@ export function layersSvgMarkup(layers, uidPrefix) {
             if (innerOnlyCut && before) {
                 // Restore the outer half: repaint the pre-cut stack masked to
                 // the band-outside-the-shape region (white band strokes with
-                // the shape fill blacked out on top — a mask form Chromium
+                // the shape fill blacked out on top - a mask form Chromium
                 // honors at the top level).
                 const g2 = SHAPES[l.glyph]
                 const sc = g2.strokeScale || 1
@@ -771,7 +771,7 @@ export function LayersThumb({ layers, size }) {
 }
 
 // Rasterize a layer stack to a PNG data URL at the locked 512x512 output
-// size — the signage backplate first, then the layers (WYSIWYG with the
+// size - the signage backplate first, then the layers (WYSIWYG with the
 // designer canvas).
 export function rasterizeLayers(layers, size = CANVAS_SIZE) {
     const inner = layersSvgMarkup(layers, "r")
@@ -804,17 +804,17 @@ export function rasterizeLayers(layers, size = CANVAS_SIZE) {
 
 // Renders the in-game material texture for a signage design, in the exact
 // format stock Portal 2 signage uses: a fully OPAQUE image (the standard
-// white backplate with the artwork composited on top — same WYSIWYG result
+// white backplate with the artwork composited on top - same WYSIWYG result
 // as the editor icon), where the ALPHA CHANNEL is the self-illum mask. Stock
 // signage VMTs set $selfillum with no $selfillummask, which tells Source to
-// glow wherever the base texture's alpha is bright — so the white plate
+// glow wherever the base texture's alpha is bright - so the white plate
 // lights up and the dark artwork stays unlit, like the built-in signs.
 //
 // opts.glowMode picks the alpha content:
-//   "brightness" (default) — alpha = pixel luminance: white plate glows,
+//   "brightness" (default) - alpha = pixel luminance: white plate glows,
 //       dark art doesn't (matches stock signage exactly)
-//   "shape" — alpha = 255 everywhere: the whole sign glows uniformly
-//   "off"   — hasGlow false; the VMT omits $selfillum entirely
+//   "shape" - alpha = 255 everywhere: the whole sign glows uniformly
+//   "off"   - hasGlow false; the VMT omits $selfillum entirely
 //
 // Returns { base, hasGlow }: base is the data-URL PNG, hasGlow tells the
 // backend whether to write $selfillum.
@@ -856,7 +856,7 @@ export function rasterizeSignageTextures(layers, size = CANVAS_SIZE, opts = {}) 
         // Build the glow mask as a SEPARATE grayscale image (the backend
         // joins it into the texture's alpha channel). It can't be baked in
         // here: canvas stores premultiplied pixels, so alpha 0 destroys the
-        // RGB underneath — the frame would export as solid black.
+        // RGB underneath - the frame would export as solid black.
         //
         // Mask values match the canonical BEE2 signage textures: the bare
         // plate glows at a flat ~37.5% (96) and artwork glows by its own
@@ -866,7 +866,7 @@ export function rasterizeSignageTextures(layers, size = CANVAS_SIZE, opts = {}) 
         const FRAME = 0
         const ART_FLOOR = 2.25
         // Width of the non-glowing frame ring, in 128-scale pixels
-        // (sign_bg's metal border) — smaller = thinner dark edge
+        // (sign_bg's metal border) - smaller = thinner dark edge
         const FRAME_WIDTH = 3
         const inset = Math.max(1, Math.round(size * (FRAME_WIDTH / 128)))
         const px = ctx.getImageData(0, 0, size, size)

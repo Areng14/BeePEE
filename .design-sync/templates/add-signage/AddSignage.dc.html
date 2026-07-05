@@ -7,7 +7,7 @@
 </head>
 <body>
 <x-dc>
-<!-- @template name="Add Signage" description="BeePEE new-signage dialog — name field with live ID preview, optional Clean-style picture, Create disabled until named" -->
+<!-- @template name="Add Signage" description="BeePEE new-signage dialog - name field with live ID preview, optional Clean-style picture, Create disabled until named" -->
 <helmet>
   <style>
     *{-webkit-font-smoothing:antialiased}
@@ -21,7 +21,7 @@
     <div style="padding:20px">
 
       <sc-if value="{{ created }}" hint-placeholder-val="{{ false }}">
-        <div style="background:rgba(29,179,79,0.15);border:1px solid #1db34f;color:#5fe08a;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px">Signage created — opening editor…</div>
+        <div style="background:rgba(29,179,79,0.15);border:1px solid #1db34f;color:#5fe08a;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px">Signage created - opening editor…</div>
       </sc-if>
 
       <label style="display:block;color:rgba(255,255,255,0.6);font-size:12px;margin-bottom:6px">Name</label>
@@ -30,7 +30,7 @@
         <div style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:6px;font-family:ui-monospace,Consolas,monospace">{{ idPreview }}</div>
       </sc-if>
       <sc-if value="{{ noName }}" hint-placeholder-val="{{ false }}">
-        <div style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:6px">Display name — the ID is generated automatically</div>
+        <div style="color:rgba(255,255,255,0.4);font-size:12px;margin-top:6px">Display name - the ID is generated automatically</div>
       </sc-if>
 
       <label style="display:block;color:rgba(255,255,255,0.6);font-size:12px;margin:18px 0 6px">Signage picture (Clean style, optional)</label>
