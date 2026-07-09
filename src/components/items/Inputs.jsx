@@ -105,17 +105,15 @@ function InputOutputConfigDialog({
     const [secDisableMaxFires, setSecDisableMaxFires] = useState("-1")
 
     // Output states
+    // Note: outputs have no delay/max-fires - the editoritems output format
+    // is just "instance:entity;output", those settings only exist on inputs
     const [activateEntity, setActivateEntity] = useState("")
     const [activateOutput, setActivateOutput] = useState("")
     const [activateParam, setActivateParam] = useState("")
-    const [activateDelay, setActivateDelay] = useState("0")
-    const [activateMaxFires, setActivateMaxFires] = useState("-1")
 
     const [deactivateEntity, setDeactivateEntity] = useState("")
     const [deactivateOutput, setDeactivateOutput] = useState("")
     const [deactivateParam, setDeactivateParam] = useState("")
-    const [deactivateDelay, setDeactivateDelay] = useState("0")
-    const [deactivateMaxFires, setDeactivateMaxFires] = useState("-1")
 
     useEffect(() => {
         if (open && itemId) {
@@ -357,13 +355,7 @@ function InputOutputConfigDialog({
         return `${entity},${inputOutput},${param},${delay},${maxFires}`
     }
 
-    const buildOutputCommand = (
-        entity,
-        outputName,
-        param = "",
-        delay = "0",
-        maxFires = "-1",
-    ) => {
+    const buildOutputCommand = (entity, outputName, param = "") => {
         if (!entity || !outputName) return ""
         // For outputs, we might need parameters in the future, but for now keep the instance format
         return `instance:${entity};${outputName}`
@@ -405,15 +397,11 @@ function InputOutputConfigDialog({
                 activateEntity,
                 activateOutput,
                 activateParam,
-                activateDelay,
-                activateMaxFires,
             ),
             out_deactivate: buildOutputCommand(
                 deactivateEntity,
                 deactivateOutput,
                 deactivateParam,
-                deactivateDelay,
-                deactivateMaxFires,
             ),
         }))
     }, [
@@ -440,13 +428,9 @@ function InputOutputConfigDialog({
         activateEntity,
         activateOutput,
         activateParam,
-        activateDelay,
-        activateMaxFires,
         deactivateEntity,
         deactivateOutput,
         deactivateParam,
-        deactivateDelay,
-        deactivateMaxFires,
     ])
 
     const handleSave = () => {
@@ -1965,7 +1949,7 @@ function InputOutputConfigDialog({
                                                 sx={{
                                                     display: "grid",
                                                     gridTemplateColumns:
-                                                        "200px 180px 150px 100px 100px",
+                                                        "200px 180px 150px",
                                                     gap: 2,
                                                     alignItems: "center",
                                                     minWidth: "max-content",
@@ -2135,45 +2119,6 @@ function InputOutputConfigDialog({
                                                     />
                                                 </Tooltip>
 
-                                                <TextField
-                                                    label="Delay (s)"
-                                                    value={activateDelay}
-                                                    onChange={(e) =>
-                                                        setActivateDelay(
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    type="number"
-                                                    slotProps={{
-                                                        htmlInput: {
-                                                            step: 1,
-                                                            min: 0,
-                                                        },
-                                                    }}
-                                                    size="small"
-                                                    sx={{
-                                                        minWidth: "100px",
-                                                        height: "56px",
-                                                    }}
-                                                />
-
-                                                <Tooltip title="Maximum number of times this output can fire (-1 for unlimited)">
-                                                    <TextField
-                                                        label="Max Fires"
-                                                        value={activateMaxFires}
-                                                        onChange={(e) =>
-                                                            setActivateMaxFires(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="-1"
-                                                        size="small"
-                                                        sx={{
-                                                            minWidth: "100px",
-                                                            height: "56px",
-                                                        }}
-                                                    />
-                                                </Tooltip>
                                             </Box>
                                         </Box>
                                     </CardContent>
@@ -2214,7 +2159,7 @@ function InputOutputConfigDialog({
                                                 sx={{
                                                     display: "grid",
                                                     gridTemplateColumns:
-                                                        "200px 180px 150px 100px 100px",
+                                                        "200px 180px 150px",
                                                     gap: 2,
                                                     alignItems: "center",
                                                     minWidth: "max-content",
@@ -2384,47 +2329,6 @@ function InputOutputConfigDialog({
                                                     />
                                                 </Tooltip>
 
-                                                <TextField
-                                                    label="Delay (s)"
-                                                    value={deactivateDelay}
-                                                    onChange={(e) =>
-                                                        setDeactivateDelay(
-                                                            e.target.value,
-                                                        )
-                                                    }
-                                                    type="number"
-                                                    slotProps={{
-                                                        htmlInput: {
-                                                            step: 1,
-                                                            min: 0,
-                                                        },
-                                                    }}
-                                                    size="small"
-                                                    sx={{
-                                                        minWidth: "100px",
-                                                        height: "56px",
-                                                    }}
-                                                />
-
-                                                <Tooltip title="Maximum number of times this output can fire (-1 for unlimited)">
-                                                    <TextField
-                                                        label="Max Fires"
-                                                        value={
-                                                            deactivateMaxFires
-                                                        }
-                                                        onChange={(e) =>
-                                                            setDeactivateMaxFires(
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="-1"
-                                                        size="small"
-                                                        sx={{
-                                                            minWidth: "100px",
-                                                            height: "56px",
-                                                        }}
-                                                    />
-                                                </Tooltip>
                                             </Box>
                                         </Box>
                                     </CardContent>
