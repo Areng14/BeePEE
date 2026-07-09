@@ -1,6 +1,7 @@
 const { dialog } = require("electron")
 const { logger } = require("./utils/logger")
 const { isDev } = require("./utils/isDev")
+const { isBeta } = require("./utils/betaInfo")
 
 // Lazy-load autoUpdater to avoid accessing app before it's ready
 let _autoUpdater = null
@@ -22,9 +23,13 @@ class AutoUpdater {
         this.autoUpdater.logger = logger
         this.autoUpdater.autoDownload = false // Don't auto-download, ask user first
         this.autoUpdater.autoInstallOnAppQuit = true
-        
+
+        // Beta builds follow GitHub prereleases; stable builds only see full
+        // releases (betas are published as prereleases via publish:beta)
+        this.autoUpdater.allowPrerelease = isBeta()
+
         // Log updater initialization
-        logger.info("Auto-updater: Initialized")
+        logger.info(`Auto-updater: Initialized (channel: ${isBeta() ? "beta" : "stable"})`)
         console.log("[Auto-updater] Initialized")
 
         // Set up event listeners

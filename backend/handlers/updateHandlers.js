@@ -6,6 +6,7 @@ const { dialog, BrowserWindow, app } = require("electron")
 const fs = require("fs")
 const path = require("path")
 const { createChangelogWindow } = require("../items/itemEditor")
+const { isBeta } = require("../utils/betaInfo")
 
 function register(ipcMain, mainWindow) {
     // Check for updates manually (triggered by user)
@@ -57,10 +58,17 @@ function register(ipcMain, mainWindow) {
         }
     })
 
-    // Load changelog data
+    // Load changelog data (beta builds use changelog-beta.json,
+    // falling back to the stable changelog if it doesn't exist)
     ipcMain.handle("load-changelog", async () => {
         try {
-            const changelogPath = path.join(app.getAppPath(), "changelog.json")
+            let changelogPath = path.join(app.getAppPath(), "changelog.json")
+            if (isBeta()) {
+                const betaPath = path.join(app.getAppPath(), "changelog-beta.json")
+                if (fs.existsSync(betaPath)) {
+                    changelogPath = betaPath
+                }
+            }
             if (!fs.existsSync(changelogPath)) {
                 throw new Error("Changelog file not found")
             }

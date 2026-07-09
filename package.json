@@ -12,7 +12,8 @@
     "scripts": {
         "dev": "concurrently -k \"vite\" \"electron .\"",
         "build": "node scripts/inject-config.js && vite build && electron-builder && node scripts/restore-config.js",
-        "publish": "node scripts/inject-config.js && vite build && electron-builder --publish always && node scripts/restore-config.js",
+        "publish": "node scripts/check-release-version.js stable && node scripts/inject-config.js && vite build && electron-builder --publish always && node scripts/restore-config.js",
+        "build:beta": "node scripts/check-release-version.js beta && node scripts/inject-config.js && vite build && electron-builder --publish never && node scripts/restore-config.js",
         "start": "electron .",
         "format": "prettier --write .",
         "lint": "eslint . --fix",
@@ -35,7 +36,8 @@
             "backend/**/*",
             "node_modules/**/*",
             "package.json",
-            "changelog.json"
+            "changelog.json",
+            "changelog-beta.json"
         ],
         "directories": {
             "buildResources": "build",

@@ -2,7 +2,8 @@
  * Injects environment variables into config files before build
  * Run with: node scripts/inject-config.js
  *
- * Reads CRASH_REPORT_ENDPOINT from .env file (or environment) and injects it into the config
+ * Reads CRASH_REPORT_ENDPOINT and CRASH_REPORT_ENDPOINT_BETA from .env file
+ * (or environment) and injects them into the config
  */
 
 const fs = require("fs")
@@ -10,7 +11,12 @@ const path = require("path")
 
 const CONFIG_FILE = path.join(__dirname, "..", "backend", "utils", "crashReportConfig.js")
 const ENV_FILE = path.join(__dirname, "..", ".env")
-const PLACEHOLDER = "__CRASH_REPORT_ENDPOINT__"
+
+// env var name -> placeholder in crashReportConfig.js
+const INJECTIONS = {
+    CRASH_REPORT_ENDPOINT: "__CRASH_REPORT_ENDPOINT__",
+    CRASH_REPORT_ENDPOINT_BETA: "__CRASH_REPORT_ENDPOINT_BETA__",
+}
 
 /**
  * Parse .env file and return key-value pairs
@@ -36,35 +42,33 @@ function parseEnvFile(filePath) {
 }
 
 function injectConfig() {
-    // Try environment variable first, then .env file
-    let endpoint = process.env.CRASH_REPORT_ENDPOINT
-
-    if (!endpoint) {
-        const envVars = parseEnvFile(ENV_FILE)
-        endpoint = envVars.CRASH_REPORT_ENDPOINT
-    }
-
-    if (!endpoint) {
-        console.warn("WARN: CRASH_REPORT_ENDPOINT not set - crash reporting will be disabled in this build")
-        console.warn("      Set it in .env file or as environment variable")
-        return
-    }
-
-    // Read the config file
+    const envVars = parseEnvFile(ENV_FILE)
     let content = fs.readFileSync(CONFIG_FILE, "utf-8")
+    let changed = false
 
-    // Check if placeholder exists
-    if (!content.includes(PLACEHOLDER)) {
-        console.log("INFO: No placeholder found in crashReportConfig.js (may already be injected)")
-        return
+    for (const [envName, placeholder] of Object.entries(INJECTIONS)) {
+        // Environment variable takes precedence over .env file
+        const value = process.env[envName] || envVars[envName]
+
+        if (!value) {
+            console.warn(`WARN: ${envName} not set - this endpoint will be disabled in this build`)
+            console.warn("      Set it in .env file or as environment variable")
+            continue
+        }
+
+        if (!content.includes(placeholder)) {
+            console.log(`INFO: No ${placeholder} placeholder found in crashReportConfig.js (may already be injected)`)
+            continue
+        }
+
+        content = content.replace(placeholder, value)
+        changed = true
+        console.log(`OK: Injected ${envName} into crashReportConfig.js`)
     }
 
-    // Replace placeholder with actual endpoint
-    content = content.replace(PLACEHOLDER, endpoint)
-
-    // Write back
-    fs.writeFileSync(CONFIG_FILE, content, "utf-8")
-    console.log("OK: Injected CRASH_REPORT_ENDPOINT into crashReportConfig.js")
+    if (changed) {
+        fs.writeFileSync(CONFIG_FILE, content, "utf-8")
+    }
 }
 
 injectConfig()

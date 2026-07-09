@@ -4,6 +4,7 @@ const os = require("os")
 const { app } = require("electron")
 const { logger } = require("./logger")
 const { getCrashReportEndpoint } = require("./crashReportConfig")
+const { isBeta } = require("./betaInfo")
 const { getCurrentPackageDir, savePackageAsBpee } = require("../packageManager")
 
 const MAX_LOG_BYTES = 500 * 1024 // 500KB read buffer
@@ -133,6 +134,7 @@ async function submitCrashReport({ userDescription, errorDetails }) {
             JSON.stringify(errorDetails || null),
         )
         formData.append("appVersion", packageJson.version)
+        formData.append("channel", isBeta() ? "beta" : "stable")
         formData.append("timestamp", new Date().toISOString())
         formData.append("platform", process.platform)
         formData.append("osVersion", os.release())

@@ -218,6 +218,23 @@ Standard editor windows use `width: 960, height: 1024` in `backend/items/itemEdi
     }
     ```
 
+### Beta Release System
+
+- **Making a beta release**:
+    1. Set `version` in `package.json` to a prerelease version, e.g. `1.2.0-beta.1`
+    2. Update `changelog-beta.json` with the beta's changes
+    3. Run `npm run build:beta` - builds the installer locally, publishes NOTHING to GitHub
+    4. Share the installer from `release/` (e.g. `BeePEE Setup 1.2.0-beta.1.exe`) directly with testers (Discord etc.)
+    5. For the stable release later, set version to `1.2.0`, update `changelog.json`, and run `npm run publish`
+- **Distribution**: betas are distributed manually as installer files only - they never appear on GitHub. `build:beta` passes `--publish never` so nothing leaks even if `GH_TOKEN` is set.
+- **Beta → stable graduation**: beta builds still check the main repo for updates. New betas won't be offered (they're not on GitHub), but when the stable version ships, semver ranks `1.2.0` above `1.2.0-beta.x`, so beta users are automatically offered the stable update.
+- **Channel detection** (`backend/utils/betaInfo.js`): a build is "beta" when its version has a `-beta`/`-alpha`/`-rc` suffix. Everything below keys off this.
+- **Version guard** (`scripts/check-release-version.js`): `npm run publish` fails on prerelease versions, `npm run build:beta` fails on plain versions - prevents shipping the wrong channel.
+- **Startup popup**: beta builds show a warning dialog on every launch (`backend/main.js`) telling testers the build is bug prone, to stress test, and to report bugs via Help > Report Bug.
+- **Beta changelog** (`changelog-beta.json`): beta builds load this file in the What's New window instead of `changelog.json` (falling back to it if missing) - see `load-changelog` in `backend/handlers/updateHandlers.js`. Same JSON structure as the stable changelog.
+- **Auto-updater**: beta builds set `allowPrerelease = true` (harmless since the main repo only has stable tags); stable builds filter out any `-beta.x` tagged version by semver suffix.
+- **Separate bug report endpoint**: `backend/utils/crashReportConfig.js` holds two build-time placeholders. Set both `CRASH_REPORT_ENDPOINT` (stable) and `CRASH_REPORT_ENDPOINT_BETA` (beta) in `.env`; `scripts/inject-config.js` injects both. Beta builds report to the beta endpoint (falling back to stable if unset). Reports also include a `channel` form field (`beta`/`stable`).
+
 ## Key Technical Architecture
 
 ### Electron IPC Communication

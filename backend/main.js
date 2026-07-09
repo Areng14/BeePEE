@@ -404,6 +404,26 @@ app.whenReady().then(async () => {
         })
     }
 
+    // Beta builds greet the tester with a warning on every launch
+    const { isBeta } = require("./utils/betaInfo.js")
+    if (isBeta()) {
+        window.webContents.once("did-finish-load", () => {
+            setTimeout(() => {
+                dialog.showMessageBox(window, {
+                    type: "warning",
+                    title: "Beta Version",
+                    message: `You are running a BETA version of BeePEE (v${require("../package.json").version})`,
+                    detail:
+                        "Beta builds are bug prone and less stable than regular releases.\n\n" +
+                        "• Please stress test as much as you can - that's what betas are for!\n" +
+                        "• If you encounter any bugs, report them via Help > Report Bug.\n" +
+                        "• Keep backups of important packages before opening them in this version.",
+                    buttons: ["Got it"],
+                })
+            }, 500)
+        })
+    }
+
     // Check for version change and show changelog if needed
     const { getLastSeenVersion, setLastSeenVersion } = require("./utils/settings.js")
     const { createChangelogWindow } = require("./items/itemEditor.js")
