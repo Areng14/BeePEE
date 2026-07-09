@@ -26,6 +26,11 @@ import {
     ExpandMore,
     Save as SaveIcon,
     Close,
+    Visibility,
+    VisibilityOff,
+    Flip,
+    Link as LinkIcon,
+    LinkOff,
 } from "@mui/icons-material"
 import {
     GLYPHS,
@@ -91,7 +96,17 @@ const MAX_LAYER = 2048 // layers may extend well past the 512 canvas
 const _sess = Math.random().toString(36).slice(2, 8)
 let _lid = 0
 const nextId = () => `L${_sess}_${++_lid}`
+let _gid = 0
+const nextGroupId = () => `G${_sess}_${++_gid}`
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
+
+// Stable accent color per group id for the layers panel link badges
+const GROUP_COLORS = ["#e05c4a", "#4a90d9", "#4caf50", "#b46be0", "#e0a13c", "#3cc9c9"]
+const groupColor = (gid) => {
+    let h = 0
+    for (let i = 0; i < gid.length; i++) h = (h * 31 + gid.charCodeAt(i)) >>> 0
+    return GROUP_COLORS[h % GROUP_COLORS.length]
+}
 
 // Black or white, whichever contrasts with the given fill color - so a
 // freshly enabled outline is never invisible (e.g. black-on-black)
@@ -208,6 +223,11 @@ function SignageDesigner({
     const op = useRef(null) // active transform: { type, ... }
     const clipboard = useRef(null) // copied layers (Ctrl+C / Ctrl+V)
     const sideDrag = useRef(null) // sidebar resize: { side, startX, startW }
+    // Layers panel: row being dragged, drop indicator, inline rename
+    const layerDrag = useRef(null)
+    const [dropMark, setDropMark] = useState(null) // { id, before }
+    const [renameId, setRenameId] = useState(null)
+    const [renameDraft, setRenameDraft] = useState("")
 
     // ---- Preferences -------------------------------------------------
     const [prefs, setPrefs] = useState(SIGNAGE_PREF_DEFAULTS)
@@ -568,6 +588,80 @@ function SignageDesigner({
                 rot: l.rot || 0,
             }))
 
+    // Expand a set of layer ids so every member of any touched group is
+    // included - clicking one grouped layer selects the whole group.
+    const expandWithGroups = (ids, ls = layersRef.current) => {
+        const groups = new Set()
+        for (const l of ls) {
+            if (l.group && ids.includes(l.id)) groups.add(l.group)
+        }
+        if (!groups.size) return ids
+        const out = new Set(ids)
+        for (const l of ls) {
+            if (l.group && groups.has(l.group)) out.add(l.id)
+        }
+        return [...out]
+    }
+
+    // Duplicated/pasted grouped layers become their own group, not extra
+    // members of the original one
+    const remapGroups = (arr) => {
+        const map = new Map()
+        return arr.map((l) => {
+            if (!l.group) return l
+            if (!map.has(l.group)) map.set(l.group, nextGroupId())
+            return { ...l, group: map.get(l.group) }
+        })
+    }
+
+    // Patch one layer by id (layers panel: visibility, rename, ...)
+    const setLayerProps = (id, patch, coalesceTag) => {
+        pushHistory(coalesceTag)
+        setLayers((ls) =>
+            ls.map((l) => (l.id === id ? { ...l, ...patch } : l)),
+        )
+    }
+
+    const groupSel = () => {
+        if (selIds.length < 2) return
+        pushHistory()
+        const gid = nextGroupId()
+        setLayers((ls) =>
+            ls.map((l) => (selSet.has(l.id) ? { ...l, group: gid } : l)),
+        )
+    }
+
+    const ungroupSel = () => {
+        if (!selIds.length) return
+        pushHistory()
+        setLayers((ls) =>
+            ls.map((l) => (selSet.has(l.id) ? { ...l, group: null } : l)),
+        )
+    }
+
+    // Mirror the selection across its bounding box; a single layer flips in
+    // place. Layers render rotate-then-flip, so a global mirror maps
+    // rotate(θ)∘flip to rotate(−θ)∘flip' - negate the rotation and toggle
+    // the flip flag, then mirror the position across the box center.
+    const flipSel = (axis) => {
+        if (!selIds.length) return
+        pushHistory()
+        const sel = layers.filter((l) => selSet.has(l.id))
+        const x0 = Math.min(...sel.map((l) => l.x))
+        const x1 = Math.max(...sel.map((l) => l.x + l.w))
+        const y0 = Math.min(...sel.map((l) => l.y))
+        const y1 = Math.max(...sel.map((l) => l.y + l.h))
+        setLayers((ls) =>
+            ls.map((l) => {
+                if (!selSet.has(l.id)) return l
+                const rot = (360 - (l.rot || 0)) % 360
+                return axis === "h"
+                    ? { ...l, x: x0 + x1 - (l.x + l.w), flipH: !l.flipH, rot }
+                    : { ...l, y: y0 + y1 - (l.y + l.h), flipV: !l.flipV, rot }
+            }),
+        )
+    }
+
     const startGroupResize = (e, handle) => {
         e.stopPropagation()
         e.preventDefault()
@@ -610,10 +704,12 @@ function SignageDesigner({
             setSelIds(ids)
             if (!ids.includes(l.id)) return // toggled off - no drag
         } else if (e.shiftKey) {
-            ids = selSet.has(l.id) ? selIds : [...selIds, l.id]
+            ids = selSet.has(l.id)
+                ? selIds
+                : expandWithGroups([...selIds, l.id], layers)
             setSelIds(ids)
         } else {
-            ids = selSet.has(l.id) ? selIds : [l.id]
+            ids = selSet.has(l.id) ? selIds : expandWithGroups([l.id], layers)
             setSelIds(ids)
         }
         pushHistory()
@@ -870,6 +966,7 @@ function SignageDesigner({
                     ? layersRef.current
                           .filter(
                               (l) =>
+                                  !l.hidden &&
                                   l.x < rx1 &&
                                   l.x + l.w > rx0 &&
                                   l.y < ry1 &&
@@ -877,7 +974,7 @@ function SignageDesigner({
                           )
                           .map((l) => l.id)
                     : []
-                setSelIds([...new Set([...o.base, ...hits])])
+                setSelIds(expandWithGroups([...new Set([...o.base, ...hits])]))
                 setMarquee(null)
             }
             op.current = null
@@ -958,6 +1055,10 @@ function SignageDesigner({
             } else if (ctrl && key === "d") {
                 e.preventDefault()
                 dupSel()
+            } else if (ctrl && key === "g") {
+                e.preventDefault()
+                if (e.shiftKey) ungroupSel()
+                else groupSel()
             } else if (e.key === "Delete" || e.key === "Backspace") {
                 e.preventDefault()
                 removeSel()
@@ -995,12 +1096,14 @@ function SignageDesigner({
         if (!selIds.length) return
         pushHistory()
         const off = cell || 20
-        const dupes = layers
-            .filter((l) => selSet.has(l.id))
-            .map((l) => ({
-                ...snapLayer({ ...l, x: l.x + off, y: l.y + off }, snap),
-                id: nextId(),
-            }))
+        const dupes = remapGroups(
+            layers
+                .filter((l) => selSet.has(l.id))
+                .map((l) => ({
+                    ...snapLayer({ ...l, x: l.x + off, y: l.y + off }, snap),
+                    id: nextId(),
+                })),
+        )
         setLayers((ls) => [...ls, ...dupes])
         setSelIds(dupes.map((l) => l.id))
     }
@@ -1020,14 +1123,32 @@ function SignageDesigner({
         if (!src || !src.length) return
         pushHistory()
         const off = cell || 20
-        const pasted = src.map((c) => ({
-            ...snapLayer({ ...c, x: c.x + off, y: c.y + off }, snap),
-            id: nextId(),
-        }))
+        const pasted = remapGroups(
+            src.map((c) => ({
+                ...snapLayer({ ...c, x: c.x + off, y: c.y + off }, snap),
+                id: nextId(),
+            })),
+        )
         setLayers((ls) => [...ls, ...pasted])
         setSelIds(pasted.map((l) => l.id))
     }
     const selectAll = () => setSelIds(layers.map((l) => l.id))
+    // Move srcId next to dstId in the stack. The panel lists topmost first
+    // (reversed array), so dropping ABOVE a row means AFTER it in the array.
+    const reorderLayer = (srcId, dstId, before) => {
+        if (!srcId || srcId === dstId) return
+        pushHistory()
+        setLayers((ls) => {
+            const src = ls.find((l) => l.id === srcId)
+            if (!src) return ls
+            const without = ls.filter((l) => l.id !== srcId)
+            let idx = without.findIndex((l) => l.id === dstId)
+            if (idx < 0) return ls
+            if (before) idx += 1
+            without.splice(idx, 0, src)
+            return without
+        })
+    }
     const raise = (dir) => {
         if (!selIds.length) return
         pushHistory()
@@ -1127,6 +1248,10 @@ function SignageDesigner({
         duplicate: dupSel,
         delete: removeSel,
         selectAll,
+        group: groupSel,
+        ungroup: ungroupSel,
+        flipH: () => flipSel("h"),
+        flipV: () => flipSel("v"),
     }
     useEffect(() => {
         window.package?.onSignageDesignerMenu?.((action) => {
@@ -1162,6 +1287,41 @@ function SignageDesigner({
                         type={kind}
                         gold={gold}
                         bar={theme.palette.text.primary}
+                    />
+                </Box>
+            </Box>
+        </Tooltip>
+    )
+
+    const flipBtn = (axis, title) => (
+        <Tooltip key={axis} title={title}>
+            {/* span wrapper so the tooltip works while the button is disabled */}
+            <Box component="span" sx={{ display: "flex" }}>
+                <Box
+                    component="button"
+                    disabled={!hasSel}
+                    onClick={() => hasSel && flipSel(axis)}
+                    sx={{
+                        width: 32,
+                        height: 28,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: "transparent",
+                        border: "none",
+                        borderRight: 1,
+                        borderColor: "divider",
+                        cursor: hasSel ? "pointer" : "not-allowed",
+                        opacity: hasSel ? 1 : 0.35,
+                        p: 0,
+                        color: "text.primary",
+                    }}>
+                    <Flip
+                        sx={{
+                            fontSize: 17,
+                            transform:
+                                axis === "v" ? "rotate(90deg)" : "none",
+                        }}
                     />
                 </Box>
             </Box>
@@ -1486,6 +1646,18 @@ function SignageDesigner({
                             {alignBtn("mv", "Center vertically")}
                             {alignBtn("bottom", "Align bottom")}
                         </Box>
+                        <Box
+                            sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                border: 1,
+                                borderColor: "#555",
+                                borderRadius: 1,
+                                overflow: "hidden",
+                            }}>
+                            {flipBtn("h", "Flip horizontally")}
+                            {flipBtn("v", "Flip vertically")}
+                        </Box>
                         <Box sx={{ flex: 1 }} />
                         {/* Zoom controls - Ctrl+scroll on the canvas also zooms */}
                         <Box
@@ -1729,6 +1901,7 @@ function SignageDesigner({
                             </Box>
                         )}
                         {layers.map((l) => {
+                            if (l.hidden) return null
                             const active = selSet.has(l.id)
                             const showHandles = active && selIds.length === 1
                             const handle = (hd, cursor, pos) => (
@@ -1760,6 +1933,9 @@ function SignageDesigner({
                                         transform: `rotate(${l.rot || 0}deg)`,
                                         cursor: "move",
                                     }}>
+                                    {/* Flip only the artwork - the selection
+                                        outline and resize handles stay in
+                                        data space so drag math is unaffected */}
                                     <svg
                                         width={l.w * s}
                                         height={l.h * s}
@@ -1772,6 +1948,9 @@ function SignageDesigner({
                                             display: "block",
                                             width: l.w * s,
                                             height: l.h * s,
+                                            opacity: l.opacity ?? 1,
+                                            transform: `scale(${l.flipH ? -1 : 1}, ${l.flipV ? -1 : 1})`,
+                                            transformOrigin: "center center",
                                         }}
                                         dangerouslySetInnerHTML={{
                                             __html: hasEraserPart(l)
@@ -2014,7 +2193,8 @@ function SignageDesigner({
                     {selLayer ? (
                         <Stack spacing={1.75}>
                             <Typography variant="subtitle2" fontWeight={600}>
-                                Transform · {SHAPES[selLayer.glyph].label}
+                                Transform ·{" "}
+                                {selLayer.name || SHAPES[selLayer.glyph].label}
                             </Typography>
                             <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.25 }}>
                                 <NumField
@@ -2061,6 +2241,54 @@ function SignageDesigner({
                                     sx={{ fontSize: 11.5, px: 0.5, height: 40 }}>
                                     Make square
                                 </Button>
+                            </Box>
+                            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
+                                <Button
+                                    variant={selLayer.flipH ? "contained" : "outlined"}
+                                    size="small"
+                                    startIcon={<Flip sx={{ fontSize: 15 }} />}
+                                    onClick={() => flipSel("h")}
+                                    sx={{ fontSize: 11.5, px: 0.5 }}>
+                                    Flip H
+                                </Button>
+                                <Button
+                                    variant={selLayer.flipV ? "contained" : "outlined"}
+                                    size="small"
+                                    startIcon={
+                                        <Flip
+                                            sx={{
+                                                fontSize: 15,
+                                                transform: "rotate(90deg)",
+                                            }}
+                                        />
+                                    }
+                                    onClick={() => flipSel("v")}
+                                    sx={{ fontSize: 11.5, px: 0.5 }}>
+                                    Flip V
+                                </Button>
+                            </Box>
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, px: 0.5 }}>
+                                <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{ whiteSpace: "nowrap" }}>
+                                    Opacity
+                                </Typography>
+                                <Slider
+                                    size="small"
+                                    min={5}
+                                    max={100}
+                                    value={Math.round((selLayer.opacity ?? 1) * 100)}
+                                    onChange={(e, v) =>
+                                        updateSel((l) => ({ ...l, opacity: v / 100 }))
+                                    }
+                                    sx={{ flex: 1 }}
+                                />
+                                <Typography
+                                    variant="caption"
+                                    sx={{ minWidth: 32, textAlign: "right" }}>
+                                    {Math.round((selLayer.opacity ?? 1) * 100)}%
+                                </Typography>
                             </Box>
                             {(() => {
                                 const mode =
@@ -2565,6 +2793,87 @@ function SignageDesigner({
                             <Typography variant="subtitle2" fontWeight={600}>
                                 {selIds.length} layers selected
                             </Typography>
+                            {(() => {
+                                const sel = layers.filter((l) =>
+                                    selSet.has(l.id),
+                                )
+                                const anyGrouped = sel.some((l) => l.group)
+                                return (
+                                    <Box
+                                        sx={{
+                                            display: "grid",
+                                            gridTemplateColumns: "1fr 1fr",
+                                            gap: 1,
+                                        }}>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={
+                                                <LinkIcon sx={{ fontSize: 15 }} />
+                                            }
+                                            onClick={groupSel}
+                                            sx={{ fontSize: 11.5, px: 0.5 }}>
+                                            Group
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            disabled={!anyGrouped}
+                                            startIcon={
+                                                <LinkOff sx={{ fontSize: 15 }} />
+                                            }
+                                            onClick={ungroupSel}
+                                            sx={{ fontSize: 11.5, px: 0.5 }}>
+                                            Ungroup
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={<Flip sx={{ fontSize: 15 }} />}
+                                            onClick={() => flipSel("h")}
+                                            sx={{ fontSize: 11.5, px: 0.5 }}>
+                                            Flip H
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            startIcon={
+                                                <Flip
+                                                    sx={{
+                                                        fontSize: 15,
+                                                        transform:
+                                                            "rotate(90deg)",
+                                                    }}
+                                                />
+                                            }
+                                            onClick={() => flipSel("v")}
+                                            sx={{ fontSize: 11.5, px: 0.5 }}>
+                                            Flip V
+                                        </Button>
+                                    </Box>
+                                )
+                            })()}
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, px: 0.5 }}>
+                                <Typography
+                                    variant="caption"
+                                    color="text.secondary"
+                                    sx={{ whiteSpace: "nowrap" }}>
+                                    Opacity
+                                </Typography>
+                                <Slider
+                                    size="small"
+                                    min={5}
+                                    max={100}
+                                    value={Math.round(
+                                        (layers.find((l) => selSet.has(l.id))
+                                            ?.opacity ?? 1) * 100,
+                                    )}
+                                    onChange={(e, v) =>
+                                        updateSel((l) => ({ ...l, opacity: v / 100 }))
+                                    }
+                                    sx={{ flex: 1 }}
+                                />
+                            </Box>
                             <Box>
                                 <Typography
                                     variant="caption"
@@ -2635,7 +2944,299 @@ function SignageDesigner({
                             Ctrl-click toggles, Shift-click adds.
                         </Typography>
                     )}
-                    <Box sx={{ flex: 1 }} />
+                    {/* Layers panel - topmost layer first, Photoshop style */}
+                    <Box
+                        sx={{
+                            flex: 1,
+                            minHeight: 100,
+                            display: "flex",
+                            flexDirection: "column",
+                        }}>
+                        <Typography
+                            variant="subtitle2"
+                            fontWeight={600}
+                            sx={{ mb: 0.75 }}>
+                            Layers
+                        </Typography>
+                        <Box
+                            sx={{
+                                flex: 1,
+                                overflowY: "auto",
+                                border: 1,
+                                borderColor: "divider",
+                                borderRadius: 1,
+                                bgcolor: "background.paper",
+                            }}
+                            onDragOver={(e) => {
+                                // Allow dropping in the empty area below the
+                                // rows (sends the layer to the back)
+                                if (layerDrag.current) e.preventDefault()
+                            }}
+                            onDrop={(e) => {
+                                if (!layerDrag.current) return
+                                e.preventDefault()
+                                const last = layers[0]
+                                if (last)
+                                    reorderLayer(
+                                        layerDrag.current,
+                                        last.id,
+                                        false,
+                                    )
+                                layerDrag.current = null
+                                setDropMark(null)
+                            }}>
+                            {layers.length === 0 && (
+                                <Typography
+                                    variant="caption"
+                                    color="text.disabled"
+                                    sx={{ display: "block", p: 1.25 }}>
+                                    No layers yet.
+                                </Typography>
+                            )}
+                            {[...layers].reverse().map((l) => {
+                                const active = selSet.has(l.id)
+                                const label =
+                                    l.name ||
+                                    SHAPES[l.glyph]?.label ||
+                                    l.glyph
+                                return (
+                                    <Box
+                                        key={l.id}
+                                        draggable={renameId !== l.id}
+                                        onDragStart={(e) => {
+                                            layerDrag.current = l.id
+                                            e.dataTransfer.effectAllowed =
+                                                "move"
+                                        }}
+                                        onDragEnd={() => {
+                                            layerDrag.current = null
+                                            setDropMark(null)
+                                        }}
+                                        onDragOver={(e) => {
+                                            if (!layerDrag.current) return
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            const r =
+                                                e.currentTarget.getBoundingClientRect()
+                                            setDropMark({
+                                                id: l.id,
+                                                before:
+                                                    e.clientY <
+                                                    r.top + r.height / 2,
+                                            })
+                                        }}
+                                        onDrop={(e) => {
+                                            if (!layerDrag.current) return
+                                            e.preventDefault()
+                                            e.stopPropagation()
+                                            reorderLayer(
+                                                layerDrag.current,
+                                                l.id,
+                                                e.clientY <
+                                                    e.currentTarget.getBoundingClientRect()
+                                                        .top +
+                                                        e.currentTarget.getBoundingClientRect()
+                                                            .height /
+                                                            2,
+                                            )
+                                            layerDrag.current = null
+                                            setDropMark(null)
+                                        }}
+                                        onMouseDown={(e) => {
+                                            if (renameId === l.id) return
+                                            if (e.ctrlKey || e.metaKey) {
+                                                setSelIds((ids) =>
+                                                    ids.includes(l.id)
+                                                        ? ids.filter(
+                                                              (x) => x !== l.id,
+                                                          )
+                                                        : [...ids, l.id],
+                                                )
+                                            } else if (e.shiftKey) {
+                                                setSelIds((ids) =>
+                                                    expandWithGroups(
+                                                        [
+                                                            ...new Set([
+                                                                ...ids,
+                                                                l.id,
+                                                            ]),
+                                                        ],
+                                                        layers,
+                                                    ),
+                                                )
+                                            } else {
+                                                setSelIds(
+                                                    expandWithGroups(
+                                                        [l.id],
+                                                        layers,
+                                                    ),
+                                                )
+                                            }
+                                        }}
+                                        onDoubleClick={() => {
+                                            setRenameId(l.id)
+                                            setRenameDraft(label)
+                                        }}
+                                        sx={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            gap: 0.75,
+                                            px: 0.75,
+                                            py: 0.5,
+                                            cursor: "pointer",
+                                            userSelect: "none",
+                                            bgcolor: active
+                                                ? "action.selected"
+                                                : "transparent",
+                                            opacity: l.hidden ? 0.45 : 1,
+                                            borderTop:
+                                                dropMark?.id === l.id &&
+                                                dropMark.before
+                                                    ? `2px solid ${gold}`
+                                                    : "2px solid transparent",
+                                            borderBottom:
+                                                dropMark?.id === l.id &&
+                                                !dropMark.before
+                                                    ? `2px solid ${gold}`
+                                                    : "2px solid transparent",
+                                            "&:hover": {
+                                                bgcolor: active
+                                                    ? "action.selected"
+                                                    : "action.hover",
+                                            },
+                                        }}>
+                                        <Tooltip
+                                            title={
+                                                l.hidden
+                                                    ? "Show layer"
+                                                    : "Hide layer"
+                                            }>
+                                            <IconButton
+                                                size="small"
+                                                sx={{ p: 0.25 }}
+                                                onMouseDown={(e) =>
+                                                    e.stopPropagation()
+                                                }
+                                                onClick={() =>
+                                                    setLayerProps(l.id, {
+                                                        hidden: !l.hidden,
+                                                    })
+                                                }>
+                                                {l.hidden ? (
+                                                    <VisibilityOff
+                                                        sx={{ fontSize: 15 }}
+                                                    />
+                                                ) : (
+                                                    <Visibility
+                                                        sx={{ fontSize: 15 }}
+                                                    />
+                                                )}
+                                            </IconButton>
+                                        </Tooltip>
+                                        <Box
+                                            sx={{
+                                                width: 22,
+                                                height: 22,
+                                                flexShrink: 0,
+                                                display: "flex",
+                                                alignItems: "center",
+                                                justifyContent: "center",
+                                                bgcolor: "background.default",
+                                                border: 1,
+                                                borderColor: "divider",
+                                                borderRadius: 0.5,
+                                                transform: `scale(${l.flipH ? -1 : 1}, ${l.flipV ? -1 : 1})`,
+                                            }}>
+                                            <ShapeSvg
+                                                id={l.glyph}
+                                                color={
+                                                    l.color === "transparent"
+                                                        ? "#999999"
+                                                        : l.color
+                                                }
+                                                w={14}
+                                            />
+                                        </Box>
+                                        {renameId === l.id ? (
+                                            <TextField
+                                                size="small"
+                                                variant="standard"
+                                                autoFocus
+                                                value={renameDraft}
+                                                onChange={(e) =>
+                                                    setRenameDraft(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                onBlur={() => {
+                                                    const v =
+                                                        renameDraft.trim()
+                                                    if (v && v !== label) {
+                                                        setLayerProps(l.id, {
+                                                            name: v,
+                                                        })
+                                                    }
+                                                    setRenameId(null)
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    e.stopPropagation()
+                                                    if (e.key === "Enter")
+                                                        e.target.blur()
+                                                    if (e.key === "Escape")
+                                                        setRenameId(null)
+                                                }}
+                                                sx={{ flex: 1 }}
+                                                inputProps={{
+                                                    style: { fontSize: 12 },
+                                                }}
+                                            />
+                                        ) : (
+                                            <Typography
+                                                variant="caption"
+                                                noWrap
+                                                sx={{ flex: 1, minWidth: 0 }}>
+                                                {label}
+                                            </Typography>
+                                        )}
+                                        {(l.opacity ?? 1) < 1 && (
+                                            <Typography
+                                                variant="caption"
+                                                color="text.disabled"
+                                                sx={{
+                                                    fontSize: 10,
+                                                    flexShrink: 0,
+                                                }}>
+                                                {Math.round(
+                                                    (l.opacity ?? 1) * 100,
+                                                )}
+                                                %
+                                            </Typography>
+                                        )}
+                                        {l.group && (
+                                            <Tooltip title="Grouped - click selects the whole group (Ctrl+Shift+G to ungroup)">
+                                                <LinkIcon
+                                                    sx={{
+                                                        fontSize: 13,
+                                                        flexShrink: 0,
+                                                        color: groupColor(
+                                                            l.group,
+                                                        ),
+                                                    }}
+                                                />
+                                            </Tooltip>
+                                        )}
+                                    </Box>
+                                )
+                            })}
+                        </Box>
+                        <Typography
+                            variant="caption"
+                            color="text.disabled"
+                            sx={{ mt: 0.5, lineHeight: 1.4 }}>
+                            Drag to reorder · double-click to rename ·
+                            Ctrl+G groups the selection
+                        </Typography>
+                    </Box>
                     <Box>
                         <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
                             Preview

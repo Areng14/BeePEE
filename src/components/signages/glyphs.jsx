@@ -509,6 +509,8 @@ export const hasEraserPart = (l) => {
     return p.fillTrans || p.outlineTrans
 }
 
+const clampOpacity = (v) => Math.max(0, Math.min(1, v))
+
 // Renders a layer's inner SVG markup (shared by the designer canvas, the
 // thumbnails, and the PNG rasterizer so all three agree pixel-for-pixel).
 // Layer style props: styleMode ("fill"|"outline"|"both"), outlineAlign
@@ -633,13 +635,30 @@ export function layerInnerSvg(l, uid, opts = {}) {
 // masks over everything below them. Shared by the thumbnails and the PNG
 // rasterizer (the interactive canvas renders layers individually for
 // hit-testing, showing erasers as a checkerboard ghost instead).
+// Hidden layers are skipped; flipH/flipV mirror the layer around its own
+// center (composed after the rotation, matching the canvas CSS transform);
+// opacity < 1 fades the layer (and proportionally weakens eraser cuts).
 export function layersSvgMarkup(layers, uidPrefix) {
-    const wrap = (l, inner) =>
-        `<g transform="translate(${l.x},${l.y}) rotate(${l.rot || 0} ${l.w / 2} ${l.h / 2})">` +
-        `<svg x="0" y="0" width="${l.w}" height="${l.h}" viewBox="${(SHAPES[l.glyph] || {}).vb || "0 0 24 24"}" preserveAspectRatio="none" overflow="visible">${inner}</svg>` +
-        `</g>`
+    const wrap = (l, inner) => {
+        const cx = l.w / 2
+        const cy = l.h / 2
+        const flip =
+            l.flipH || l.flipV
+                ? ` translate(${cx} ${cy}) scale(${l.flipH ? -1 : 1} ${l.flipV ? -1 : 1}) translate(${-cx} ${-cy})`
+                : ""
+        const op =
+            l.opacity != null && l.opacity < 1
+                ? ` opacity="${clampOpacity(l.opacity)}"`
+                : ""
+        return (
+            `<g${op} transform="translate(${l.x},${l.y}) rotate(${l.rot || 0} ${cx} ${cy})${flip}">` +
+            `<svg x="0" y="0" width="${l.w}" height="${l.h}" viewBox="${(SHAPES[l.glyph] || {}).vb || "0 0 24 24"}" preserveAspectRatio="none" overflow="visible">${inner}</svg>` +
+            `</g>`
+        )
+    }
     let acc = ""
     layers.forEach((l, i) => {
+        if (l.hidden) return
         const uid = `${uidPrefix}-${l.id}-${i}`
         const p = layerParts(l)
 
