@@ -33,6 +33,7 @@ import {
     Flip,
     Link as LinkIcon,
     LinkOff,
+    Title as TitleIcon,
 } from "@mui/icons-material"
 import {
     GLYPHS,
@@ -49,6 +50,11 @@ import {
     serializeDesign,
     rehydrateDesign,
     rasterizeLayers,
+    TEXT_GLYPH,
+    TEXT_FONTS,
+    isTextLayer,
+    layerVb,
+    measureTextGlyph,
 } from "./glyphs"
 import {
     loadSignagePrefs,
@@ -504,6 +510,64 @@ function SignageDesigner({
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [cell, snap, snapLayer],
     )
+
+    // Drop a new text layer in the canvas center, sized like a default
+    // shape (height from prefs, width from the measured text aspect)
+    const addTextLayer = useCallback(() => {
+        const p = prefsRef.current
+        const id = nextId()
+        const text = "TEXT"
+        const fontFamily = "Arial"
+        const m = measureTextGlyph(text, fontFamily, false, false)
+        const h = Math.max(24, Math.round(p.signageDefaultShapeSize || 128) / 2)
+        const w = clamp(Math.round(h / m.aspect), 24, CANVAS_SIZE)
+        const color = p.signageDefaultColor || "#000000"
+        let l = {
+            id,
+            glyph: TEXT_GLYPH,
+            text,
+            fontFamily,
+            bold: false,
+            italic: false,
+            textVb: m.vb,
+            x: CANVAS_SIZE / 2 - w / 2,
+            y: CANVAS_SIZE / 2 - h / 2,
+            w,
+            h,
+            color,
+            rot: 0,
+            styleMode: "fill",
+            outlineAlign: "center",
+            outlineWidth: p.signageDefaultOutlineWidth || 3,
+            outlineColor: contrastFor(color),
+            rounded: false,
+        }
+        l = snapLayer(l, snap)
+        pushHistory()
+        setLayers((ls) => [...ls, l])
+        setSelIds([id])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [snap, snapLayer])
+
+    // Re-measure a text layer after content/font changes; the height is
+    // kept and the width follows the new text's aspect ratio
+    const updateTextLayer = (patch) => {
+        updateSel((l) => {
+            if (!isTextLayer(l)) return l
+            const next = { ...l, ...patch }
+            const m = measureTextGlyph(
+                next.text,
+                next.fontFamily,
+                next.bold,
+                next.italic,
+            )
+            return {
+                ...next,
+                textVb: m.vb,
+                w: clamp(Math.round(next.h / m.aspect), 4, MAX_LAYER),
+            }
+        })
+    }
 
     const toCanvas = (e) => {
         const r = canvasRef.current.getBoundingClientRect()
@@ -1068,6 +1132,11 @@ function SignageDesigner({
                 pasteClipboard()
                 return
             }
+            if (ctrl && key === "t") {
+                e.preventDefault()
+                addTextLayer()
+                return
+            }
 
             if (!selIds.length) return
             if (ctrl && key === "c") {
@@ -1276,6 +1345,7 @@ function SignageDesigner({
         ungroup: ungroupSel,
         flipH: () => flipSel("h"),
         flipV: () => flipSel("v"),
+        addText: addTextLayer,
     }
     useEffect(() => {
         window.package?.onSignageDesignerMenu?.((action) => {
@@ -1682,6 +1752,28 @@ function SignageDesigner({
                             {flipBtn("h", "Flip horizontally")}
                             {flipBtn("v", "Flip vertically")}
                         </Box>
+                        <Tooltip title="Add text">
+                            <Box
+                                component="button"
+                                onClick={addTextLayer}
+                                sx={{
+                                    width: 32,
+                                    height: 30,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    background: "transparent",
+                                    border: 1,
+                                    borderColor: "#555",
+                                    borderRadius: 1,
+                                    cursor: "pointer",
+                                    color: "text.primary",
+                                    p: 0,
+                                    "&:hover": { bgcolor: "action.hover" },
+                                }}>
+                                <TitleIcon sx={{ fontSize: 18 }} />
+                            </Box>
+                        </Tooltip>
                         <Box sx={{ flex: 1 }} />
                         {/* Zoom controls - Ctrl+scroll on the canvas also zooms */}
                         <Box
@@ -1964,9 +2056,7 @@ function SignageDesigner({
                                     <svg
                                         width={l.w * s}
                                         height={l.h * s}
-                                        viewBox={
-                                            SHAPES[l.glyph]?.vb || "0 0 24 24"
-                                        }
+                                        viewBox={layerVb(l)}
                                         preserveAspectRatio="none"
                                         overflow="visible"
                                         style={{
@@ -2229,8 +2319,94 @@ function SignageDesigner({
                         <Stack spacing={1.75}>
                             <Typography variant="subtitle2" fontWeight={600}>
                                 Transform ·{" "}
-                                {selLayer.name || SHAPES[selLayer.glyph].label}
+                                {selLayer.name ||
+                                    (isTextLayer(selLayer)
+                                        ? "Text"
+                                        : SHAPES[selLayer.glyph]?.label ||
+                                          selLayer.glyph)}
                             </Typography>
+                            {isTextLayer(selLayer) && (
+                                <>
+                                    <TextField
+                                        label="Text"
+                                        size="small"
+                                        fullWidth
+                                        value={selLayer.text || ""}
+                                        onChange={(e) =>
+                                            updateTextLayer({
+                                                text: e.target.value,
+                                            })
+                                        }
+                                    />
+                                    <TextField
+                                        select
+                                        label="Font"
+                                        size="small"
+                                        fullWidth
+                                        value={selLayer.fontFamily || "Arial"}
+                                        onChange={(e) =>
+                                            updateTextLayer({
+                                                fontFamily: e.target.value,
+                                            })
+                                        }>
+                                        {TEXT_FONTS.map((f) => (
+                                            <MenuItem
+                                                key={f}
+                                                value={f}
+                                                sx={{ fontFamily: f }}>
+                                                {f}
+                                            </MenuItem>
+                                        ))}
+                                    </TextField>
+                                    <Box sx={{ display: "flex", gap: 0.5 }}>
+                                        <FormControlLabel
+                                            sx={{ ml: -0.75, mr: 1 }}
+                                            control={
+                                                <Checkbox
+                                                    size="small"
+                                                    checked={!!selLayer.bold}
+                                                    onChange={(e) =>
+                                                        updateTextLayer({
+                                                            bold: e.target
+                                                                .checked,
+                                                        })
+                                                    }
+                                                />
+                                            }
+                                            label={
+                                                <Typography
+                                                    variant="caption"
+                                                    fontWeight={700}>
+                                                    Bold
+                                                </Typography>
+                                            }
+                                        />
+                                        <FormControlLabel
+                                            sx={{ mr: 0 }}
+                                            control={
+                                                <Checkbox
+                                                    size="small"
+                                                    checked={!!selLayer.italic}
+                                                    onChange={(e) =>
+                                                        updateTextLayer({
+                                                            italic:
+                                                                e.target
+                                                                    .checked,
+                                                        })
+                                                    }
+                                                />
+                                            }
+                                            label={
+                                                <Typography
+                                                    variant="caption"
+                                                    fontStyle="italic">
+                                                    Italic
+                                                </Typography>
+                                            }
+                                        />
+                                    </Box>
+                                </>
+                            )}
                             <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.25 }}>
                                 <NumField
                                     label="Width"
@@ -2439,29 +2615,32 @@ function SignageDesigner({
                                                             ? "auto"
                                                             : "none",
                                                     }}>
-                                        <ToggleButtonGroup
-                                            size="small"
-                                            exclusive
-                                            fullWidth
-                                            sx={{ mt: 0.5 }}
-                                            value={selLayer.outlineAlign || "center"}
-                                            onChange={(e, v) =>
-                                                v &&
-                                                updateSel((l) => ({
-                                                    ...l,
-                                                    outlineAlign: v,
-                                                }))
-                                            }>
-                                            <ToggleButton value="inner" sx={{ fontSize: 10.5 }}>
-                                                Inner
-                                            </ToggleButton>
-                                            <ToggleButton value="center" sx={{ fontSize: 10.5 }}>
-                                                Center
-                                            </ToggleButton>
-                                            <ToggleButton value="outer" sx={{ fontSize: 10.5 }}>
-                                                Outer
-                                            </ToggleButton>
-                                        </ToggleButtonGroup>
+                                        {/* Text outlines are always centered strokes */}
+                                        {!isTextLayer(selLayer) && (
+                                            <ToggleButtonGroup
+                                                size="small"
+                                                exclusive
+                                                fullWidth
+                                                sx={{ mt: 0.5 }}
+                                                value={selLayer.outlineAlign || "center"}
+                                                onChange={(e, v) =>
+                                                    v &&
+                                                    updateSel((l) => ({
+                                                        ...l,
+                                                        outlineAlign: v,
+                                                    }))
+                                                }>
+                                                <ToggleButton value="inner" sx={{ fontSize: 10.5 }}>
+                                                    Inner
+                                                </ToggleButton>
+                                                <ToggleButton value="center" sx={{ fontSize: 10.5 }}>
+                                                    Center
+                                                </ToggleButton>
+                                                <ToggleButton value="outer" sx={{ fontSize: 10.5 }}>
+                                                    Outer
+                                                </ToggleButton>
+                                            </ToggleButtonGroup>
+                                        )}
                                         <Box
                                             sx={{
                                                 display: "flex",
@@ -2994,8 +3173,9 @@ function SignageDesigner({
                                 const active = selSet.has(l.id)
                                 const label =
                                     l.name ||
-                                    SHAPES[l.glyph]?.label ||
-                                    l.glyph
+                                    (isTextLayer(l)
+                                        ? `"${l.text || "Text"}"`
+                                        : SHAPES[l.glyph]?.label || l.glyph)
                                 return (
                                     <Box
                                         key={l.id}
@@ -3147,15 +3327,29 @@ function SignageDesigner({
                                                 borderRadius: 0.5,
                                                 transform: `scale(${l.flipH ? -1 : 1}, ${l.flipV ? -1 : 1})`,
                                             }}>
-                                            <ShapeSvg
-                                                id={l.glyph}
-                                                color={
-                                                    l.color === "transparent"
-                                                        ? "#999999"
-                                                        : l.color
-                                                }
-                                                w={14}
-                                            />
+                                            {isTextLayer(l) ? (
+                                                <TitleIcon
+                                                    sx={{
+                                                        fontSize: 15,
+                                                        color:
+                                                            l.color ===
+                                                            "transparent"
+                                                                ? "#999999"
+                                                                : l.color,
+                                                    }}
+                                                />
+                                            ) : (
+                                                <ShapeSvg
+                                                    id={l.glyph}
+                                                    color={
+                                                        l.color ===
+                                                        "transparent"
+                                                            ? "#999999"
+                                                            : l.color
+                                                    }
+                                                    w={14}
+                                                />
+                                            )}
                                         </Box>
                                         {renameId === l.id ? (
                                             <TextField
@@ -3352,8 +3546,10 @@ function SignageDesigner({
                                 setRenameId(ctxLayer.id)
                                 setRenameDraft(
                                     ctxLayer.name ||
-                                        SHAPES[ctxLayer.glyph]?.label ||
-                                        ctxLayer.glyph,
+                                        (isTextLayer(ctxLayer)
+                                            ? ctxLayer.text || "Text"
+                                            : SHAPES[ctxLayer.glyph]?.label ||
+                                              ctxLayer.glyph),
                                 )
                             })}>
                             Rename

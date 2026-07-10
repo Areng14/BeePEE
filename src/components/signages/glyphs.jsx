@@ -380,6 +380,80 @@ for (const s of SIGN_SECTIONS) {
 
 const shapeVb = (g) => g.vb || "0 0 24 24"
 
+// ---- Text layers ---------------------------------------------------------
+// A text layer is a layer whose glyph is the TEXT_GLYPH sentinel: instead of
+// SHAPES paths it renders an SVG <text> element. Its own viewBox (textVb)
+// and baseline are measured from the string + font at creation/edit time,
+// so the text fills the layer bounds edge-to-edge like the path glyphs do.
+export const TEXT_GLYPH = "__text"
+export const isTextLayer = (l) => l.glyph === TEXT_GLYPH
+
+export const TEXT_FONTS = [
+    "Arial",
+    "Verdana",
+    "Georgia",
+    "Times New Roman",
+    "Courier New",
+    "Impact",
+    "Trebuchet MS",
+    "Comic Sans MS",
+]
+
+// Layer viewBox: text layers carry their own, path glyphs use the shape's
+export const layerVb = (l) =>
+    isTextLayer(l)
+        ? l.textVb || "0 0 100 40"
+        : (SHAPES[l.glyph] || {}).vb || "0 0 24 24"
+
+const escapeXml = (s) =>
+    String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+
+// Measure a string at 100px in the given font and return the tight-bounds
+// viewBox + baseline for rendering it edge-to-edge in a layer.
+export function measureTextGlyph(text, fontFamily = "Arial", bold, italic) {
+    const ctx = document.createElement("canvas").getContext("2d")
+    ctx.font = `${italic ? "italic " : ""}${bold ? "bold " : ""}100px ${fontFamily}`
+    const m = ctx.measureText(text || " ")
+    const asc = Math.ceil(m.actualBoundingBoxAscent ?? 80)
+    const desc = Math.ceil(m.actualBoundingBoxDescent ?? 20)
+    const left = Math.ceil(m.actualBoundingBoxLeft ?? 0)
+    const w = Math.max(4, Math.ceil(m.width))
+    const h = Math.max(4, asc + desc)
+    return {
+        vb: `${-left} ${-asc} ${w} ${h}`,
+        aspect: h / w, // multiply a width by this to get the height
+    }
+}
+
+// SVG markup for a text layer (fill / outline / both, honoring the shared
+// styleMode + colors). Outlines are always centered strokes; in "both" mode
+// the stroke is painted UNDER the fill so it surrounds the glyphs.
+const textLayerSvg = (l) => {
+    const [, , vw, vh] = (l.textVb || "0 0 100 40").split(/\s+/).map(Number)
+    const sc = Math.max(vw || 100, vh || 40) / 24
+    const font =
+        ` font-family="${escapeXml(l.fontFamily || "Arial")}" font-size="100"` +
+        (l.bold ? ' font-weight="bold"' : "") +
+        (l.italic ? ' font-style="italic"' : "")
+    const tEl = (fill, stroke, sw) =>
+        `<text x="0" y="0"${font} fill="${fill}"${
+            stroke
+                ? ` stroke="${stroke}" stroke-width="${sw}" stroke-linejoin="round" stroke-linecap="round"`
+                : ""
+        }>${escapeXml(l.text || "")}</text>`
+    const mode = l.styleMode || (l.outline ? "outline" : "fill")
+    const w = (l.outlineWidth || 3) * sc
+    if (mode === "fill") return tEl(l.color)
+    if (mode === "outline") return tEl("none", l.color, w)
+    return (
+        tEl("none", l.outlineColor || "#000000", w * 2) + tEl(l.color)
+    )
+}
+
 export function ShapeSvg({ id, color, w, h }) {
     const uid = useId()
     const g = SHAPES[id]
@@ -519,6 +593,9 @@ const clampOpacity = (v) => Math.max(0, Math.min(1, v))
 // SVG can only stroke centered on the edge, so inner clips the stroke to the
 // shape and outer masks the shape out of it (double width, half survives).
 export function layerInnerSvg(l, uid, opts = {}) {
+    // Text layers render an SVG <text> element instead of shape paths.
+    // The same markup works inside eraser masks (black text hides).
+    if (isTextLayer(l)) return textLayerSvg(l)
     const g = SHAPES[l.glyph]
     if (!g) return ""
     const c = l.color
@@ -652,7 +729,7 @@ export function layersSvgMarkup(layers, uidPrefix) {
                 : ""
         return (
             `<g${op} transform="translate(${l.x},${l.y}) rotate(${l.rot || 0} ${cx} ${cy})${flip}">` +
-            `<svg x="0" y="0" width="${l.w}" height="${l.h}" viewBox="${(SHAPES[l.glyph] || {}).vb || "0 0 24 24"}" preserveAspectRatio="none" overflow="visible">${inner}</svg>` +
+            `<svg x="0" y="0" width="${l.w}" height="${l.h}" viewBox="${layerVb(l)}" preserveAspectRatio="none" overflow="visible">${inner}</svg>` +
             `</g>`
         )
     }
@@ -671,7 +748,10 @@ export function layersSvgMarkup(layers, uidPrefix) {
         }
 
         let cutSpec = null
+        // Text outlines are always center-aligned, so the inner-cut repaint
+        // pass (which needs shape paths) never applies to them
         const innerOnlyCut =
+            !isTextLayer(l) &&
             p.outlineTrans &&
             !p.fillTrans &&
             (l.outlineAlign || "center") === "inner"

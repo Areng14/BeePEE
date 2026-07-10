@@ -56,6 +56,8 @@ function buildSignageDesignerMenu(win) {
                 item("Undo", "undo", "CmdOrCtrl+Z"),
                 item("Redo", "redo", "CmdOrCtrl+Y"),
                 { type: "separator" },
+                item("Add Text", "addText", "CmdOrCtrl+T"),
+                { type: "separator" },
                 item("Cut", "cut", "CmdOrCtrl+X"),
                 item("Copy", "copy", "CmdOrCtrl+C"),
                 item("Paste", "paste", "CmdOrCtrl+V"),
