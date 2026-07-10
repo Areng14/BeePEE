@@ -3283,7 +3283,7 @@ function SignageDesigner({
                             color="text.disabled"
                             noWrap
                             sx={{ mt: 0.5, flexShrink: 0 }}>
-                            Drag to reorder · double-click renames · Ctrl+G groups
+                            Drag to reorder · right-click
                         </Typography>
                     </Box>
                 </Box>
