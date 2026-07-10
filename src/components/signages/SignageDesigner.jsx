@@ -2277,31 +2277,6 @@ function SignageDesigner({
                                     Make square
                                 </Button>
                             </Box>
-                            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
-                                <Button
-                                    variant={selLayer.flipH ? "contained" : "outlined"}
-                                    size="small"
-                                    startIcon={<Flip sx={{ fontSize: 15 }} />}
-                                    onClick={() => flipSel("h")}
-                                    sx={{ fontSize: 11.5, px: 0.5 }}>
-                                    Flip H
-                                </Button>
-                                <Button
-                                    variant={selLayer.flipV ? "contained" : "outlined"}
-                                    size="small"
-                                    startIcon={
-                                        <Flip
-                                            sx={{
-                                                fontSize: 15,
-                                                transform: "rotate(90deg)",
-                                            }}
-                                        />
-                                    }
-                                    onClick={() => flipSel("v")}
-                                    sx={{ fontSize: 11.5, px: 0.5 }}>
-                                    Flip V
-                                </Button>
-                            </Box>
                             <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, px: 0.5 }}>
                                 <Typography
                                     variant="caption"
@@ -2847,30 +2822,6 @@ function SignageDesigner({
                                             sx={{ fontSize: 11.5, px: 0.5 }}>
                                             Ungroup
                                         </Button>
-                                        <Button
-                                            variant="outlined"
-                                            size="small"
-                                            startIcon={<Flip sx={{ fontSize: 15 }} />}
-                                            onClick={() => flipSel("h")}
-                                            sx={{ fontSize: 11.5, px: 0.5 }}>
-                                            Flip H
-                                        </Button>
-                                        <Button
-                                            variant="outlined"
-                                            size="small"
-                                            startIcon={
-                                                <Flip
-                                                    sx={{
-                                                        fontSize: 15,
-                                                        transform:
-                                                            "rotate(90deg)",
-                                                    }}
-                                                />
-                                            }
-                                            onClick={() => flipSel("v")}
-                                            sx={{ fontSize: 11.5, px: 0.5 }}>
-                                            Flip V
-                                        </Button>
                                     </Box>
                                 )
                             })()}
@@ -3283,7 +3234,7 @@ function SignageDesigner({
                             color="text.disabled"
                             noWrap
                             sx={{ mt: 0.5, flexShrink: 0 }}>
-                            Drag to reorder · right-click
+                            Drag to reorder
                         </Typography>
                     </Box>
                 </Box>
