@@ -18,6 +18,8 @@ import {
     DialogContent,
     DialogContentText,
     DialogActions,
+    Menu,
+    MenuItem,
 } from "@mui/material"
 import { useTheme } from "@mui/material/styles"
 import {
@@ -37,7 +39,6 @@ import {
     PRIMS,
     SHAPES,
     ShapeSvg,
-    LayersThumb,
     CANVAS_SIZE,
     SIGN_BG,
     layerInnerSvg,
@@ -229,6 +230,8 @@ function SignageDesigner({
     const [dropMark, setDropMark] = useState(null) // { id, before }
     const [renameId, setRenameId] = useState(null)
     const [renameDraft, setRenameDraft] = useState("")
+    // Right-click layer menu: { mouseX, mouseY, layerId }
+    const [ctxMenu, setCtxMenu] = useState(null)
 
     // ---- Preferences -------------------------------------------------
     const [prefs, setPrefs] = useState(SIGNAGE_PREF_DEFAULTS)
@@ -667,6 +670,20 @@ function SignageDesigner({
                     : { ...l, y: y0 + y1 - (l.y + l.h), flipV: !l.flipV, rot }
             }),
         )
+    }
+
+    // Right-click on a layer (canvas or panel row): ensure it's selected,
+    // then open the context menu at the cursor. Selection-wide actions
+    // (front/back, flip, duplicate, delete) apply to the whole selection.
+    const openLayerMenu = (e, l) => {
+        e.preventDefault()
+        e.stopPropagation()
+        if (!selSet.has(l.id)) setSelIds(expandWithGroups([l.id], layers))
+        setCtxMenu({
+            mouseX: e.clientX + 2,
+            mouseY: e.clientY - 6,
+            layerId: l.id,
+        })
     }
 
     const startGroupResize = (e, handle) => {
@@ -1931,6 +1948,7 @@ function SignageDesigner({
                                 <Box
                                     key={l.id}
                                     onMouseDown={(e) => startMove(e, l)}
+                                    onContextMenu={(e) => openLayerMenu(e, l)}
                                     sx={{
                                         position: "absolute",
                                         left: l.x * s,
@@ -2790,20 +2808,6 @@ function SignageDesigner({
                                     })()}
                                 </Box>
                             </Box>
-                            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
-                                <Button variant="outlined" size="small" onClick={() => raise(1)}>
-                                    Front
-                                </Button>
-                                <Button variant="outlined" size="small" onClick={() => raise(-1)}>
-                                    Back
-                                </Button>
-                                <Button variant="outlined" size="small" onClick={dupSel}>
-                                    Duplicate
-                                </Button>
-                                <Button variant="outlined" size="small" color="error" onClick={removeSel}>
-                                    Delete
-                                </Button>
-                            </Box>
                         </Stack>
                     ) : selIds.length > 1 ? (
                         <Stack spacing={1.75}>
@@ -2930,20 +2934,6 @@ function SignageDesigner({
                                     )}
                                 </Box>
                             </Box>
-                            <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1 }}>
-                                <Button variant="outlined" size="small" onClick={() => raise(1)}>
-                                    Front
-                                </Button>
-                                <Button variant="outlined" size="small" onClick={() => raise(-1)}>
-                                    Back
-                                </Button>
-                                <Button variant="outlined" size="small" onClick={dupSel}>
-                                    Duplicate
-                                </Button>
-                                <Button variant="outlined" size="small" color="error" onClick={removeSel}>
-                                    Delete
-                                </Button>
-                            </Box>
                             <Typography
                                 variant="caption"
                                 color="text.disabled"
@@ -2961,20 +2951,6 @@ function SignageDesigner({
                             Ctrl-click toggles, Shift-click adds.
                         </Typography>
                     )}
-                    <Box sx={{ flex: 1 }} />
-                    <Box>
-                        <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-                            Preview
-                        </Typography>
-                        <Box sx={{ display: "flex", gap: 1 }}>
-                            <Box sx={{ p: 0.75, bgcolor: "background.default", border: 1, borderColor: "divider", borderRadius: 1 }}>
-                                <LayersThumb layers={layers} size={56} />
-                            </Box>
-                            <Box sx={{ p: 0.75, bgcolor: "background.default", border: 1, borderColor: "divider", borderRadius: 1 }}>
-                                <LayersThumb layers={layers} size={32} />
-                            </Box>
-                        </Box>
-                    </Box>
                     </Box>
 
                     {/* Splitter - drag to resize the layers pane */}
@@ -3147,6 +3123,9 @@ function SignageDesigner({
                                             setRenameId(l.id)
                                             setRenameDraft(label)
                                         }}
+                                        onContextMenu={(e) =>
+                                            openLayerMenu(e, l)
+                                        }
                                         sx={{
                                             display: "flex",
                                             alignItems: "center",
@@ -3364,6 +3343,88 @@ function SignageDesigner({
                     </Button>
                 </Stack>
             </Box>
+
+            {/* Layer context menu (right-click a canvas layer or panel row) */}
+            {(() => {
+                const ctxLayer = ctxMenu
+                    ? layers.find((l) => l.id === ctxMenu.layerId)
+                    : null
+                const act = (fn) => () => {
+                    setCtxMenu(null)
+                    fn()
+                }
+                const anyGrouped = layers.some(
+                    (l) => selSet.has(l.id) && l.group,
+                )
+                return (
+                    <Menu
+                        open={!!ctxMenu && !!ctxLayer}
+                        onClose={() => setCtxMenu(null)}
+                        anchorReference="anchorPosition"
+                        anchorPosition={
+                            ctxMenu
+                                ? { top: ctxMenu.mouseY, left: ctxMenu.mouseX }
+                                : undefined
+                        }
+                        slotProps={{
+                            list: { dense: true },
+                        }}>
+                        <MenuItem onClick={act(() => raise(1))}>
+                            Bring to Front
+                        </MenuItem>
+                        <MenuItem onClick={act(() => raise(-1))}>
+                            Send to Back
+                        </MenuItem>
+                        <Divider />
+                        <MenuItem onClick={act(() => flipSel("h"))}>
+                            Flip Horizontal
+                        </MenuItem>
+                        <MenuItem onClick={act(() => flipSel("v"))}>
+                            Flip Vertical
+                        </MenuItem>
+                        <Divider />
+                        <MenuItem
+                            disabled={selIds.length < 2}
+                            onClick={act(groupSel)}>
+                            Group
+                        </MenuItem>
+                        <MenuItem
+                            disabled={!anyGrouped}
+                            onClick={act(ungroupSel)}>
+                            Ungroup
+                        </MenuItem>
+                        <Divider />
+                        <MenuItem
+                            onClick={act(() => {
+                                if (!ctxLayer) return
+                                setRenameId(ctxLayer.id)
+                                setRenameDraft(
+                                    ctxLayer.name ||
+                                        SHAPES[ctxLayer.glyph]?.label ||
+                                        ctxLayer.glyph,
+                                )
+                            })}>
+                            Rename
+                        </MenuItem>
+                        <MenuItem
+                            onClick={act(() => {
+                                if (!ctxLayer) return
+                                setLayerProps(ctxLayer.id, {
+                                    hidden: !ctxLayer.hidden,
+                                })
+                            })}>
+                            {ctxLayer?.hidden ? "Show" : "Hide"}
+                        </MenuItem>
+                        <Divider />
+                        <MenuItem onClick={act(dupSel)}>Duplicate</MenuItem>
+                        <MenuItem
+                            onClick={act(removeSel)}
+                            sx={{ color: "error.main" }}>
+                            Delete
+                        </MenuItem>
+                    </Menu>
+                )
+            })()}
 
             {/* Confirm discarding unsaved edits */}
             <Dialog

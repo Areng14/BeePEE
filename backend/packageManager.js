@@ -1090,7 +1090,11 @@ const importPackage = async (pathToPackage) => {
     })
 }
 
-const loadPackage = async (pathToPackage, skipProgressReset = false) => {
+const loadPackage = async (
+    pathToPackage,
+    skipProgressReset = false,
+    alreadyExtracted = false,
+) => {
     return timeOperation("Load package", async () => {
         let extractionDir = null
         try {
@@ -1134,6 +1138,25 @@ const loadPackage = async (pathToPackage, skipProgressReset = false) => {
 
                 if (!skipProgressReset) {
                     sendProgressUpdate(50, "Loading extracted package...")
+                }
+            } else if (alreadyExtracted) {
+                // The archive was just extracted and converted by
+                // importPackage() - re-extracting would wipe that work
+                // (including the VMF stats analysis, which this path
+                // doesn't redo) and double the load time.
+                console.log(
+                    "Loading just-imported package (skipping re-extraction):",
+                    pathToPackage,
+                )
+                pkg = new Package(pathToPackage)
+                packageDir = pkg.packageDir
+                if (!fs.existsSync(path.join(packageDir, "info.json"))) {
+                    throw new Error(
+                        `Imported package directory is missing info.json: ${packageDir}`,
+                    )
+                }
+                if (!skipProgressReset) {
+                    sendProgressUpdate(50, "Loading imported package...")
                 }
             } else {
                 // Loading from archive - need to extract

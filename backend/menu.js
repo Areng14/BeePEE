@@ -271,10 +271,13 @@ function createMainMenu(mainWindow) {
                                     message: "Loading imported package...",
                                 },
                             )
+                            // Skip progress reset AND re-extraction - the
+                            // import above already extracted and converted
                             const pkg = await loadPackage(
                                 result.filePaths[0],
                                 true,
-                            ) // Skip progress reset since we're continuing from import
+                                true,
+                            )
                             // currentPackageDir is now managed in packageManager.js
 
                             // Send final completion message

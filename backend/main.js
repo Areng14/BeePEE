@@ -711,7 +711,8 @@ async function handleFileOpen(filePath, isStartup = false) {
                 message: "Loading imported package...",
             })
 
-            const pkg = await loadPackage(filePath, true)
+            // Already extracted and converted by importPackage() above
+            const pkg = await loadPackage(filePath, true, true)
 
             // Send final completion message
             mainWindow.webContents.send("package-loading-progress", {
