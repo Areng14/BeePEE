@@ -360,8 +360,8 @@ contextBridge.exposeInMainWorld("package", {
     // ========================================
     // CRASH REPORT FUNCTIONS
     // ========================================
-    submitCrashReport: (userDescription, errorDetails) =>
-        ipcRenderer.invoke("submit-crash-report", { userDescription, errorDetails }),
+    submitCrashReport: (userDescription, errorDetails, contact) =>
+        ipcRenderer.invoke("submit-crash-report", { userDescription, errorDetails, contact }),
     getCrashReportStatus: () =>
         ipcRenderer.invoke("get-crash-report-status"),
     onCrashReportData: (callback) => {

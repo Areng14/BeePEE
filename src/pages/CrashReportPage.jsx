@@ -18,6 +18,7 @@ export default function CrashReportPage() {
     const [errorDetails, setErrorDetails] = useState(null)
     const [isManual, setIsManual] = useState(true)
     const [userDescription, setUserDescription] = useState("")
+    const [contact, setContact] = useState("")
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [submitResult, setSubmitResult] = useState(null)
     const [hasSubmitted, setHasSubmitted] = useState(false)
@@ -46,6 +47,7 @@ export default function CrashReportPage() {
             const result = await window.package.submitCrashReport(
                 userDescription,
                 errorDetails,
+                contact,
             )
             setSubmitResult(result)
             if (result.success) {
@@ -198,6 +200,27 @@ export default function CrashReportPage() {
                             ? "Describe the issue you're experiencing..."
                             : "Describe the action that caused the error..."
                     }
+                    disabled={isSubmitting || !!updateInfo}
+                    sx={{
+                        "& .MuiOutlinedInput-root": {
+                            color: "white",
+                            "& fieldset": { borderColor: "rgba(255,255,255,0.3)" },
+                            "&:hover fieldset": { borderColor: "rgba(255,255,255,0.5)" },
+                            "&.Mui-focused fieldset": { borderColor: "primary.main" },
+                        },
+                        "& .MuiInputLabel-root": { color: "rgba(255,255,255,0.7)" },
+                        "& .MuiInputLabel-root.Mui-focused": { color: "primary.main" },
+                    }}
+                />
+
+                {/* Optional contact for follow-up questions */}
+                <TextField
+                    label="Discord username (optional)"
+                    value={contact}
+                    onChange={(e) => setContact(e.target.value)}
+                    fullWidth
+                    size="small"
+                    placeholder="So we can reach you if we have questions"
                     disabled={isSubmitting || !!updateInfo}
                     sx={{
                         "& .MuiOutlinedInput-root": {

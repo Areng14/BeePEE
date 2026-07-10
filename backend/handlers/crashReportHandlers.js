@@ -7,9 +7,9 @@ const { getCrashReportEndpoint } = require("../utils/crashReportConfig")
  * @param {Electron.BrowserWindow} mainWindow
  */
 function register(ipcMain, mainWindow) {
-    ipcMain.handle("submit-crash-report", async (event, { userDescription, errorDetails }) => {
+    ipcMain.handle("submit-crash-report", async (event, { userDescription, errorDetails, contact }) => {
         try {
-            return await submitCrashReport({ userDescription, errorDetails })
+            return await submitCrashReport({ userDescription, errorDetails, contact })
         } catch (error) {
             console.error("Failed to submit crash report:", error)
             return { success: false, error: error.message }

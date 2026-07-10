@@ -107,9 +107,10 @@ async function createTempPackageZip() {
  * @param {Object} params
  * @param {string} params.userDescription - What the user was doing
  * @param {Object|null} params.errorDetails - Error info (type, message, stack, timestamp)
+ * @param {string} [params.contact] - Optional Discord username for follow-up
  * @returns {Promise<{success: boolean, error?: string, reason?: string}>}
  */
-async function submitCrashReport({ userDescription, errorDetails }) {
+async function submitCrashReport({ userDescription, errorDetails, contact }) {
     const endpoint = getCrashReportEndpoint()
     if (!endpoint) {
         return { success: false, reason: "No endpoint configured" }
@@ -129,6 +130,7 @@ async function submitCrashReport({ userDescription, errorDetails }) {
         const formData = new FormData()
         formData.append("logs", logs)
         formData.append("userDescription", userDescription || "")
+        formData.append("contact", (contact || "").trim())
         formData.append(
             "errorDetails",
             JSON.stringify(errorDetails || null),
