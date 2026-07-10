@@ -7,9 +7,14 @@
                 "This is a BETA build - it is bug prone. If you encounter any bugs go to Help > Report Bug. Please stress test as much as you can!"
             ],
             "changes": {
-                "added": [],
+                "added": [
+                    "Flip horizontal / vertical to the signage editor",
+                    "Layers to the signage editor",
+                    "Text to the signage editor"
+                ],
                 "fixed": [
-                    "Output delay value resets to 0 when edited in item outputs - removed the Delay and Max Fires fields from outputs, since the editoritems output format can't store them (they only apply to inputs)"
+                    "Output delay value resets to 0 when edited in item outputs (i removed it LOL it wasnt supposed to be there)",
+                    "Package load times from a .bee_pack doubling"
                 ]
             }
         }
