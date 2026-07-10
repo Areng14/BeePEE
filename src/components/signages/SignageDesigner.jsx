@@ -238,6 +238,8 @@ function SignageDesigner({
     const [renameDraft, setRenameDraft] = useState("")
     // Right-click layer menu: { mouseX, mouseY, layerId }
     const [ctxMenu, setCtxMenu] = useState(null)
+    // Text layer being edited in place on the canvas (double-click)
+    const [editingTextId, setEditingTextId] = useState(null)
 
     // ---- Preferences -------------------------------------------------
     const [prefs, setPrefs] = useState(SIGNAGE_PREF_DEFAULTS)
@@ -546,27 +548,41 @@ function SignageDesigner({
         pushHistory()
         setLayers((ls) => [...ls, l])
         setSelIds([id])
+        // A fresh text layer goes straight into in-place editing
+        setEditingTextId(id)
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [snap, snapLayer])
 
     // Re-measure a text layer after content/font changes; the height is
     // kept and the width follows the new text's aspect ratio
+    const remeasureText = (l, patch) => {
+        const next = { ...l, ...patch }
+        const m = measureTextGlyph(
+            next.text,
+            next.fontFamily,
+            next.bold,
+            next.italic,
+        )
+        return {
+            ...next,
+            textVb: m.vb,
+            w: clamp(Math.round(next.h / m.aspect), 4, MAX_LAYER),
+        }
+    }
+
+    // Sidebar font/style edits apply to the whole selection
     const updateTextLayer = (patch) => {
-        updateSel((l) => {
-            if (!isTextLayer(l)) return l
-            const next = { ...l, ...patch }
-            const m = measureTextGlyph(
-                next.text,
-                next.fontFamily,
-                next.bold,
-                next.italic,
-            )
-            return {
-                ...next,
-                textVb: m.vb,
-                w: clamp(Math.round(next.h / m.aspect), 4, MAX_LAYER),
-            }
-        })
+        updateSel((l) => (isTextLayer(l) ? remeasureText(l, patch) : l))
+    }
+
+    // In-place editor edits exactly one layer (coalesced into one undo step)
+    const updateTextById = (id, patch) => {
+        pushHistory("text-edit")
+        setLayers((ls) =>
+            ls.map((l) =>
+                l.id === id && isTextLayer(l) ? remeasureText(l, patch) : l,
+            ),
+        )
     }
 
     const toCanvas = (e) => {
@@ -782,6 +798,9 @@ function SignageDesigner({
 
     const startMove = (e, l) => {
         e.stopPropagation()
+        // Without this, dragging starts a native text selection and the
+        // browser paints a blue highlight over layers (especially text)
+        e.preventDefault()
         // Ctrl toggles membership, Shift adds, plain click selects (keeps
         // an existing multi-selection when grabbing a selected layer)
         let ids
@@ -1698,6 +1717,9 @@ function SignageDesigner({
                         p: 2,
                         bgcolor: "background.default",
                         minWidth: 0,
+                        // Marquee/layer drags must never start a native text
+                        // selection (blue highlight over layers and captions)
+                        userSelect: "none",
                     }}>
                     {/* Toolbar */}
                     <Box
@@ -2041,6 +2063,11 @@ function SignageDesigner({
                                     key={l.id}
                                     onMouseDown={(e) => startMove(e, l)}
                                     onContextMenu={(e) => openLayerMenu(e, l)}
+                                    onDoubleClick={(e) => {
+                                        if (!isTextLayer(l)) return
+                                        e.stopPropagation()
+                                        setEditingTextId(l.id)
+                                    }}
                                     sx={{
                                         position: "absolute",
                                         left: l.x * s,
@@ -2063,7 +2090,10 @@ function SignageDesigner({
                                             display: "block",
                                             width: l.w * s,
                                             height: l.h * s,
-                                            opacity: l.opacity ?? 1,
+                                            opacity:
+                                                editingTextId === l.id
+                                                    ? 0.15
+                                                    : (l.opacity ?? 1),
                                             transform: `scale(${l.flipH ? -1 : 1}, ${l.flipV ? -1 : 1})`,
                                             transformOrigin: "center center",
                                         }}
@@ -2073,6 +2103,89 @@ function SignageDesigner({
                                                 : layerInnerSvg(l, `cv-${l.id}`),
                                         }}
                                     />
+                                    {/* In-place text editor - lives inside
+                                        the rotated layer box so it tracks
+                                        the object; the svg dims behind it */}
+                                    {editingTextId === l.id &&
+                                        isTextLayer(l) &&
+                                        (() => {
+                                            const vh =
+                                                Number(
+                                                    (l.textVb || "0 0 100 40")
+                                                        .split(/\s+/)[3],
+                                                ) || 100
+                                            const fontPx = Math.max(
+                                                8,
+                                                (100 * (l.h * s)) / vh,
+                                            )
+                                            return (
+                                                <input
+                                                    autoFocus
+                                                    value={l.text || ""}
+                                                    onFocus={(e) =>
+                                                        e.target.select()
+                                                    }
+                                                    onChange={(e) =>
+                                                        updateTextById(l.id, {
+                                                            text: e.target
+                                                                .value,
+                                                        })
+                                                    }
+                                                    onBlur={() =>
+                                                        setEditingTextId(null)
+                                                    }
+                                                    onKeyDown={(e) => {
+                                                        e.stopPropagation()
+                                                        if (
+                                                            e.key ===
+                                                                "Enter" ||
+                                                            e.key === "Escape"
+                                                        ) {
+                                                            setEditingTextId(
+                                                                null,
+                                                            )
+                                                        }
+                                                    }}
+                                                    onMouseDown={(e) =>
+                                                        e.stopPropagation()
+                                                    }
+                                                    onDoubleClick={(e) =>
+                                                        e.stopPropagation()
+                                                    }
+                                                    style={{
+                                                        position: "absolute",
+                                                        inset: 0,
+                                                        width: "100%",
+                                                        height: "100%",
+                                                        boxSizing:
+                                                            "border-box",
+                                                        background:
+                                                            "transparent",
+                                                        border: "none",
+                                                        outline: "none",
+                                                        textAlign: "center",
+                                                        padding: 0,
+                                                        fontFamily:
+                                                            l.fontFamily ||
+                                                            "Arial",
+                                                        fontWeight: l.bold
+                                                            ? 700
+                                                            : 400,
+                                                        fontStyle: l.italic
+                                                            ? "italic"
+                                                            : "normal",
+                                                        fontSize: fontPx,
+                                                        lineHeight: 1,
+                                                        color:
+                                                            l.color ===
+                                                            "transparent"
+                                                                ? "#666666"
+                                                                : l.color,
+                                                        caretColor: "#d2b019",
+                                                    }}
+                                                />
+                                            )
+                                        })()}
                                     {active && (
                                         <Box
                                             sx={{
@@ -2327,17 +2440,12 @@ function SignageDesigner({
                             </Typography>
                             {isTextLayer(selLayer) && (
                                 <>
-                                    <TextField
-                                        label="Text"
-                                        size="small"
-                                        fullWidth
-                                        value={selLayer.text || ""}
-                                        onChange={(e) =>
-                                            updateTextLayer({
-                                                text: e.target.value,
-                                            })
-                                        }
-                                    />
+                                    <Typography
+                                        variant="caption"
+                                        color="text.disabled">
+                                        Double-click the text on the canvas to
+                                        edit it.
+                                    </Typography>
                                     <TextField
                                         select
                                         label="Font"
