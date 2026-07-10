@@ -208,12 +208,40 @@ export function parseSvgToGlyph(svgText, opts = {}) {
 
     const num = (el, attr, fallback = 0) =>
         parseFloat(el.getAttribute(attr)) || fallback
-    // Presentation lookup: inline style wins over the attribute
+
+    // Illustrator/Inkscape exports often carry presentation via CSS classes
+    // in a <style> block (.cls-1 { fill: none; stroke: #000; ... }) instead
+    // of attributes - collect those class rules so prop() can resolve them.
+    // Without this, stroke-only art (e.g. motion lines) parses as zero-area
+    // fills and renders invisible.
+    const classRules = {}
+    for (const styleEl of doc.querySelectorAll("style")) {
+        const css = styleEl.textContent || ""
+        for (const m of css.matchAll(/\.([\w-]+)\s*\{([^}]*)\}/g)) {
+            const props = classRules[m[1]] || (classRules[m[1]] = {})
+            for (const decl of m[2].split(";")) {
+                const i = decl.indexOf(":")
+                if (i > 0) {
+                    props[decl.slice(0, i).trim()] = decl
+                        .slice(i + 1)
+                        .trim()
+                }
+            }
+        }
+    }
+
+    // Presentation lookup: inline style > attribute > class rule
     const prop = (el, name) => {
         const style = el.getAttribute("style") || ""
         const m = style.match(new RegExp(`(?:^|;)\\s*${name}\\s*:\\s*([^;]+)`))
         if (m) return m[1].trim()
-        return el.getAttribute(name)
+        const attr = el.getAttribute(name)
+        if (attr != null) return attr
+        for (const cls of (el.getAttribute("class") || "").split(/\s+/)) {
+            const rule = classRules[cls]
+            if (rule && rule[name] != null) return rule[name]
+        }
+        return null
     }
     const isFillNone = (el) => (prop(el, "fill") || "").trim() === "none"
     const hasStroke = (el) => {
