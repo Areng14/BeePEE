@@ -215,6 +215,7 @@ function SignageDesigner({
     const [outlineOpen, setOutlineOpen] = useState(false)
     const [paletteW, setPaletteW] = useState(176)
     const [propsW, setPropsW] = useState(210)
+    const [layersH, setLayersH] = useState(240) // layers pane height (dock bottom)
     const [customIds, setCustomIds] = useState([])
     const [zoom, setZoom] = useState(1) // canvas magnification, 0.5–4
     const svgInputRef = useRef(null)
@@ -399,6 +400,12 @@ function SignageDesigner({
             const d = sideDrag.current
             if (!d) return
             e.preventDefault()
+            if (d.side === "layers") {
+                // Horizontal splitter between the edit pane and layers pane
+                const dy = e.clientY - d.startY
+                setLayersH(clamp(d.startH - dy, 90, 560))
+                return
+            }
             const dx = e.clientX - d.startX
             if (d.side === "left") setPaletteW(clamp(d.startW + dx, 120, 340))
             else setPropsW(clamp(d.startW - dx, 170, 380))
@@ -2177,19 +2184,29 @@ function SignageDesigner({
                     }}
                 />
 
-                {/* Properties */}
+                {/* Right dock: edit controls on top, layers pane pinned at
+                    the bottom, separated by a draggable splitter */}
                 <Box
                     sx={{
                         width: propsW,
                         flexShrink: 0,
                         borderLeft: 1,
                         borderColor: "divider",
-                        p: 2,
-                        overflowY: "auto",
                         display: "flex",
                         flexDirection: "column",
-                        gap: 2,
+                        minHeight: 0,
                     }}>
+                    {/* Edit pane (properties + preview) */}
+                    <Box
+                        sx={{
+                            flex: 1,
+                            minHeight: 0,
+                            p: 2,
+                            overflowY: "auto",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 2,
+                        }}>
                     {selLayer ? (
                         <Stack spacing={1.75}>
                             <Typography variant="subtitle2" fontWeight={600}>
@@ -2944,28 +2961,81 @@ function SignageDesigner({
                             Ctrl-click toggles, Shift-click adds.
                         </Typography>
                     )}
-                    {/* Layers panel - topmost layer first, Photoshop style */}
+                    <Box sx={{ flex: 1 }} />
+                    <Box>
+                        <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
+                            Preview
+                        </Typography>
+                        <Box sx={{ display: "flex", gap: 1 }}>
+                            <Box sx={{ p: 0.75, bgcolor: "background.default", border: 1, borderColor: "divider", borderRadius: 1 }}>
+                                <LayersThumb layers={layers} size={56} />
+                            </Box>
+                            <Box sx={{ p: 0.75, bgcolor: "background.default", border: 1, borderColor: "divider", borderRadius: 1 }}>
+                                <LayersThumb layers={layers} size={32} />
+                            </Box>
+                        </Box>
+                    </Box>
+                    </Box>
+
+                    {/* Splitter - drag to resize the layers pane */}
+                    <Box
+                        onMouseDown={(e) => {
+                            e.preventDefault()
+                            sideDrag.current = {
+                                side: "layers",
+                                startY: e.clientY,
+                                startH: layersH,
+                            }
+                        }}
+                        sx={{
+                            height: "5px",
+                            mt: "-3px",
+                            flexShrink: 0,
+                            cursor: "row-resize",
+                            zIndex: 2,
+                            "&:hover": { bgcolor: "primary.main", opacity: 0.4 },
+                        }}
+                    />
+
+                    {/* Layers pane - topmost layer first, Photoshop style */}
                     <Box
                         sx={{
-                            flex: 1,
-                            minHeight: 100,
+                            height: layersH,
+                            flexShrink: 0,
+                            borderTop: 1,
+                            borderColor: "divider",
+                            bgcolor: "background.paper",
                             display: "flex",
                             flexDirection: "column",
+                            px: 2,
+                            pt: 1,
+                            pb: 1.25,
+                            minHeight: 0,
                         }}>
                         <Typography
                             variant="subtitle2"
                             fontWeight={600}
                             sx={{ mb: 0.75 }}>
                             Layers
+                            {layers.length > 0 && (
+                                <Typography
+                                    component="span"
+                                    variant="caption"
+                                    color="text.disabled"
+                                    sx={{ ml: 0.75 }}>
+                                    {layers.length}
+                                </Typography>
+                            )}
                         </Typography>
                         <Box
                             sx={{
                                 flex: 1,
+                                minHeight: 0,
                                 overflowY: "auto",
                                 border: 1,
                                 borderColor: "divider",
                                 borderRadius: 1,
-                                bgcolor: "background.paper",
+                                bgcolor: "background.default",
                             }}
                             onDragOver={(e) => {
                                 // Allow dropping in the empty area below the
@@ -3232,23 +3302,10 @@ function SignageDesigner({
                         <Typography
                             variant="caption"
                             color="text.disabled"
-                            sx={{ mt: 0.5, lineHeight: 1.4 }}>
-                            Drag to reorder · double-click to rename ·
-                            Ctrl+G groups the selection
+                            noWrap
+                            sx={{ mt: 0.5, flexShrink: 0 }}>
+                            Drag to reorder · double-click renames · Ctrl+G groups
                         </Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-                            Preview
-                        </Typography>
-                        <Box sx={{ display: "flex", gap: 1 }}>
-                            <Box sx={{ p: 0.75, bgcolor: "background.default", border: 1, borderColor: "divider", borderRadius: 1 }}>
-                                <LayersThumb layers={layers} size={56} />
-                            </Box>
-                            <Box sx={{ p: 0.75, bgcolor: "background.default", border: 1, borderColor: "divider", borderRadius: 1 }}>
-                                <LayersThumb layers={layers} size={32} />
-                            </Box>
-                        </Box>
                     </Box>
                 </Box>
             </Box>
