@@ -276,10 +276,10 @@ function createSignageDesignerWindow(mainWindow, editPayload = null) {
     }
 
     signageDesignerWindow = new BrowserWindow({
-        width: 960,
-        height: 680,
-        minWidth: 960,
-        minHeight: 640,
+        width: 1280,
+        height: 900,
+        minWidth: 1024,
+        minHeight: 720,
         title: "BeePEE - Signage Designer",
         webPreferences: {
             nodeIntegration: false,
