@@ -1,22 +1,24 @@
 /**
- * Injects environment variables into config files before build
+ * Injects crash report endpoints before build
  * Run with: node scripts/inject-config.js
  *
- * Reads CRASH_REPORT_ENDPOINT and CRASH_REPORT_ENDPOINT_BETA from .env file
- * (or environment) and injects them into the config
+ * Reads CRASH_REPORT_ENDPOINT and CRASH_REPORT_ENDPOINT_BETA from .env
+ * (or environment) and writes them to a GITIGNORED generated file that
+ * crashReportConfig.js reads at runtime. Tracked source is never touched,
+ * so the real URLs can't be committed by accident.
  */
 
 const fs = require("fs")
 const path = require("path")
 
-const CONFIG_FILE = path.join(__dirname, "..", "backend", "utils", "crashReportConfig.js")
+const GENERATED_FILE = path.join(
+    __dirname,
+    "..",
+    "backend",
+    "utils",
+    "crashEndpoints.generated.json",
+)
 const ENV_FILE = path.join(__dirname, "..", ".env")
-
-// env var name -> placeholder in crashReportConfig.js
-const INJECTIONS = {
-    CRASH_REPORT_ENDPOINT: "__CRASH_REPORT_ENDPOINT__",
-    CRASH_REPORT_ENDPOINT_BETA: "__CRASH_REPORT_ENDPOINT_BETA__",
-}
 
 /**
  * Parse .env file and return key-value pairs
@@ -43,32 +45,33 @@ function parseEnvFile(filePath) {
 
 function injectConfig() {
     const envVars = parseEnvFile(ENV_FILE)
-    let content = fs.readFileSync(CONFIG_FILE, "utf-8")
-    let changed = false
+    // Environment variables take precedence over the .env file
+    const endpoint =
+        process.env.CRASH_REPORT_ENDPOINT || envVars.CRASH_REPORT_ENDPOINT
+    const endpointBeta =
+        process.env.CRASH_REPORT_ENDPOINT_BETA ||
+        envVars.CRASH_REPORT_ENDPOINT_BETA
 
-    for (const [envName, placeholder] of Object.entries(INJECTIONS)) {
-        // Environment variable takes precedence over .env file
-        const value = process.env[envName] || envVars[envName]
-
-        if (!value) {
-            console.warn(`WARN: ${envName} not set - this endpoint will be disabled in this build`)
-            console.warn("      Set it in .env file or as environment variable")
-            continue
-        }
-
-        if (!content.includes(placeholder)) {
-            console.log(`INFO: No ${placeholder} placeholder found in crashReportConfig.js (may already be injected)`)
-            continue
-        }
-
-        content = content.replace(placeholder, value)
-        changed = true
-        console.log(`OK: Injected ${envName} into crashReportConfig.js`)
+    if (!endpoint) {
+        console.warn(
+            "WARN: CRASH_REPORT_ENDPOINT not set - crash reporting will be disabled in this build",
+        )
+        console.warn("      Set it in .env file or as environment variable")
+    }
+    if (!endpointBeta) {
+        console.warn(
+            "WARN: CRASH_REPORT_ENDPOINT_BETA not set - beta builds will fall back to the stable endpoint",
+        )
     }
 
-    if (changed) {
-        fs.writeFileSync(CONFIG_FILE, content, "utf-8")
-    }
+    const out = {}
+    if (endpoint) out.endpoint = endpoint
+    if (endpointBeta) out.endpointBeta = endpointBeta
+
+    fs.writeFileSync(GENERATED_FILE, JSON.stringify(out, null, 4), "utf-8")
+    console.log(
+        `OK: Wrote crash report endpoints to ${path.basename(GENERATED_FILE)} (gitignored)`,
+    )
 }
 
 injectConfig()

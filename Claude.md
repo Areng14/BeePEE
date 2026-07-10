@@ -233,7 +233,7 @@ Standard editor windows use `width: 960, height: 1024` in `backend/items/itemEdi
 - **Startup popup**: beta builds show a warning dialog on every launch (`backend/main.js`) telling testers the build is bug prone, to stress test, and to report bugs via Help > Report Bug.
 - **Beta changelog** (`changelog-beta.json`): beta builds load this file in the What's New window instead of `changelog.json` (falling back to it if missing) - see `load-changelog` in `backend/handlers/updateHandlers.js`. Same JSON structure as the stable changelog.
 - **Auto-updater**: beta builds set `allowPrerelease = true` (harmless since the main repo only has stable tags); stable builds filter out any `-beta.x` tagged version by semver suffix.
-- **Separate bug report endpoint**: `backend/utils/crashReportConfig.js` holds two build-time placeholders. Set both `CRASH_REPORT_ENDPOINT` (stable) and `CRASH_REPORT_ENDPOINT_BETA` (beta) in `.env`; `scripts/inject-config.js` injects both. Beta builds report to the beta endpoint (falling back to stable if unset). Reports also include a `channel` form field (`beta`/`stable`).
+- **Separate bug report endpoint**: set `CRASH_REPORT_ENDPOINT` (stable) and `CRASH_REPORT_ENDPOINT_BETA` (beta) in `.env`. At build time `scripts/inject-config.js` writes them to `backend/utils/crashEndpoints.generated.json` - a **gitignored** file read at runtime by `crashReportConfig.js`, so real URLs never touch tracked source and can't be committed by accident. `restore-config.js` deletes the generated file after the build. Beta builds report to the beta endpoint (falling back to stable if unset); reports include a `channel` form field (`beta`/`stable`).
 
 ## Key Technical Architecture
 
