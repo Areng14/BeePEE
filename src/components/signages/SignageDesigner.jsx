@@ -3368,6 +3368,7 @@ function SignageDesigner({
                         }
                         slotProps={{
                             list: { dense: true },
+                            paper: { sx: { minWidth: 220 } },
                         }}>
                         <MenuItem onClick={act(() => raise(1))}>
                             Bring to Front
